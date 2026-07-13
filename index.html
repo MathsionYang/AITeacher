@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Teacher MVP - 人教版小学数学</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AI</div>
+          <div>
+            <h1>同步数学 MVP</h1>
+            <p>人教版 · 小学数学</p>
+          </div>
+        </div>
+
+        <div class="control-block">
+          <label for="gradeSelect">年级</label>
+          <select id="gradeSelect"></select>
+        </div>
+
+        <div class="control-block">
+          <label for="volumeSelect">册别</label>
+          <select id="volumeSelect"></select>
+        </div>
+
+        <div class="control-block">
+          <label for="unitSelect">单元</label>
+          <select id="unitSelect"></select>
+        </div>
+
+        <div class="control-row">
+          <div class="control-block">
+            <label for="difficultySelect">难度</label>
+            <select id="difficultySelect">
+              <option value="基础">基础</option>
+              <option value="提高">提高</option>
+              <option value="挑战">挑战</option>
+            </select>
+          </div>
+          <div class="control-block">
+            <label for="questionCount">题量</label>
+            <input id="questionCount" type="number" min="3" max="20" value="6" />
+          </div>
+        </div>
+
+        <button id="generatePaperBtn" class="primary-btn full">生成同步练习</button>
+
+        <div class="scope-card">
+          <span>当前范围</span>
+          <strong id="scopeLabel"></strong>
+          <p id="scopeSummary"></p>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">MVP 原型</p>
+            <h2>学、练、批、讲、复测一体化</h2>
+          </div>
+          <div class="metric-strip">
+            <div>
+              <span id="questionMetric">0</span>
+              <p>当前题目</p>
+            </div>
+            <div>
+              <span id="mistakeMetric">0</span>
+              <p>错题记录</p>
+            </div>
+            <div>
+              <span id="scheduleMetric">未设置</span>
+              <p>周期测验</p>
+            </div>
+          </div>
+        </header>
+
+        <nav class="tabs" aria-label="功能导航">
+          <button class="tab-btn active" data-tab="courseware">知识点课件</button>
+          <button class="tab-btn" data-tab="practice">同步出题</button>
+          <button class="tab-btn" data-tab="grading">拍照批改</button>
+          <button class="tab-btn" data-tab="mistakes">错题库</button>
+          <button class="tab-btn" data-tab="schedule">周期测验</button>
+        </nav>
+
+        <section id="courseware" class="tab-panel active">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Courseware</p>
+              <h3>知识点课件生成</h3>
+            </div>
+            <button id="downloadCoursewareBtn" class="secondary-btn">导出 Markdown</button>
+          </div>
+          <div id="knowledgePoints" class="tag-grid"></div>
+          <div id="coursewareSlides" class="slide-grid"></div>
+        </section>
+
+        <section id="practice" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Practice</p>
+              <h3>同步练习</h3>
+            </div>
+            <div class="button-row">
+              <button id="showAnswerBtn" class="secondary-btn">显示答案</button>
+              <button id="copyAnswersBtn" class="secondary-btn">复制答题模板</button>
+            </div>
+          </div>
+          <div id="practiceList" class="question-list empty-state"></div>
+        </section>
+
+        <section id="grading" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Grading</p>
+              <h3>拍照上传与自动判分</h3>
+            </div>
+            <button id="gradeBtn" class="primary-btn">判分并生成解析</button>
+          </div>
+
+          <div class="grading-grid">
+            <div class="upload-panel">
+              <label class="file-drop" for="answerImage">
+                <span>上传答题照片</span>
+                <small>支持本地图片预览；OCR 服务后续接入</small>
+              </label>
+              <input id="answerImage" type="file" accept="image/*" />
+              <img id="answerPreview" alt="答题照片预览" />
+            </div>
+
+            <div class="answer-panel">
+              <div class="textarea-head">
+                <label for="answerInput">OCR 识别/手动校正答案</label>
+                <button id="simulateOcrBtn" class="secondary-btn small">模拟识别</button>
+              </div>
+              <textarea id="answerInput" rows="10" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
+              <p class="hint">MVP 阶段先保留人工校正入口，避免 OCR 误识别直接影响判分。</p>
+            </div>
+          </div>
+
+          <div id="gradingSummary" class="score-panel"></div>
+          <div id="gradingResults" class="result-list"></div>
+        </section>
+
+        <section id="mistakes" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Mistake Book</p>
+              <h3>错题库</h3>
+            </div>
+            <div class="button-row">
+              <button id="mistakePaperBtn" class="primary-btn">随机生成错题卷</button>
+              <button id="clearMasteredBtn" class="secondary-btn">清理已掌握</button>
+            </div>
+          </div>
+          <div id="mistakeList" class="mistake-list empty-state"></div>
+        </section>
+
+        <section id="schedule" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Schedule</p>
+              <h3>周期测验</h3>
+            </div>
+            <button id="scheduledPaperBtn" class="primary-btn">生成本期测验</button>
+          </div>
+
+          <div class="schedule-grid">
+            <div class="control-block">
+              <label for="frequencySelect">频率</label>
+              <select id="frequencySelect">
+                <option value="每日">每日</option>
+                <option value="每周">每周</option>
+                <option value="每月">每月</option>
+              </select>
+            </div>
+            <div class="control-block">
+              <label for="scheduledCount">测验题量</label>
+              <input id="scheduledCount" type="number" min="5" max="30" value="10" />
+            </div>
+            <div class="control-block">
+              <label for="mistakeRatio">错题占比</label>
+              <input id="mistakeRatio" type="range" min="0" max="80" value="40" />
+              <span id="mistakeRatioLabel">40%</span>
+            </div>
+            <button id="saveScheduleBtn" class="secondary-btn">保存设置</button>
+          </div>
+
+          <div id="scheduleStatus" class="schedule-status"></div>
+          <div id="scheduledPaper" class="question-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
+
