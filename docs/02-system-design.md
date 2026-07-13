@@ -71,6 +71,7 @@ index.html
 - `generateQuestions()` 根据知识点标签生成原创计算题、应用题、几何题和统计题。
 - `capQuestionCount()` 将每次题量限制在 20 题以内。
 - `normalizePaperPoints()` 将当前试卷分值归一为 100 分。
+- `enforceUnitQuestionBoundary()` 对进入当前试卷的题目做 `unitId`、`unitTitle`、`knowledgePoint` 校验，确保同步练习只出现所选单元知识点。
 - 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
 - `state.currentQuestions` 保存当前试卷。
 

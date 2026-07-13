@@ -513,7 +513,7 @@
   function generatePractice() {
     const unit = unitData();
     state.questionCount = capQuestionCount(state.questionCount);
-    state.currentQuestions = normalizePaperPoints(generateQuestions(unit, Number(state.grade), state.difficulty, state.questionCount));
+    state.currentQuestions = normalizePaperPoints(generateScopedQuestions(unit, Number(state.grade), state.difficulty, state.questionCount));
     state.gradingResults = [];
     $("gradingSummary").classList.remove("active");
     $("gradingSummary").innerHTML = "";
@@ -521,8 +521,32 @@
     $("performanceFeedback").innerHTML = "";
   }
 
+  function generateScopedQuestions(unit, grade, difficulty, count) {
+    const safeCount = capGeneratedQuestionCount(count);
+    if (!safeCount) return [];
+    let scoped = enforceUnitQuestionBoundary(generateQuestions(unit, grade, difficulty, safeCount), unit);
+    let attempts = 0;
+
+    while (scoped.length < safeCount && attempts < 3) {
+      const needed = safeCount - scoped.length;
+      scoped = scoped.concat(enforceUnitQuestionBoundary(generateQuestions(unit, grade, difficulty, needed), unit));
+      attempts += 1;
+    }
+
+    return scoped.slice(0, safeCount);
+  }
+
+  function enforceUnitQuestionBoundary(questions, unit) {
+    const allowedPoints = new Set(unit.points || []);
+    return questions.filter((questionItem) => (
+      questionItem.unitId === unit.id
+      && questionItem.unitTitle === unit.title
+      && (!allowedPoints.size || allowedPoints.has(questionItem.knowledgePoint))
+    ));
+  }
+
   function generateQuestions(unit, grade, difficulty, count) {
-    const safeCount = capQuestionCount(count);
+    const safeCount = capGeneratedQuestionCount(count);
     const questions = [];
     const modes = ["概念理解", "基础计算", "情境应用", "变式判断", "综合提升"];
     const maxSameType = Math.max(2, Math.ceil(safeCount / modes.length));
@@ -535,7 +559,7 @@
       const mode = modes[cursor % modes.length];
       const candidate = makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode, index: cursor });
       const used = typeCounts[candidate.questionType] || 0;
-      const canUse = used < maxSameType || questions.length + Object.keys(typeCounts).length >= count;
+      const canUse = used < maxSameType || questions.length + Object.keys(typeCounts).length >= safeCount;
       if (canUse) {
         questions.push({ ...candidate, id: `${unit.id}-q${Date.now()}-${questions.length}` });
         typeCounts[candidate.questionType] = used + 1;
@@ -811,6 +835,10 @@
     return clamp(Number(value) || 6, 3, 20);
   }
 
+  function capGeneratedQuestionCount(value) {
+    return clamp(Number(value) || 0, 0, 20);
+  }
+
   function normalizePaperPoints(questions) {
     const capped = questions.slice(0, 20);
     if (!capped.length) return [];
@@ -930,7 +958,7 @@
 
   function gradeAnswers() {
     if (!state.currentQuestions.length) generatePractice();
-    state.currentQuestions = normalizePaperPoints(state.currentQuestions);
+    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(state.currentQuestions, unitData()));
     const answers = parseAnswers($("answerInput").value);
     const results = state.currentQuestions.map((question, index) => {
       const submitted = answers[index + 1] || "";
@@ -1461,7 +1489,7 @@
       switchTab("mistakes");
       return;
     }
-    state.currentQuestions = normalizePaperPoints(activeMistakes.map((item, index) => ({
+    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(activeMistakes.map((item, index) => ({
       id: `mistake-${item.id}-${index}`,
       unitId: unitData().id,
       unitTitle: item.unitTitle,
@@ -1476,7 +1504,7 @@
       checkMethod: item.checkMethod,
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
-    })));
+    })), unitData()));
     state.answersVisible = false;
     switchTab("practice");
     renderAll();
@@ -1517,7 +1545,7 @@
     const mistakeCount = Math.round((count * state.schedule.mistakeRatio) / 100);
     const activeMistakes = shuffle(currentUnitMistakes()).slice(0, mistakeCount);
     const newQuestionCount = Math.max(0, count - activeMistakes.length);
-    const newQuestions = generateQuestions(unitData(), Number(state.grade), state.difficulty, newQuestionCount);
+    const newQuestions = generateScopedQuestions(unitData(), Number(state.grade), state.difficulty, newQuestionCount);
     const mistakeQuestions = activeMistakes.map((item, index) => ({
       id: `scheduled-mistake-${item.id}-${index}`,
       unitId: unitData().id,
@@ -1534,7 +1562,7 @@
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
     }));
-    state.currentQuestions = normalizePaperPoints(shuffle([...mistakeQuestions, ...newQuestions]));
+    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(shuffle([...mistakeQuestions, ...newQuestions]), unitData()));
     $("scheduledPaper").className = "question-list";
     $("scheduledPaper").innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
     renderPractice();
