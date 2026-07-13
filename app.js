@@ -55,12 +55,25 @@
   }
 
   function buildSelectors() {
-    $("gradeSelect").innerHTML = Object.entries(content.grades)
+    $("gradeSelect").innerHTML = supportedGradeEntries()
       .map(([id, grade]) => `<option value="${id}">${grade.name}</option>`)
       .join("");
+    if (!content.grades[state.grade] || !supportedGradeIds().includes(state.grade)) {
+      state.grade = supportedGradeIds()[0] || Object.keys(content.grades)[0];
+    }
     $("gradeSelect").value = state.grade;
     refreshVolumeOptions();
     refreshUnitOptions();
+  }
+
+  function supportedGradeIds() {
+    return content.supportedGrades || Object.keys(content.grades);
+  }
+
+  function supportedGradeEntries() {
+    return supportedGradeIds()
+      .filter((id) => content.grades[id])
+      .map((id) => [id, content.grades[id]]);
   }
 
   function refreshVolumeOptions() {
