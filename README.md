@@ -3,7 +3,7 @@
 小学数学人教版同步学习 MVP。当前版本是一个可直接打开的本地前端原型，聚焦：
 
 - 教材范围选择：人教版、小学数学、3-6 年级、上下册、单元
-- 知识点课件：按单元生成课堂型课件大纲
+- 知识点课件：按单元生成视觉化课件，支持审核编辑、PDF/Markdown 导出
 - 同步出题：按知识点、题量、难度生成练习
 - 拍照批改：支持上传答题照片预览，并用 OCR/手动校正文本文本完成判分
 - 逐题解析：自动给出考点、答案、解题思路和错因提示
@@ -43,6 +43,7 @@ D:\AITeacher\index.html
 - [系统设计](docs/02-system-design.md)
 - [交付计划](docs/03-delivery-plan.md)
 - [教材与题库版权合规方案](docs/04-copyright-compliance.md)
+- [AI 课件生成规范](docs/05-ai-courseware-generation-spec.md)
 - [人教版三年级数学上册客观知识点提炼](docs/knowledge/rj-grade3-math-a-objective-knowledge.md)
 - [人教版四年级数学上册客观知识点提炼](docs/knowledge/rj-grade4-math-a-objective-knowledge.md)
 - [人教版五年级数学上册客观知识点提炼](docs/knowledge/rj-grade5-math-a-objective-knowledge.md)

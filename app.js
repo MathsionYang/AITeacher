@@ -2,6 +2,7 @@
   const content = window.RJ_MATH_CONTENT;
   const mistakeKey = "ai-teacher-rj-math-mistakes-v1";
   const scheduleKey = "ai-teacher-rj-math-schedule-v1";
+  const coursewareReviewKey = "ai-teacher-rj-math-courseware-reviews-v1";
 
   const state = {
     grade: "3",
@@ -12,8 +13,10 @@
     currentQuestions: [],
     answersVisible: false,
     activeTab: "courseware",
+    coursewareEditMode: false,
     gradingResults: [],
     mistakes: readJson(mistakeKey, []),
+    coursewareReviews: readJson(coursewareReviewKey, {}),
     schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 })
   };
 
@@ -143,6 +146,10 @@
     });
 
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
+    $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
+    $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
+    $("saveCoursewareBtn").addEventListener("click", saveCoursewareReview);
+    $("resetCoursewareBtn").addEventListener("click", resetCoursewareReview);
     $("showAnswerBtn").addEventListener("click", () => {
       state.answersVisible = !state.answersVisible;
       renderPractice();
@@ -220,64 +227,205 @@
     $("coursewareSlides").innerHTML = buildCoursewareSlides(unit)
       .map(
         (slide, index) => `
-          <article class="slide-card">
-            <h4>${index + 1}. ${escapeHtml(slide.title)}</h4>
-            <p>${escapeHtml(slide.body)}</p>
-            <ul>${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          <article class="slide-card ${state.coursewareEditMode ? "editing" : ""}" data-slide-index="${index}">
+            <div class="visual-stage visual-${escapeAttribute(slide.visualType)}">
+              ${renderSlideVisual(slide, unit, index)}
+            </div>
+            <h4 data-edit="title" contenteditable="${state.coursewareEditMode}">${index + 1}. ${escapeHtml(slide.title)}</h4>
+            <p data-edit="body" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.body)}</p>
+            <ul>${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}</ul>
             <div class="source-note">参考来源：${renderSourceLinks(slide.sources)}</div>
           </article>
         `
       )
       .join("");
+    $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
   }
 
   function buildCoursewareSlides(unit) {
     const [firstPoint, secondPoint, thirdPoint] = padPoints(unit.points);
     const sources = getSourceRefs(unit);
-    return [
+    const baseSlides = [
       {
         title: "学习目标",
         body: `本节围绕“${unit.title}”建立清晰概念和可迁移方法。`,
         bullets: [`说清楚：${firstPoint}`, `做准确：${secondPoint}`, `会应用：${thirdPoint}`],
+        visualType: "goals",
         sources
       },
       {
         title: "情境导入",
         body: "从生活问题进入数学表达，让学生先观察、再表达、再列式。",
         bullets: [`用熟悉情境引出 ${unit.tags[0] || "核心概念"}`, "让学生说出已知条件和问题", "鼓励用图、表、式三种方式表达"],
+        visualType: "context",
         sources
       },
       {
         title: "概念讲解",
         body: "把抽象概念拆成可观察、可操作、可验证的步骤。",
         bullets: unit.points.slice(0, 3),
+        visualType: "concept",
         sources
       },
       {
         title: "例题精讲",
         body: "用一道典型题示范审题、建模、计算和检查。",
         bullets: ["先圈关键词", "再确定数量关系", "最后用估算或逆运算检查"],
+        visualType: "example",
         sources
       },
       {
         title: "课堂练习",
         body: "由易到难安排基础题、变式题和小应用题。",
         bullets: [`基础：${unit.tags[0] || "概念"}直接应用`, "提高：改变条件或表达方式", "挑战：结合生活场景解释结果"],
+        visualType: "practice",
         sources
       },
       {
         title: "小结与作业",
         body: "把本节内容收束成知识点、方法和易错提醒。",
         bullets: ["写下今天最重要的一个方法", "完成 5-8 道同步练习", "把错题归因后加入错题本"],
+        visualType: "summary",
         sources
       }
     ];
+    return applyCoursewareReview(unit, baseSlides);
   }
 
   function padPoints(points) {
     const result = points.slice();
     while (result.length < 3) result.push(points[0] || "核心知识点");
     return result;
+  }
+
+  function coursewareKey(unit) {
+    return `${state.grade}-${state.volume}-${unit.id}`;
+  }
+
+  function applyCoursewareReview(unit, slides) {
+    const review = state.coursewareReviews[coursewareKey(unit)];
+    if (!Array.isArray(review)) return slides;
+    return slides.map((slide, index) => ({
+      ...slide,
+      title: review[index]?.title || slide.title,
+      body: review[index]?.body || slide.body,
+      bullets: Array.isArray(review[index]?.bullets) && review[index].bullets.length ? review[index].bullets : slide.bullets
+    }));
+  }
+
+  function toggleCoursewareReview() {
+    state.coursewareEditMode = !state.coursewareEditMode;
+    renderCourseware();
+  }
+
+  function saveCoursewareReview() {
+    const unit = unitData();
+    const slides = Array.from(document.querySelectorAll("#coursewareSlides .slide-card")).map((card) => ({
+      title: cleanEditableText(card.querySelector('[data-edit="title"]')?.innerText || "").replace(/^\d+\.\s*/, ""),
+      body: cleanEditableText(card.querySelector('[data-edit="body"]')?.innerText || ""),
+      bullets: Array.from(card.querySelectorAll('[data-edit="bullet"]'))
+        .map((item) => cleanEditableText(item.innerText))
+        .filter(Boolean)
+    }));
+    state.coursewareReviews[coursewareKey(unit)] = slides;
+    writeJson(coursewareReviewKey, state.coursewareReviews);
+    state.coursewareEditMode = false;
+    renderCourseware();
+  }
+
+  function resetCoursewareReview() {
+    delete state.coursewareReviews[coursewareKey(unitData())];
+    writeJson(coursewareReviewKey, state.coursewareReviews);
+    state.coursewareEditMode = false;
+    renderCourseware();
+  }
+
+  function cleanEditableText(value) {
+    return String(value).replace(/\s+/g, " ").trim();
+  }
+
+  function exportCoursewarePdf() {
+    switchTab("courseware");
+    window.print();
+  }
+
+  function renderSlideVisual(slide, unit, index) {
+    const points = padPoints(unit.points);
+    if (slide.visualType === "goals") {
+      return `
+        <div class="goal-map">
+          ${points.slice(0, 3).map((point, pointIndex) => `<span style="--i:${pointIndex}">${escapeHtml(shortLabel(point))}</span>`).join("")}
+        </div>
+      `;
+    }
+    if (slide.visualType === "context") return renderTopicVisual(unit, "large");
+    if (slide.visualType === "concept") {
+      return `
+        <div class="concept-map">
+          ${points.slice(0, 4).map((point) => `<span>${escapeHtml(shortLabel(point))}</span>`).join("")}
+        </div>
+      `;
+    }
+    if (slide.visualType === "example") return renderTopicVisual(unit, "focus");
+    if (slide.visualType === "practice") {
+      return `
+        <div class="practice-ladder">
+          <span>基础</span>
+          <span>变式</span>
+          <span>应用</span>
+        </div>
+      `;
+    }
+    return `
+      <div class="summary-cycle">
+        <span>学</span><span>练</span><span>批</span><span>复</span>
+      </div>
+    `;
+  }
+
+  function renderTopicVisual(unit, size) {
+    const tagText = unit.tags.join(",");
+    if (includesAny(tagText, ["分数", "百分数"])) {
+      return `
+        <div class="fraction-visual ${size}">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      `;
+    }
+    if (includesAny(tagText, ["图形", "角", "面积", "体积", "空间", "方向"])) {
+      return `
+        <div class="geometry-visual ${size}">
+          <span class="shape square"></span>
+          <span class="shape triangle"></span>
+          <span class="shape circle"></span>
+          <span class="shape line"></span>
+        </div>
+      `;
+    }
+    if (includesAny(tagText, ["统计", "可能性"])) {
+      return `
+        <div class="bar-visual ${size}">
+          <span style="--h:48%"></span><span style="--h:76%"></span><span style="--h:58%"></span><span style="--h:88%"></span>
+        </div>
+      `;
+    }
+    if (includesAny(tagText, ["长度", "单位", "数感", "大数", "小数"])) {
+      return `
+        <div class="numberline-visual ${size}">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      `;
+    }
+    return `
+      <div class="flow-visual ${size}">
+        <span>条件</span><span>关系</span><span>算式</span><span>结果</span>
+      </div>
+    `;
+  }
+
+  function shortLabel(value) {
+    const text = String(value).replace(/[，。、；：]/g, "");
+    return text.length > 8 ? `${text.slice(0, 8)}…` : text;
   }
 
   function renderPractice() {
