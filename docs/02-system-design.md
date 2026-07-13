@@ -7,6 +7,7 @@ index.html
   -> styles.css
   -> data.js       教材元数据、来源目录、知识包注册函数
   -> knowledge/    按年级和册别拆分的知识点 JS 数据包
+  -> agents/       大模型与 Agent 配置声明
   -> app.js        课件生成、出题、判分、错题库、周期测验
   -> localStorage  本地错题库和测验设置
 ```
@@ -53,7 +54,7 @@ index.html
 正式实现：
 
 - 本地前端提交教材范围、教学目标和知识点 JSON。
-- 本地 Agent 或用户配置的大模型生成结构化初稿。
+- 本地 Agent 或用户配置的大模型生成结构化初稿；模型配置参考 `.env.example`，Agent 声明参考 `agents/ai-teacher-agents.yaml`。
 - 规则引擎校验知识点覆盖、来源、题型重复和版权风险。
 - 用户审核后导出 PDF/Markdown，后续可扩展本地 PPTX 导出。
 
@@ -185,6 +186,8 @@ schedules
 
 ## 4. AI/OCR 接入建议
 
+- 模型协议：参考 OfferAgent，采用 OpenAI-compatible Chat Completions；provider、model、apiKey、baseUrl、timeout、temperature、seed 均可配置。
+- 安全策略：API Key 不提交、不写入代码、不建议持久化到 `localStorage`；浏览器直连失败时使用客户电脑上的本地代理或客户自有模型网关。
 - 课件：大模型只基于结构化客观知识点生成课件 JSON，固定模板和低随机性参数保证稳定性。
 - 视觉：Agent 负责把知识点映射为分数格、几何图、统计柱、数轴、流程图等参数化图形。
 - OCR：可用本地 PaddleOCR/TrOCR，也可接入用户配置的云 OCR；手写数学建议保留人工确认。
@@ -192,6 +195,8 @@ schedules
 - 判分：结构化题走确定性判分，开放题走 AI 评分 + 置信度 + 人工复核。
 - 解析：大模型生成讲解，但必须引用题目、答案和知识点，避免自由发挥。
 - 错因归类：先用固定枚举，再用模型辅助解释。
+
+详细分工见 `docs/06-llm-agent-architecture.md`。核心原则是：大模型负责理解、生成、诊断、规划；Agent 负责编排和检查；判分、题库、来源、权限和合规则尽量规则化、结构化。
 
 ## 5. 隐私与版权
 

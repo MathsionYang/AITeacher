@@ -89,6 +89,8 @@ MVP 当前把审核稿保存在浏览器 `localStorage` 中。产品化后可改
 
 不建议让大模型独立决定教材范围或直接读取网络教材后自由生成。教材范围应先由结构化知识库锁定，再让模型在边界内表达。
 
+模型调用参考 OfferAgent 的 OpenAI-compatible 配置方式：`temperature` 固定为 0，使用固定 `seed`，输出 JSON，再由规则引擎检查知识点覆盖、来源完整性、题型重复和版权风险。更完整的模型/Agent/规则边界见 `docs/06-llm-agent-architecture.md`。
+
 ## 7. 导出
 
 MVP 支持两种导出：

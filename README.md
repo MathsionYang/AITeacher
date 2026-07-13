@@ -9,6 +9,7 @@
 - 逐题解析：自动给出考点、答案、解题思路和错因提示
 - 错题库：自动记住错题，支持随机生成错题卷
 - 周期测验：配置每日/每周/每月测验计划，并生成测验卷
+- 大模型与 Agent：参考 OfferAgent 的 OpenAI-compatible 配置方式，只在生成、解析、诊断、规划环节使用模型
 
 ## 打开方式
 
@@ -37,6 +38,15 @@ D:\AITeacher\index.html
 
 每个 JS 文件对应 `docs/knowledge/` 下的一份客观知识点提炼文档。新增下册或其他教材版本时，新增一个知识包并在 `index.html` 中引入即可。
 
+## 模型配置
+
+MVP 不配置模型也能运行。后续接入真实模型时，可参考 `.env.example` 和 `agents/ai-teacher-agents.yaml`：
+
+- 模型协议：OpenAI-compatible `/chat/completions`
+- 推荐参数：`temperature=0`、固定 `seed`
+- Key 策略：真实 Key 不提交、不写入代码、不持久化到浏览器 localStorage
+- 分工原则：模型做生成/解析/诊断/规划，判分/来源/题库/权限/版权校验走规则化模块
+
 ## 文档
 
 - [MVP PRD](docs/01-mvp-prd.md)
@@ -44,6 +54,7 @@ D:\AITeacher\index.html
 - [交付计划](docs/03-delivery-plan.md)
 - [教材与题库版权合规方案](docs/04-copyright-compliance.md)
 - [AI 课件生成规范](docs/05-ai-courseware-generation-spec.md)
+- [大模型与 Agent 架构设计](docs/06-llm-agent-architecture.md)
 - [人教版三年级数学上册客观知识点提炼](docs/knowledge/rj-grade3-math-a-objective-knowledge.md)
 - [人教版四年级数学上册客观知识点提炼](docs/knowledge/rj-grade4-math-a-objective-knowledge.md)
 - [人教版五年级数学上册客观知识点提炼](docs/knowledge/rj-grade5-math-a-objective-knowledge.md)

@@ -1,0 +1,67 @@
+interface:
+  display_name: "AI Teacher Math Agents"
+  short_description: "Local-first小学数学课件、出题、批改、错题复习和周期测验编排"
+  default_prompt: "Use AI Teacher agents to generate textbook-aligned original math courseware, questions, grading feedback, and review plans from audited knowledge points."
+
+runtime:
+  protocol: "openai-compatible-chat-completions"
+  default_temperature: 0
+  default_seed: 20260713
+  default_timeout_ms: 90000
+  response_format: "json_object"
+  key_policy: "API Key only lives in local runtime memory or customer-owned local config; never commit real keys."
+
+agents:
+  courseware_agent:
+    role: "课件 Agent"
+    model_tasks:
+      - "基于已审核知识点生成原创课件大纲、讲解话术、课堂互动、小结和作业"
+      - "给出视觉化表达意图，例如分数格、数轴、几何示意、统计图和解题流程"
+    rule_tasks:
+      - "校验每页是否绑定知识点和来源"
+      - "校验是否覆盖本单元核心知识点"
+      - "检查疑似教材原文、课本图片、教材原题或未经授权题库痕迹"
+    output: "editable_courseware_json"
+
+  question_agent:
+    role: "出题 Agent"
+    model_tasks:
+      - "按知识点、题型、难度和题量生成原创题、答案、解析和评分点"
+    rule_tasks:
+      - "按知识点拆分题量"
+      - "控制题型分布，限制同题型重复"
+      - "验算答案、校验难度、执行版权相似度检查"
+    output: "validated_question_set_json"
+
+  grading_agent:
+    role: "批改 Agent"
+    model_tasks:
+      - "理解 OCR/人工校正后的学生作答过程"
+      - "为错题生成逐题解析、错因和同类提醒"
+    rule_tasks:
+      - "接收图片并调用 OCR"
+      - "结构化题号和答案"
+      - "客观题、计算题、填空题优先走确定性判分"
+      - "把错题写入错题库"
+    output: "grading_report_json"
+
+  mistake_review_agent:
+    role: "错题复习 Agent"
+    model_tasks:
+      - "根据历史错题解释薄弱点和复习优先级"
+    rule_tasks:
+      - "按知识点聚类错题"
+      - "生成错题卷"
+      - "安排间隔复习并更新掌握状态"
+    output: "review_plan_json"
+
+  scheduled_exam_agent:
+    role: "周期测验 Agent"
+    model_tasks:
+      - "根据学情生成测验讲评建议"
+    rule_tasks:
+      - "到时间自动组卷"
+      - "混合新题和错题"
+      - "控制难度、题量和错题占比"
+      - "提交后更新学情报告"
+    output: "scheduled_exam_json"
