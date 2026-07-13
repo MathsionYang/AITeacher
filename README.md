@@ -26,6 +26,17 @@ D:\AITeacher\index.html
 - 拍照批改已完成上传、预览、答案解析和判分流程；真正的 OCR/手写识别作为适配器预留，当前用“模拟识别/手动校正”完成闭环。
 - 判分先覆盖客观题、计算题、填空题等结构化题型；应用题过程分和开放题将在后续阶段接入更细评分规则。
 
+## 知识点数据包
+
+知识点按“年级 + 册别”拆成独立 JS 文件，便于后续单册替换更新：
+
+- `knowledge/rj-grade3-math-a.js`
+- `knowledge/rj-grade4-math-a.js`
+- `knowledge/rj-grade5-math-a.js`
+- `knowledge/rj-grade6-math-a.js`
+
+每个 JS 文件对应 `docs/knowledge/` 下的一份客观知识点提炼文档。新增下册或其他教材版本时，新增一个知识包并在 `index.html` 中引入即可。
+
 ## 文档
 
 - [MVP PRD](docs/01-mvp-prd.md)

@@ -5,7 +5,8 @@
 ```text
 index.html
   -> styles.css
-  -> data.js       人教版小学数学原创样例知识图谱
+  -> data.js       教材元数据、来源目录、知识包注册函数
+  -> knowledge/    按年级和册别拆分的知识点 JS 数据包
   -> app.js        课件生成、出题、判分、错题库、周期测验
   -> localStorage  本地错题库和测验设置
 ```
@@ -24,8 +25,9 @@ index.html
 
 当前实现：
 
-- `data.js` 内置 `RJ_MATH_CONTENT`，并通过 `supportedGrades` 限定 3-6 年级。
-- 单元字段包括 `title`、`summary`、`tags`、`points`。
+- `data.js` 内置 `RJ_MATH_CONTENT`、来源目录和 `registerRJMathKnowledge()` 注册函数，并通过 `supportedGrades` 限定 3-6 年级。
+- `knowledge/rj-grade{n}-math-{volume}.js` 按年级、册别独立维护知识点。
+- 单元字段包括 `title`、`summary`、`tags`、`points`，并继承来源文档和教材来源文件信息。
 
 正式实现：
 

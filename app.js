@@ -37,7 +37,8 @@
   }
 
   function volumeData() {
-    return gradeData().volumes[state.volume];
+    const grade = gradeData();
+    return grade.volumes[state.volume] || grade.volumes[firstVolumeId(grade)];
   }
 
   function unitData() {
@@ -61,6 +62,7 @@
     if (!content.grades[state.grade] || !supportedGradeIds().includes(state.grade)) {
       state.grade = supportedGradeIds()[0] || Object.keys(content.grades)[0];
     }
+    state.volume = firstVolumeId(gradeData());
     $("gradeSelect").value = state.grade;
     refreshVolumeOptions();
     refreshUnitOptions();
@@ -76,25 +78,32 @@
       .map((id) => [id, content.grades[id]]);
   }
 
+  function firstVolumeId(grade) {
+    return Object.keys((grade && grade.volumes) || {})[0];
+  }
+
   function refreshVolumeOptions() {
-    $("volumeSelect").innerHTML = Object.entries(gradeData().volumes)
+    const grade = gradeData();
+    if (!grade.volumes[state.volume]) state.volume = firstVolumeId(grade);
+    $("volumeSelect").innerHTML = Object.entries(grade.volumes)
       .map(([id, volume]) => `<option value="${id}">${volume.name}</option>`)
       .join("");
     $("volumeSelect").value = state.volume;
   }
 
   function refreshUnitOptions() {
-    $("unitSelect").innerHTML = volumeData().units
+    const volume = volumeData();
+    $("unitSelect").innerHTML = volume.units
       .map((unit) => `<option value="${unit.id}">${unit.title}</option>`)
       .join("");
-    state.unitId = volumeData().units[0].id;
+    state.unitId = volume.units[0].id;
     $("unitSelect").value = state.unitId;
   }
 
   function bindEvents() {
     $("gradeSelect").addEventListener("change", (event) => {
       state.grade = event.target.value;
-      state.volume = "A";
+      state.volume = firstVolumeId(gradeData());
       refreshVolumeOptions();
       refreshUnitOptions();
       generatePractice();
