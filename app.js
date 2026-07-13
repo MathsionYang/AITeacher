@@ -183,8 +183,16 @@
 
   function renderCourseware() {
     const unit = unitData();
+    const sourceRefs = getSourceRefs(unit);
     $("knowledgePoints").innerHTML = unit.points
-      .map((point) => `<span class="tag">${escapeHtml(point)}</span>`)
+      .map(
+        (point) => `
+          <article class="knowledge-card">
+            <strong>${escapeHtml(point)}</strong>
+            <p>来源：${renderSourceLinks(sourceRefs)}</p>
+          </article>
+        `
+      )
       .join("");
 
     $("coursewareSlides").innerHTML = buildCoursewareSlides(unit)
@@ -194,6 +202,7 @@
             <h4>${index + 1}. ${escapeHtml(slide.title)}</h4>
             <p>${escapeHtml(slide.body)}</p>
             <ul>${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+            <div class="source-note">参考来源：${renderSourceLinks(slide.sources)}</div>
           </article>
         `
       )
@@ -202,36 +211,43 @@
 
   function buildCoursewareSlides(unit) {
     const [firstPoint, secondPoint, thirdPoint] = padPoints(unit.points);
+    const sources = getSourceRefs(unit);
     return [
       {
         title: "学习目标",
         body: `本节围绕“${unit.title}”建立清晰概念和可迁移方法。`,
-        bullets: [`说清楚：${firstPoint}`, `做准确：${secondPoint}`, `会应用：${thirdPoint}`]
+        bullets: [`说清楚：${firstPoint}`, `做准确：${secondPoint}`, `会应用：${thirdPoint}`],
+        sources
       },
       {
         title: "情境导入",
         body: "从生活问题进入数学表达，让学生先观察、再表达、再列式。",
-        bullets: [`用熟悉情境引出 ${unit.tags[0] || "核心概念"}`, "让学生说出已知条件和问题", "鼓励用图、表、式三种方式表达"]
+        bullets: [`用熟悉情境引出 ${unit.tags[0] || "核心概念"}`, "让学生说出已知条件和问题", "鼓励用图、表、式三种方式表达"],
+        sources
       },
       {
         title: "概念讲解",
         body: "把抽象概念拆成可观察、可操作、可验证的步骤。",
-        bullets: unit.points.slice(0, 3)
+        bullets: unit.points.slice(0, 3),
+        sources
       },
       {
         title: "例题精讲",
         body: "用一道典型题示范审题、建模、计算和检查。",
-        bullets: ["先圈关键词", "再确定数量关系", "最后用估算或逆运算检查"]
+        bullets: ["先圈关键词", "再确定数量关系", "最后用估算或逆运算检查"],
+        sources
       },
       {
         title: "课堂练习",
         body: "由易到难安排基础题、变式题和小应用题。",
-        bullets: [`基础：${unit.tags[0] || "概念"}直接应用`, "提高：改变条件或表达方式", "挑战：结合生活场景解释结果"]
+        bullets: [`基础：${unit.tags[0] || "概念"}直接应用`, "提高：改变条件或表达方式", "挑战：结合生活场景解释结果"],
+        sources
       },
       {
         title: "小结与作业",
         body: "把本节内容收束成知识点、方法和易错提醒。",
-        bullets: ["写下今天最重要的一个方法", "完成 5-8 道同步练习", "把错题归因后加入错题本"]
+        bullets: ["写下今天最重要的一个方法", "完成 5-8 道同步练习", "把错题归因后加入错题本"],
+        sources
       }
     ];
   }
@@ -263,12 +279,15 @@
         <h4>${index + 1}. ${escapeHtml(question.stem)}</h4>
         <div class="question-meta">
           <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
+          <span class="pill green">${escapeHtml(question.questionType || "同步练习")}</span>
           <span class="pill orange">${escapeHtml(question.difficulty)}</span>
           <span class="pill">${question.point} 分</span>
         </div>
+        <p class="source-note">知识点来源：${renderSourceLinks(question.sourceRefs || getSourceRefs(unitData()))}</p>
         <div class="answer-block">
           <p><strong>答案：</strong>${escapeHtml(question.answer)}</p>
           <p><strong>解析：</strong>${escapeHtml(question.explanation)}</p>
+          ${renderExplanationDetail(question)}
         </div>
       </article>
     `;
@@ -285,28 +304,51 @@
 
   function generateQuestions(unit, grade, difficulty, count) {
     const questions = [];
-    for (let index = 0; index < count; index += 1) {
+    const modes = ["概念理解", "基础计算", "情境应用", "变式判断", "综合提升"];
+    const maxSameType = Math.max(2, Math.ceil(count / modes.length));
+    const typeCounts = {};
+    let cursor = 0;
+
+    while (questions.length < count && cursor < count * 6) {
+      const tag = unit.tags[cursor % unit.tags.length] || "综合";
+      const knowledgePoint = unit.points[cursor % unit.points.length] || tag;
+      const mode = modes[cursor % modes.length];
+      const candidate = makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode, index: cursor });
+      const used = typeCounts[candidate.questionType] || 0;
+      const canUse = used < maxSameType || questions.length + Object.keys(typeCounts).length >= count;
+      if (canUse) {
+        questions.push({ ...candidate, id: `${unit.id}-q${Date.now()}-${questions.length}` });
+        typeCounts[candidate.questionType] = used + 1;
+      }
+      cursor += 1;
+    }
+
+    while (questions.length < count) {
+      const index = questions.length;
       const tag = unit.tags[index % unit.tags.length] || "综合";
-      questions.push(makeQuestion({ unit, grade, difficulty, tag, index }));
+      const knowledgePoint = unit.points[index % unit.points.length] || tag;
+      questions.push(makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode: modes[index % modes.length], index }));
     }
     return questions;
   }
 
   function makeQuestion(context) {
     const { tag } = context;
-    if (includesAny(tag, ["分数"])) return fractionQuestion(context);
-    if (includesAny(tag, ["小数"])) return decimalQuestion(context);
-    if (includesAny(tag, ["百分数"])) return percentQuestion(context);
-    if (includesAny(tag, ["比例", "比"])) return ratioQuestion(context);
-    if (includesAny(tag, ["方程"])) return equationQuestion(context);
-    if (includesAny(tag, ["体积"])) return volumeQuestion(context);
-    if (includesAny(tag, ["面积"])) return areaQuestion(context);
-    if (includesAny(tag, ["长度", "单位", "人民币"])) return conversionQuestion(context);
-    if (includesAny(tag, ["时间"])) return timeQuestion(context);
-    if (includesAny(tag, ["统计"])) return statisticsQuestion(context);
-    if (includesAny(tag, ["图形", "角", "方向", "观察"])) return geometryQuestion(context);
-    if (includesAny(tag, ["乘除", "倍数", "口诀", "余数"])) return multiplicationQuestion(context);
-    return arithmeticQuestion(context);
+    let built;
+    if (includesAny(tag, ["分数"])) built = fractionQuestion(context);
+    else if (includesAny(tag, ["小数"])) built = decimalQuestion(context);
+    else if (includesAny(tag, ["百分数"])) built = percentQuestion(context);
+    else if (includesAny(tag, ["比例", "比"])) built = ratioQuestion(context);
+    else if (includesAny(tag, ["方程"])) built = equationQuestion(context);
+    else if (includesAny(tag, ["体积"])) built = volumeQuestion(context);
+    else if (includesAny(tag, ["面积"])) built = areaQuestion(context);
+    else if (includesAny(tag, ["长度", "单位", "人民币"])) built = conversionQuestion(context);
+    else if (includesAny(tag, ["时间"])) built = timeQuestion(context);
+    else if (includesAny(tag, ["统计"])) built = statisticsQuestion(context);
+    else if (includesAny(tag, ["图形", "角", "方向", "观察"])) built = geometryQuestion(context);
+    else if (includesAny(tag, ["乘除", "倍数", "口诀", "余数"])) built = multiplicationQuestion(context);
+    else built = arithmeticQuestion(context);
+    return enrichQuestion(built, context);
   }
 
   function arithmeticQuestion({ unit, grade, difficulty, tag, index }) {
@@ -452,6 +494,92 @@
     };
   }
 
+  function enrichQuestion(questionItem, context) {
+    const questionType = pickQuestionType(context.mode, context.tag);
+    const sourceRefs = getSourceRefs(context.unit);
+    const enriched = {
+      ...questionItem,
+      knowledgePoint: context.knowledgePoint || questionItem.knowledgePoint,
+      questionType,
+      sourceIds: context.unit.sourceIds || content.defaultSourceIds || [],
+      sourceRefs
+    };
+    return {
+      ...enriched,
+      detailSteps: buildDetailSteps(enriched, context),
+      commonMistake: buildCommonMistake(enriched, context),
+      checkMethod: buildCheckMethod(enriched, context)
+    };
+  }
+
+  function pickQuestionType(mode, tag) {
+    if (mode === "概念理解") return "概念辨析题";
+    if (mode === "情境应用") return "生活应用题";
+    if (mode === "变式判断") return includesAny(tag, ["图形", "角", "方向", "统计"]) ? "图表判断题" : "变式计算题";
+    if (mode === "综合提升") return "综合提升题";
+    if (includesAny(tag, ["图形", "角", "面积", "体积"])) return "图形计算题";
+    if (includesAny(tag, ["统计"])) return "数据分析题";
+    return "基础计算题";
+  }
+
+  function buildDetailSteps(questionItem, context) {
+    return [
+      `审题：本题对应“${questionItem.knowledgePoint}”，先圈出已知条件和要求的问题。`,
+      `建模：判断题型为“${questionItem.questionType}”，选择与“${context.tag}”相关的计算、比较或数量关系方法。`,
+      `计算：${questionItem.explanation}`,
+      `作答：把结果写成“${questionItem.answer}”，如果题目有单位、余数或方程未知数，要保持格式完整。`
+    ];
+  }
+
+  function buildCommonMistake(questionItem, context) {
+    if (includesAny(context.tag, ["单位", "长度", "面积", "体积", "人民币", "时间"])) {
+      return "常见错误是漏换单位、单位名称写错，或把面积/体积/时间进率混用。";
+    }
+    if (includesAny(context.tag, ["分数", "小数", "百分数"])) {
+      return "常见错误是小数点、分母、百分号处理不一致，或结果没有按要求化简。";
+    }
+    if (includesAny(context.tag, ["乘除", "余数", "倍数"])) {
+      return "常见错误是把乘除关系反过来、余数写大于或等于除数，或口诀试商后没有回代检查。";
+    }
+    if (includesAny(context.tag, ["图形", "角", "方向"])) {
+      return "常见错误是没有先确定参照点、把周长和面积混淆，或角的分类边界记错。";
+    }
+    return "常见错误是审题跳步、只算局部条件，或没有用估算/逆运算检查结果。";
+  }
+
+  function buildCheckMethod(questionItem, context) {
+    if (includesAny(context.tag, ["方程"])) return "检查方法：把求出的未知数代回原方程，看等号两边是否相等。";
+    if (includesAny(context.tag, ["乘除", "分数", "小数", "百分数", "比例"])) return "检查方法：用估算判断结果范围，再用逆运算或代回原题验证。";
+    if (includesAny(context.tag, ["图形", "面积", "体积"])) return "检查方法：确认公式、单位和数量级是否一致，再用生活经验判断结果是否合理。";
+    return "检查方法：重新读题，看答案是否回答了题目真正问的量。";
+  }
+
+  function renderExplanationDetail(question) {
+    const steps = question.detailSteps || [];
+    return `
+      <div class="explanation-detail">
+        <strong>详细步骤</strong>
+        <ol>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+        <p><strong>易错点：</strong>${escapeHtml(question.commonMistake || "注意审题和结果格式。")}</p>
+        <p><strong>检查：</strong>${escapeHtml(question.checkMethod || "用估算或逆运算检查结果。")}</p>
+      </div>
+    `;
+  }
+
+  function getSourceRefs(unit) {
+    const ids = unit.sourceIds || content.defaultSourceIds || [];
+    return ids.map((id) => content.sourceCatalog[id]).filter(Boolean);
+  }
+
+  function renderSourceLinks(sourceRefs) {
+    return sourceRefs
+      .map(
+        (source) =>
+          `<a href="${escapeAttribute(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>`
+      )
+      .join("、");
+  }
+
   function difficultyBase(grade, difficulty) {
     const base = grade <= 1 ? 6 : grade <= 2 ? 20 : grade <= 4 ? 100 : 200;
     if (difficulty === "提高") return base * 2;
@@ -496,19 +624,24 @@
   function buildCoursewareMarkdown() {
     const unit = unitData();
     const slides = buildCoursewareSlides(unit);
+    const sources = getSourceRefs(unit);
     const lines = [
       `# ${gradeData().name}${volumeData().name} ${unit.title} 课件大纲`,
       "",
       `> 教材范围：${content.version} ${content.subject}`,
       `> 内容说明：${content.note}`,
       "",
-      "## 知识点",
-      ...unit.points.map((point) => `- ${point}`),
+      "## 知识点与来源",
+      ...unit.points.map((point) => `- ${point}（来源：${sourceNames(sources)}）`),
+      "",
+      "## 来源说明",
+      ...sources.map((source) => `- ${source.name}：${source.usage} ${source.url}`),
       ""
     ];
     slides.forEach((slide, index) => {
       lines.push(`## ${index + 1}. ${slide.title}`, "", slide.body, "");
       slide.bullets.forEach((item) => lines.push(`- ${item}`));
+      lines.push("", `来源：${sourceNames(slide.sources)}`);
       lines.push("");
     });
     return lines.join("\n");
@@ -652,11 +785,14 @@
             <div class="question-meta">
               <span class="pill ${item.correct ? "green" : "red"}">${item.correct ? "正确" : "需复习"}</span>
               <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
+              <span class="pill green">${escapeHtml(question.questionType || "同步练习")}</span>
               <span class="pill">${item.score}/${question.point} 分</span>
             </div>
+            <p class="source-note">知识点来源：${renderSourceLinks(question.sourceRefs || getSourceRefs(unitData()))}</p>
             <p><strong>学生答案：</strong>${escapeHtml(item.submitted || "未作答")}</p>
             <p><strong>正确答案：</strong>${escapeHtml(question.answer)}</p>
             <p><strong>解析思路：</strong>${escapeHtml(question.explanation)}</p>
+            ${renderExplanationDetail(question)}
           </article>
         `;
       })
@@ -679,9 +815,14 @@
         volume: volumeData().name,
         unitTitle: unitData().title,
         knowledgePoint: item.question.knowledgePoint,
+        questionType: item.question.questionType,
         stem: item.question.stem,
         answer: item.question.answer,
         explanation: item.question.explanation,
+        detailSteps: item.question.detailSteps,
+        commonMistake: item.question.commonMistake,
+        checkMethod: item.question.checkMethod,
+        sourceRefs: item.question.sourceRefs,
         submitted: item.submitted,
         point: item.question.point,
         difficulty: item.question.difficulty,
@@ -712,11 +853,14 @@
             <div class="question-meta">
               <span class="pill blue">${escapeHtml(item.grade)} ${escapeHtml(item.volume)}</span>
               <span class="pill orange">${escapeHtml(item.knowledgePoint)}</span>
+              <span class="pill green">${escapeHtml(item.questionType || "同步练习")}</span>
               <span class="pill red">错 ${item.count} 次</span>
             </div>
+            <p class="source-note">知识点来源：${renderSourceLinks(item.sourceRefs || getSourceRefs(unitData()))}</p>
             <p><strong>学生答案：</strong>${escapeHtml(item.submitted || "未作答")}</p>
             <p><strong>正确答案：</strong>${escapeHtml(item.answer)}</p>
             <p><strong>复盘提示：</strong>${escapeHtml(item.explanation)}</p>
+            ${renderExplanationDetail(item)}
             <div class="mistake-actions">
               <button class="secondary-btn small" data-action="master" data-id="${item.id}">标记已掌握</button>
               <button class="secondary-btn small" data-action="delete" data-id="${item.id}">删除</button>
@@ -762,10 +906,15 @@
       unitId: unitData().id,
       unitTitle: item.unitTitle,
       knowledgePoint: item.knowledgePoint,
+      questionType: item.questionType,
       difficulty: item.difficulty,
       stem: item.stem,
       answer: item.answer,
       explanation: item.explanation,
+      detailSteps: item.detailSteps,
+      commonMistake: item.commonMistake,
+      checkMethod: item.checkMethod,
+      sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
     }));
     state.answersVisible = false;
@@ -813,10 +962,15 @@
       unitId: unitData().id,
       unitTitle: item.unitTitle,
       knowledgePoint: item.knowledgePoint,
+      questionType: item.questionType,
       difficulty: item.difficulty,
       stem: item.stem,
       answer: item.answer,
       explanation: item.explanation,
+      detailSteps: item.detailSteps,
+      commonMistake: item.commonMistake,
+      checkMethod: item.checkMethod,
+      sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
     }));
     state.currentQuestions = shuffle([...mistakeQuestions, ...newQuestions]);
@@ -842,6 +996,13 @@
       .replace(/'/g, "&#039;");
   }
 
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/`/g, "&#096;");
+  }
+
+  function sourceNames(sourceRefs) {
+    return sourceRefs.map((source) => source.name).join("、");
+  }
+
   init();
 })();
-

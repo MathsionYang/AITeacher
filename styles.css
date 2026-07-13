@@ -295,9 +295,9 @@ textarea {
 }
 
 .tag-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 18px;
 }
 
@@ -309,6 +309,37 @@ textarea {
   padding: 8px 10px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.knowledge-card {
+  border: 1px solid #bfe5dd;
+  background: #f4fffb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.knowledge-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.knowledge-card p,
+.source-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+
+.source-note a,
+.knowledge-card a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.source-note a:hover,
+.knowledge-card a:hover {
+  text-decoration: underline;
 }
 
 .slide-grid {
@@ -411,6 +442,19 @@ textarea {
   border-radius: 8px;
   background: #f8fafc;
   border: 1px dashed var(--line);
+}
+
+.explanation-detail {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--soft-line);
+}
+
+.explanation-detail ol {
+  margin: 8px 0 10px;
+  padding-left: 20px;
+  color: #475467;
+  line-height: 1.7;
 }
 
 .show-answers .answer-block {
@@ -567,6 +611,7 @@ textarea {
   }
 
   .slide-grid,
+  .tag-grid,
   .grading-grid,
   .schedule-grid {
     grid-template-columns: 1fr;
@@ -592,4 +637,3 @@ textarea {
     padding: 16px;
   }
 }
-

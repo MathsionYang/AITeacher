@@ -1,10 +1,42 @@
 (function () {
-  const unit = (id, title, summary, tags, points) => ({ id, title, summary, tags, points });
+  const defaultSourceIds = ["pep-ebook", "moe-math-standard"];
+  const unit = (id, title, summary, tags, points, sourceIds = defaultSourceIds) => ({
+    id,
+    title,
+    summary,
+    tags,
+    points,
+    sourceIds
+  });
 
   window.RJ_MATH_CONTENT = {
     version: "人教版",
     subject: "小学数学",
-    note: "MVP 使用原创样例知识点，不包含教材原文或课本图片。",
+    note: "MVP 使用原创知识点摘要和原创题，不复制教材原文、课本图片或课后原题。",
+    defaultSourceIds,
+    sourceCatalog: {
+      "pep-ebook": {
+        name: "人民教育出版社中小学教材电子版",
+        publisher: "人民教育出版社",
+        type: "官方教材范围核验",
+        url: "https://jc.pep.com.cn/",
+        usage: "仅用于核验教材版本、册别、单元范围和知识点对齐；不复制教材原文或原题。"
+      },
+      "moe-smartedu": {
+        name: "国家中小学智慧教育平台",
+        publisher: "教育部",
+        type: "官方课程教学资源入口",
+        url: "https://basic.smartedu.cn/",
+        usage: "仅作为官方资源入口和课程同步参考，不抓取、不缓存、不二次分发平台资源。"
+      },
+      "moe-math-standard": {
+        name: "义务教育数学课程标准（2022年版）",
+        publisher: "教育部",
+        type: "课程标准",
+        url: "https://www.moe.gov.cn/srcsite/A26/s8001/202204/W020220420582346895190.pdf",
+        usage: "用于知识点能力目标、学段要求和题目难度校准。"
+      }
+    },
     grades: {
       "1": {
         name: "一年级",
@@ -147,4 +179,3 @@
     }
   };
 })();
-
