@@ -262,13 +262,16 @@ rule-engine
   判分、答案验算、题型分布、难度校验、来源校验
 
 content-store
-  知识点包、课件审核稿、题目、错题库、测验记录
+  知识点包、课件审核稿、题目、错题库、成绩记录、测验记录
 
 ocr-adapter
   本地 OCR 或客户自有 OCR 接口
 
 exporter
   Markdown、PDF、后续 PPTX
+
+mock-data
+  可替换测试数据，覆盖初始范围、错题、成绩趋势、周期测验设置
 ```
 
 ## 7. 验收标准
