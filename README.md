@@ -32,3 +32,4 @@ D:\AITeacher\index.html
 - [系统设计](docs/02-system-design.md)
 - [交付计划](docs/03-delivery-plan.md)
 - [教材与题库版权合规方案](docs/04-copyright-compliance.md)
+- [人教版三年级数学上册客观知识点提炼](docs/knowledge/rj-grade3-math-a-objective-knowledge.md)

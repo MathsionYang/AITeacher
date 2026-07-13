@@ -13,6 +13,9 @@ dist/
 build/
 .next/
 
+# Local source materials
+books/
+
 # Local environment
 .env
 .env.*
@@ -22,4 +25,3 @@ build/
 Thumbs.db
 .idea/
 .vscode/
-
