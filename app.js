@@ -3,6 +3,8 @@
   const mistakeKey = "ai-teacher-rj-math-mistakes-v1";
   const scheduleKey = "ai-teacher-rj-math-schedule-v1";
   const coursewareReviewKey = "ai-teacher-rj-math-courseware-reviews-v1";
+  const scoreHistoryKey = "ai-teacher-rj-math-score-history-v1";
+  const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
 
   const state = {
     grade: "3",
@@ -17,10 +19,12 @@
     gradingResults: [],
     mistakes: readJson(mistakeKey, []),
     coursewareReviews: readJson(coursewareReviewKey, {}),
+    scoreHistory: readJson(scoreHistoryKey, []),
     schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 })
   };
 
   const $ = (id) => document.getElementById(id);
+  let celebrationTimer = null;
 
   function readJson(key, fallback) {
     try {
@@ -133,7 +137,7 @@
     });
 
     $("questionCount").addEventListener("change", (event) => {
-      state.questionCount = clamp(Number(event.target.value) || 6, 3, 20);
+      state.questionCount = capQuestionCount(Number(event.target.value) || 6);
       event.target.value = state.questionCount;
       generatePractice();
       renderAll();
@@ -195,6 +199,7 @@
     renderPractice();
     renderMistakes();
     renderSchedule();
+    renderScoreTrends();
     renderMetrics();
   }
 
@@ -354,6 +359,7 @@
     if (slide.visualType === "goals") {
       return `
         <div class="goal-map">
+          <strong class="visual-title">本节要看懂的关系</strong>
           ${points.slice(0, 3).map((point, pointIndex) => `<span style="--i:${pointIndex}">${escapeHtml(shortLabel(point))}</span>`).join("")}
         </div>
       `;
@@ -370,6 +376,7 @@
     if (slide.visualType === "practice") {
       return `
         <div class="practice-ladder">
+          <strong class="visual-title">同一知识点逐步变式</strong>
           <span>基础</span>
           <span>变式</span>
           <span>应用</span>
@@ -378,6 +385,7 @@
     }
     return `
       <div class="summary-cycle">
+        <strong class="visual-title">复习闭环</strong>
         <span>学</span><span>练</span><span>批</span><span>复</span>
       </div>
     `;
@@ -385,40 +393,76 @@
 
   function renderTopicVisual(unit, size) {
     const tagText = unit.tags.join(",");
+    const point = shortLabel(unit.points[0] || unit.title);
     if (includesAny(tagText, ["分数", "百分数"])) {
       return `
         <div class="fraction-visual ${size}">
-          <span></span><span></span><span></span><span></span>
+          <strong class="visual-title">${escapeHtml(point)}</strong>
+          <div class="fraction-bars">
+            <span data-label="1份"></span><span data-label="2份"></span><span data-label="未取"></span><span data-label="未取"></span>
+          </div>
+          <small class="visual-caption">先确定整体，再看等分份数和取了几份。</small>
         </div>
       `;
     }
     if (includesAny(tagText, ["图形", "角", "面积", "体积", "空间", "方向"])) {
+      if (includesAny(tagText, ["角"])) {
+        return `
+          <div class="geometry-visual ${size}">
+            <strong class="visual-title">${escapeHtml(point)}</strong>
+            <div class="angle-model"><span></span><em>90° 是分类边界</em></div>
+            <small class="visual-caption">先比较角与 90° 的关系，再判断锐角、直角或钝角。</small>
+          </div>
+        `;
+      }
+      if (includesAny(tagText, ["方向", "空间", "观察"])) {
+        return `
+          <div class="geometry-visual ${size}">
+            <strong class="visual-title">${escapeHtml(point)}</strong>
+            <div class="direction-model"><span>观测点</span><i></i><em>方向 + 距离</em></div>
+            <small class="visual-caption">先定参照点，再描述方向、角度和距离。</small>
+          </div>
+        `;
+      }
       return `
         <div class="geometry-visual ${size}">
-          <span class="shape square"></span>
-          <span class="shape triangle"></span>
-          <span class="shape circle"></span>
-          <span class="shape line"></span>
+          <strong class="visual-title">${escapeHtml(point)}</strong>
+          <div class="area-model">
+            <span class="edge edge-long">长</span>
+            <span class="edge edge-wide">宽</span>
+            <em>面积 = 长 × 宽</em>
+          </div>
+          <small class="visual-caption">先找对应边，再把公式和单位对应起来。</small>
         </div>
       `;
     }
     if (includesAny(tagText, ["统计", "可能性"])) {
       return `
         <div class="bar-visual ${size}">
-          <span style="--h:48%"></span><span style="--h:76%"></span><span style="--h:58%"></span><span style="--h:88%"></span>
+          <strong class="visual-title">${escapeHtml(point)}</strong>
+          <div class="stat-bars">
+            <span style="--h:48%" data-label="A"></span><span style="--h:76%" data-label="B"></span><span style="--h:58%" data-label="C"></span><span style="--h:88%" data-label="D"></span>
+          </div>
+          <small class="visual-caption">先读数据，再比较大小、总量或平均数。</small>
         </div>
       `;
     }
     if (includesAny(tagText, ["长度", "单位", "数感", "大数", "小数"])) {
       return `
         <div class="numberline-visual ${size}">
-          <span></span><span></span><span></span><span></span><span></span>
+          <strong class="visual-title">${escapeHtml(point)}</strong>
+          <div class="numberline-model">
+            <span data-label="0"></span><span data-label="1/4"></span><span data-label="1/2"></span><span data-label="3/4"></span><span data-label="1"></span>
+          </div>
+          <small class="visual-caption">把数放到位置上，先判断大小和单位间隔。</small>
         </div>
       `;
     }
     return `
       <div class="flow-visual ${size}">
+        <strong class="visual-title">${escapeHtml(point)}</strong>
         <span>条件</span><span>关系</span><span>算式</span><span>结果</span>
+        <small class="visual-caption">每一步都回答“为什么这样列式”。</small>
       </div>
     `;
   }
@@ -432,6 +476,9 @@
     const list = $("practiceList");
     list.classList.toggle("show-answers", state.answersVisible);
     $("showAnswerBtn").textContent = state.answersVisible ? "隐藏答案" : "显示答案";
+    $("paperMeta").textContent = state.currentQuestions.length
+      ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。`
+      : "";
 
     if (!state.currentQuestions.length) {
       list.className = "question-list empty-state";
@@ -465,21 +512,24 @@
 
   function generatePractice() {
     const unit = unitData();
-    state.currentQuestions = generateQuestions(unit, Number(state.grade), state.difficulty, state.questionCount);
+    state.questionCount = capQuestionCount(state.questionCount);
+    state.currentQuestions = normalizePaperPoints(generateQuestions(unit, Number(state.grade), state.difficulty, state.questionCount));
     state.gradingResults = [];
     $("gradingSummary").classList.remove("active");
     $("gradingSummary").innerHTML = "";
     $("gradingResults").innerHTML = "";
+    $("performanceFeedback").innerHTML = "";
   }
 
   function generateQuestions(unit, grade, difficulty, count) {
+    const safeCount = capQuestionCount(count);
     const questions = [];
     const modes = ["概念理解", "基础计算", "情境应用", "变式判断", "综合提升"];
-    const maxSameType = Math.max(2, Math.ceil(count / modes.length));
+    const maxSameType = Math.max(2, Math.ceil(safeCount / modes.length));
     const typeCounts = {};
     let cursor = 0;
 
-    while (questions.length < count && cursor < count * 6) {
+    while (questions.length < safeCount && cursor < safeCount * 6) {
       const tag = unit.tags[cursor % unit.tags.length] || "综合";
       const knowledgePoint = unit.points[cursor % unit.points.length] || tag;
       const mode = modes[cursor % modes.length];
@@ -493,7 +543,7 @@
       cursor += 1;
     }
 
-    while (questions.length < count) {
+    while (questions.length < safeCount) {
       const index = questions.length;
       const tag = unit.tags[index % unit.tags.length] || "综合";
       const knowledgePoint = unit.points[index % unit.points.length] || tag;
@@ -757,6 +807,25 @@
     return base;
   }
 
+  function capQuestionCount(value) {
+    return clamp(Number(value) || 6, 3, 20);
+  }
+
+  function normalizePaperPoints(questions) {
+    const capped = questions.slice(0, 20);
+    if (!capped.length) return [];
+    const base = Math.floor(100 / capped.length);
+    const remainder = 100 - base * capped.length;
+    return capped.map((questionItem, index) => ({
+      ...questionItem,
+      point: base + (index < remainder ? 1 : 0)
+    }));
+  }
+
+  function paperTotal(questions) {
+    return questions.reduce((sum, questionItem) => sum + questionItem.point, 0);
+  }
+
   function includesAny(text, needles) {
     return needles.some((needle) => text.includes(needle));
   }
@@ -861,6 +930,7 @@
 
   function gradeAnswers() {
     if (!state.currentQuestions.length) generatePractice();
+    state.currentQuestions = normalizePaperPoints(state.currentQuestions);
     const answers = parseAnswers($("answerInput").value);
     const results = state.currentQuestions.map((question, index) => {
       const submitted = answers[index + 1] || "";
@@ -873,10 +943,13 @@
         score: correct ? question.point : 0
       };
     });
+    const summary = buildScoreSummary(results);
     state.gradingResults = results;
+    saveScoreHistory(summary, results);
     saveMistakesFromResults(results);
-    renderGradingResults(results);
+    renderGradingResults(results, summary);
     renderMistakes();
+    renderScoreTrends();
     renderMetrics();
   }
 
@@ -932,11 +1005,11 @@
     return Number.NaN;
   }
 
-  function renderGradingResults(results) {
-    const total = results.reduce((sum, item) => sum + item.question.point, 0);
-    const score = results.reduce((sum, item) => sum + item.score, 0);
-    const correctCount = results.filter((item) => item.correct).length;
-    const accuracy = results.length ? Math.round((correctCount / results.length) * 100) : 0;
+  function renderGradingResults(results, summary = buildScoreSummary(results)) {
+    const total = summary.total;
+    const score = summary.score;
+    const correctCount = summary.correctCount;
+    const accuracy = summary.accuracy;
 
     $("gradingSummary").classList.add("active");
     $("gradingSummary").innerHTML = `
@@ -945,6 +1018,7 @@
       <div><strong>${correctCount}</strong><span>答对题数</span></div>
       <div><strong>${results.length - correctCount}</strong><span>新增错题</span></div>
     `;
+    renderPerformanceFeedback(summary, results);
 
     $("gradingResults").innerHTML = results
       .map((item) => {
@@ -967,6 +1041,310 @@
         `;
       })
       .join("");
+  }
+
+  function buildScoreSummary(results) {
+    const rawTotal = results.reduce((sum, item) => sum + item.question.point, 0);
+    const rawScore = results.reduce((sum, item) => sum + item.score, 0);
+    const correctCount = results.filter((item) => item.correct).length;
+    const score = rawTotal ? Math.round((rawScore / rawTotal) * 100) : 0;
+    const knowledgeStats = {};
+
+    results.forEach((item) => {
+      const key = item.question.knowledgePoint || "未标记知识点";
+      if (!knowledgeStats[key]) {
+        knowledgeStats[key] = { score: 0, total: 0, attempts: 0, correctCount: 0, wrongCount: 0 };
+      }
+      knowledgeStats[key].score += item.score;
+      knowledgeStats[key].total += item.question.point;
+      knowledgeStats[key].attempts += 1;
+      if (item.correct) knowledgeStats[key].correctCount += 1;
+      else knowledgeStats[key].wrongCount += 1;
+    });
+
+    return {
+      score,
+      total: 100,
+      accuracy: results.length ? Math.round((correctCount / results.length) * 100) : 0,
+      correctCount,
+      wrongCount: results.length - correctCount,
+      questionCount: results.length,
+      knowledgeStats
+    };
+  }
+
+  function saveScoreHistory(summary, results) {
+    const unit = unitData();
+    const record = {
+      id: `${Date.now()}-${unit.id}`,
+      createdAt: new Date().toISOString(),
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      difficulty: state.difficulty,
+      questionCount: results.length,
+      score: summary.score,
+      total: summary.total,
+      accuracy: summary.accuracy,
+      correctCount: summary.correctCount,
+      wrongCount: summary.wrongCount,
+      knowledgeStats: summary.knowledgeStats
+    };
+    state.scoreHistory = [...state.scoreHistory, record].slice(-100);
+    writeJson(scoreHistoryKey, state.scoreHistory);
+  }
+
+  function renderPerformanceFeedback(summary) {
+    const panel = $("performanceFeedback");
+    const score = summary.score;
+    let body = "";
+
+    if (score < 60) {
+      const phrase = pickEncouragementPhrase();
+      body = `
+        <article class="feedback-card feedback-low">
+          ${renderFeedbackImage("encouragement", phrase, "这次先稳住节奏", `${score} 分 · ${unitData().title}`)}
+          <div>
+            <strong>建议先回看薄弱知识点</strong>
+            <p>把错题拆成“审题、方法、计算、检查”四步，下一次只要多拿回几道题，分数就会明显上来。</p>
+          </div>
+        </article>
+      `;
+    } else if (score < 80) {
+      body = `
+        <article class="feedback-card feedback-pass">
+          ${renderFeedbackImage("certificate", "学习肯定奖", "基础已经站稳", `${score} 分 · 继续巩固易错点`)}
+          <div>
+            <strong>已经跨过及格线</strong>
+            <p>这次说明核心概念有基础了，接下来重点减少粗心、单位、审题和格式错误。</p>
+          </div>
+        </article>
+      `;
+    } else if (score < 95) {
+      body = `
+        <article class="feedback-card feedback-great">
+          ${renderFeedbackImage("celebration", "优秀表现", "知识点掌握较稳", `${score} 分 · 屏幕撒花已触发`)}
+          <div>
+            <strong>这次表现很亮眼</strong>
+            <p>继续保持检查习惯，把最后几处易错点补齐，就能冲击满分段。</p>
+          </div>
+        </article>
+      `;
+    } else {
+      body = `
+        <article class="feedback-card feedback-champion">
+          <div class="podium-card">
+            <div class="podium-preview">
+              <span class="preview-person"></span>
+              <span class="preview-trophy"></span>
+              <span class="preview-podium"></span>
+            </div>
+            <strong>领奖台时刻</strong>
+            <p>${score} 分，知识点掌握非常扎实。</p>
+          </div>
+          <div>
+            <strong>高分稳定区</strong>
+            <p>接下来可以减少重复基础题，增加变式题和综合应用题，保持手感。</p>
+          </div>
+        </article>
+      `;
+    }
+
+    panel.innerHTML = body;
+    triggerScoreAnimation(score);
+  }
+
+  function pickEncouragementPhrase() {
+    const phrases = [
+      "别急，先把会的题拿稳",
+      "今天的错题，是下一次的加分点",
+      "一步一步来，方法比速度更重要",
+      "先订正一类题，再挑战下一类",
+      "看清条件，分数会慢慢追上来",
+      "这次找到问题，下次就更有方向"
+    ];
+    const last = localStorage.getItem(feedbackPhraseKey);
+    const candidates = phrases.filter((phrase) => phrase !== last);
+    const picked = candidates[Math.floor(Math.random() * candidates.length)] || phrases[0];
+    localStorage.setItem(feedbackPhraseKey, picked);
+    return picked;
+  }
+
+  function renderFeedbackImage(kind, title, subtitle, detail) {
+    const theme = {
+      encouragement: { bg: "#eef4ff", accent: "#2563eb", soft: "#dbeafe" },
+      certificate: { bg: "#fff7ed", accent: "#c2410c", soft: "#fed7aa" },
+      celebration: { bg: "#ecfdf5", accent: "#0f766e", soft: "#99f6e4" }
+    }[kind] || { bg: "#f8fafc", accent: "#334155", soft: "#e2e8f0" };
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="720" height="360" viewBox="0 0 720 360">
+        <rect width="720" height="360" rx="28" fill="${theme.bg}"/>
+        <rect x="36" y="36" width="648" height="288" rx="22" fill="#ffffff" stroke="${theme.accent}" stroke-width="4"/>
+        <path d="M94 248 C160 204 214 288 286 238 S414 190 498 236 S610 278 650 226" fill="none" stroke="${theme.soft}" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="574" cy="96" r="42" fill="${theme.soft}"/>
+        <circle cx="604" cy="116" r="18" fill="${theme.accent}" opacity="0.18"/>
+        <rect x="74" y="74" width="86" height="86" rx="18" fill="${theme.soft}"/>
+        <path d="M96 118 h42 M117 96 v44" stroke="${theme.accent}" stroke-width="10" stroke-linecap="round"/>
+        ${svgTextLines(title, 190, 126, 40, theme.accent, 15)}
+        <text x="190" y="194" font-size="24" font-weight="700" fill="#475467">${escapeSvg(subtitle)}</text>
+        <text x="190" y="238" font-size="24" font-weight="800" fill="#172033">${escapeSvg(detail)}</text>
+      </svg>
+    `;
+    return `<img class="feedback-image" alt="${escapeAttribute(title)}" src="${svgDataUri(svg)}">`;
+  }
+
+  function svgTextLines(text, x, y, size, fill, maxChars) {
+    return splitText(text, maxChars).map((line, index) =>
+      `<text x="${x}" y="${y + index * (size + 10)}" font-size="${size}" font-weight="900" fill="${fill}">${escapeSvg(line)}</text>`
+    ).join("");
+  }
+
+  function splitText(text, maxChars) {
+    const value = String(text);
+    const lines = [];
+    for (let index = 0; index < value.length; index += maxChars) {
+      lines.push(value.slice(index, index + maxChars));
+    }
+    return lines;
+  }
+
+  function svgDataUri(svg) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
+  }
+
+  function triggerScoreAnimation(score) {
+    const layer = $("celebrationLayer");
+    if (!layer) return;
+    clearTimeout(celebrationTimer);
+    layer.className = "celebration-layer";
+    layer.innerHTML = "";
+    if (score < 80) return;
+
+    const confetti = Array.from({ length: score >= 95 ? 58 : 42 }, (_, index) => {
+      const colors = ["#0f766e", "#2563eb", "#f97316", "#dc2626", "#f59e0b"];
+      return `<span class="confetti" style="--x:${Math.round(Math.random() * 100)}vw;--delay:${index * 34}ms;--drift:${Math.round(Math.random() * 120 - 60)}px;--color:${colors[index % colors.length]}"></span>`;
+    }).join("");
+    const podium = score >= 95 ? `
+      <div class="award-stage">
+        <div class="award-person"><span></span></div>
+        <div class="award-trophy"></div>
+        <div class="award-podium"><span>1</span></div>
+      </div>
+    ` : "";
+
+    layer.innerHTML = `${confetti}${podium}`;
+    layer.classList.add("active", score >= 95 ? "with-podium" : "confetti-only");
+    celebrationTimer = setTimeout(() => {
+      layer.className = "celebration-layer";
+      layer.innerHTML = "";
+    }, score >= 95 ? 5600 : 3600);
+  }
+
+  function renderScoreTrends() {
+    const panel = $("trendPanel");
+    if (!panel) return;
+    const currentUnit = unitData();
+    const scopedRecords = state.scoreHistory.filter(
+      (item) => item.gradeId === state.grade && item.volumeId === state.volume && item.unitId === currentUnit.id
+    );
+    const records = (scopedRecords.length ? scopedRecords : state.scoreHistory).slice(-8);
+
+    if (!records.length) {
+      panel.innerHTML = `
+        <div class="trend-empty">
+          <strong>成绩趋势</strong>
+          <p>完成一次判分后，这里会保存成绩，并分析当前单元的薄弱知识点。</p>
+        </div>
+      `;
+      return;
+    }
+
+    const weakItems = analyzeWeakKnowledge(scopedRecords.length ? scopedRecords : state.scoreHistory);
+    panel.innerHTML = `
+      <div class="trend-head">
+        <div>
+          <p class="eyebrow">Progress</p>
+          <h3>成绩趋势与薄弱知识点</h3>
+        </div>
+        <span>${scopedRecords.length ? "当前单元" : "全部记录"} · 最近 ${records.length} 次</span>
+      </div>
+      ${renderTrendSvg(records)}
+      <div class="weak-grid">
+        ${weakItems.length ? weakItems.map(renderWeakKnowledgeItem).join("") : "<p class=\"hint\">暂未发现明显薄弱项。</p>"}
+      </div>
+    `;
+  }
+
+  function renderTrendSvg(records) {
+    const width = 680;
+    const height = 210;
+    const pad = 34;
+    const sorted = records.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const points = sorted.map((item, index) => {
+      const x = sorted.length === 1 ? width / 2 : pad + (index * (width - pad * 2)) / (sorted.length - 1);
+      const y = pad + ((100 - item.score) * (height - pad * 2)) / 100;
+      return { ...item, x, y };
+    });
+    const pointString = points.map((point) => `${point.x},${point.y}`).join(" ");
+    const labels = points.map((point, index) => `
+      <circle cx="${point.x}" cy="${point.y}" r="6" fill="#0f766e"/>
+      <text x="${point.x}" y="${Math.max(18, point.y - 12)}" text-anchor="middle" font-size="13" font-weight="800" fill="#172033">${point.score}</text>
+      <text x="${point.x}" y="${height - 8}" text-anchor="middle" font-size="11" fill="#667085">${index + 1}</text>
+    `).join("");
+    return `
+      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="成绩趋势图">
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#cbd5e1"/>
+        <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#cbd5e1"/>
+        <line x1="${pad}" y1="${pad + (height - pad * 2) * 0.4}" x2="${width - pad}" y2="${pad + (height - pad * 2) * 0.4}" stroke="#edf1f7"/>
+        <line x1="${pad}" y1="${pad + (height - pad * 2) * 0.2}" x2="${width - pad}" y2="${pad + (height - pad * 2) * 0.2}" stroke="#edf1f7"/>
+        <text x="8" y="${pad + (height - pad * 2) * 0.4 + 4}" font-size="11" fill="#667085">60</text>
+        <text x="8" y="${pad + (height - pad * 2) * 0.2 + 4}" font-size="11" fill="#667085">80</text>
+        <polyline points="${pointString}" fill="none" stroke="#0f766e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        ${labels}
+      </svg>
+    `;
+  }
+
+  function analyzeWeakKnowledge(records) {
+    const grouped = {};
+    records.forEach((record) => {
+      Object.entries(record.knowledgeStats || {}).forEach(([point, stat]) => {
+        if (!grouped[point]) grouped[point] = { score: 0, total: 0, attempts: 0, wrongCount: 0 };
+        grouped[point].score += stat.score || 0;
+        grouped[point].total += stat.total || 0;
+        grouped[point].attempts += stat.attempts || 0;
+        grouped[point].wrongCount += stat.wrongCount || 0;
+      });
+    });
+    return Object.entries(grouped)
+      .map(([point, stat]) => {
+        const mastery = stat.total ? Math.round((stat.score / stat.total) * 100) : 0;
+        return {
+          point,
+          mastery,
+          attempts: stat.attempts,
+          wrongCount: stat.wrongCount,
+          label: mastery < 60 ? "薄弱" : mastery < 80 ? "需巩固" : "较稳定"
+        };
+      })
+      .sort((a, b) => a.mastery - b.mastery || b.wrongCount - a.wrongCount)
+      .slice(0, 4);
+  }
+
+  function renderWeakKnowledgeItem(item) {
+    return `
+      <article class="weak-card">
+        <div>
+          <strong>${escapeHtml(item.point)}</strong>
+          <span>${escapeHtml(item.label)} · 练过 ${item.attempts} 题</span>
+        </div>
+        <div class="mastery-bar" style="--mastery:${item.mastery}%"><span></span></div>
+        <p>掌握度 ${item.mastery}% · 错 ${item.wrongCount} 次</p>
+      </article>
+    `;
   }
 
   function saveMistakesFromResults(results) {
@@ -1065,13 +1443,25 @@
     renderMetrics();
   }
 
+  function currentUnitMistakes() {
+    const unit = unitData();
+    const allowedPoints = new Set(unit.points || []);
+    return state.mistakes.filter((item) => (
+      item.status !== "已掌握"
+      && (!item.grade || item.grade === gradeData().name)
+      && (!item.volume || item.volume === volumeData().name)
+      && item.unitTitle === unit.title
+      && (!allowedPoints.size || allowedPoints.has(item.knowledgePoint))
+    ));
+  }
+
   function buildMistakePaper() {
-    const activeMistakes = shuffle(state.mistakes.filter((item) => item.status !== "已掌握")).slice(0, state.questionCount);
+    const activeMistakes = shuffle(currentUnitMistakes()).slice(0, capQuestionCount(state.questionCount));
     if (!activeMistakes.length) {
       switchTab("mistakes");
       return;
     }
-    state.currentQuestions = activeMistakes.map((item, index) => ({
+    state.currentQuestions = normalizePaperPoints(activeMistakes.map((item, index) => ({
       id: `mistake-${item.id}-${index}`,
       unitId: unitData().id,
       unitTitle: item.unitTitle,
@@ -1086,7 +1476,7 @@
       checkMethod: item.checkMethod,
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
-    }));
+    })));
     state.answersVisible = false;
     switchTab("practice");
     renderAll();
@@ -1094,6 +1484,7 @@
 
   function restoreScheduleControls() {
     $("frequencySelect").value = state.schedule.frequency;
+    state.schedule.count = clamp(Number(state.schedule.count) || 10, 5, 20);
     $("scheduledCount").value = state.schedule.count;
     $("mistakeRatio").value = state.schedule.mistakeRatio;
     $("mistakeRatioLabel").textContent = `${state.schedule.mistakeRatio}%`;
@@ -1102,7 +1493,7 @@
   function saveSchedule() {
     state.schedule = {
       frequency: $("frequencySelect").value,
-      count: clamp(Number($("scheduledCount").value) || 10, 5, 30),
+      count: clamp(Number($("scheduledCount").value) || 10, 5, 20),
       mistakeRatio: clamp(Number($("mistakeRatio").value) || 0, 0, 80),
       updatedAt: new Date().toISOString()
     };
@@ -1116,15 +1507,15 @@
     const schedule = state.schedule;
     $("scheduleStatus").innerHTML = `
       <strong>${escapeHtml(schedule.frequency)}测验已配置</strong>
-      <p>每次 ${schedule.count} 题，其中错题占比 ${schedule.mistakeRatio}%。当前会从“${escapeHtml(unitData().title)}”和错题库混合组卷。</p>
+      <p>每次 ${schedule.count} 题，总分 100 分，其中错题占比 ${schedule.mistakeRatio}%。当前只从“${escapeHtml(unitData().title)}”单元知识点和本单元错题混合组卷。</p>
     `;
   }
 
   function buildScheduledPaper() {
     saveSchedule();
-    const count = state.schedule.count;
+    const count = clamp(state.schedule.count, 5, 20);
     const mistakeCount = Math.round((count * state.schedule.mistakeRatio) / 100);
-    const activeMistakes = shuffle(state.mistakes.filter((item) => item.status !== "已掌握")).slice(0, mistakeCount);
+    const activeMistakes = shuffle(currentUnitMistakes()).slice(0, mistakeCount);
     const newQuestionCount = Math.max(0, count - activeMistakes.length);
     const newQuestions = generateQuestions(unitData(), Number(state.grade), state.difficulty, newQuestionCount);
     const mistakeQuestions = activeMistakes.map((item, index) => ({
@@ -1143,7 +1534,7 @@
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
     }));
-    state.currentQuestions = shuffle([...mistakeQuestions, ...newQuestions]);
+    state.currentQuestions = normalizePaperPoints(shuffle([...mistakeQuestions, ...newQuestions]));
     $("scheduledPaper").className = "question-list";
     $("scheduledPaper").innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
     renderPractice();
@@ -1164,6 +1555,14 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function escapeSvg(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   function escapeAttribute(value) {

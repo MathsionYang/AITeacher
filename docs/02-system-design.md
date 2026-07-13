@@ -42,7 +42,7 @@ index.html
 - 基于单元知识点生成课堂结构。
 - 输出导入、讲解、例题、练习、小结、作业。
 - 同一输入在同一模板版本下保持大致稳定。
-- 每页优先使用图形、表格、数轴、流程或动画表达，文字只做辅助说明。
+- 每页优先使用图形、表格、数轴、流程或动画表达；图形必须服务知识点理解，而不是装饰。
 - 支持人工审核修改、PDF/Markdown 导出。
 
 当前实现：
@@ -69,6 +69,9 @@ index.html
 当前实现：
 
 - `generateQuestions()` 根据知识点标签生成原创计算题、应用题、几何题和统计题。
+- `capQuestionCount()` 将每次题量限制在 20 题以内。
+- `normalizePaperPoints()` 将当前试卷分值归一为 100 分。
+- 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
 - `state.currentQuestions` 保存当前试卷。
 
 正式实现：
@@ -91,6 +94,9 @@ index.html
 - 文件上传和图片预览已完成。
 - `answerInput` 作为 OCR 识别文本/人工校正区。
 - `gradeAnswers()` 完成结构化判分。
+- `scoreHistoryKey` 将每次成绩保存到浏览器本地存储。
+- `renderPerformanceFeedback()` 根据分数段展示鼓励图、奖状、撒花或领奖台动画。
+- `renderScoreTrends()` 根据历史成绩绘制趋势图，并按知识点统计薄弱程度。
 
 正式实现：
 
@@ -182,6 +188,9 @@ mistakes
 
 schedules
   id, user_id, frequency, question_count, mistake_ratio, active, next_run_at
+
+score_records
+  id, user_id, unit_id, score, total_score, accuracy, knowledge_stats, created_at
 ```
 
 ## 4. AI/OCR 接入建议
