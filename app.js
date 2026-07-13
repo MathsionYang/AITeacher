@@ -5,38 +5,52 @@
   const coursewareReviewKey = "ai-teacher-rj-math-courseware-reviews-v1";
   const scoreHistoryKey = "ai-teacher-rj-math-score-history-v1";
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
+  const mockData = window.AI_TEACHER_MOCK_DATA || {};
+  const mockEnabled = Boolean(mockData.enabled);
+  const initialScope = mockEnabled ? mockData.initialScope || {} : {};
 
   const state = {
-    grade: "3",
-    volume: "A",
-    unitId: "",
-    difficulty: "基础",
-    questionCount: 6,
+    grade: String(initialScope.grade || "3"),
+    volume: initialScope.volume || "A",
+    unitId: initialScope.unitId || "",
+    difficulty: initialScope.difficulty || "基础",
+    questionCount: initialScope.questionCount || 6,
     currentQuestions: [],
     answersVisible: false,
     activeTab: "courseware",
     coursewareEditMode: false,
     gradingResults: [],
-    mistakes: readJson(mistakeKey, []),
-    coursewareReviews: readJson(coursewareReviewKey, {}),
-    scoreHistory: readJson(scoreHistoryKey, []),
-    schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 })
+    mistakes: readJson(mistakeKey, [], "mistakes"),
+    coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
+    scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
+    schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule")
   };
 
   const $ = (id) => document.getElementById(id);
   let celebrationTimer = null;
 
-  function readJson(key, fallback) {
+  function readJson(key, fallback, mockField) {
     try {
       const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
+      const shouldReplace = mockEnabled && mockField && mockData.mode === "replace";
+      if (raw && !shouldReplace) return JSON.parse(raw);
+      return cloneJson(mockValue(mockField, fallback));
     } catch (error) {
-      return fallback;
+      return cloneJson(mockValue(mockField, fallback));
     }
   }
 
   function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function mockValue(field, fallback) {
+    if (!mockEnabled || !field || !Object.prototype.hasOwnProperty.call(mockData, field)) return fallback;
+    return mockData[field];
+  }
+
+  function cloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
   }
 
   function gradeData() {
@@ -56,8 +70,6 @@
     buildSelectors();
     restoreScheduleControls();
     bindEvents();
-    state.unitId = volumeData().units[0].id;
-    $("unitSelect").value = state.unitId;
     generatePractice();
     renderAll();
   }
@@ -69,7 +81,7 @@
     if (!content.grades[state.grade] || !supportedGradeIds().includes(state.grade)) {
       state.grade = supportedGradeIds()[0] || Object.keys(content.grades)[0];
     }
-    state.volume = firstVolumeId(gradeData());
+    if (!gradeData().volumes[state.volume]) state.volume = firstVolumeId(gradeData());
     $("gradeSelect").value = state.grade;
     refreshVolumeOptions();
     refreshUnitOptions();
@@ -103,7 +115,9 @@
     $("unitSelect").innerHTML = volume.units
       .map((unit) => `<option value="${unit.id}">${unit.title}</option>`)
       .join("");
-    state.unitId = volume.units[0].id;
+    if (!volume.units.some((unit) => unit.id === state.unitId)) {
+      state.unitId = volume.units[0].id;
+    }
     $("unitSelect").value = state.unitId;
   }
 
