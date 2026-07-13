@@ -33,3 +33,6 @@ D:\AITeacher\index.html
 - [交付计划](docs/03-delivery-plan.md)
 - [教材与题库版权合规方案](docs/04-copyright-compliance.md)
 - [人教版三年级数学上册客观知识点提炼](docs/knowledge/rj-grade3-math-a-objective-knowledge.md)
+- [人教版四年级数学上册客观知识点提炼](docs/knowledge/rj-grade4-math-a-objective-knowledge.md)
+- [人教版五年级数学上册客观知识点提炼](docs/knowledge/rj-grade5-math-a-objective-knowledge.md)
+- [人教版六年级数学上册客观知识点提炼](docs/knowledge/rj-grade6-math-a-objective-knowledge.md)
