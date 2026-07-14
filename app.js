@@ -1488,6 +1488,11 @@
 
   function parseMarkdownTable(raw) {
     const normalized = String(raw || "").replace(/\r\n/g, "\n");
+    const multilineTable = parseMultilineMarkdownTable(normalized);
+    return multilineTable || parseInlineMarkdownTable(normalized);
+  }
+
+  function parseMultilineMarkdownTable(normalized) {
     const lines = normalized.split("\n");
     const tableStart = lines.findIndex((line, index) => line.includes("|") && lines[index + 1] && /^\s*\|?\s*:?-{3,}:?/.test(lines[index + 1]));
     if (tableStart < 0) return null;
@@ -1502,11 +1507,53 @@
     if (tableLines.length < 3) return null;
 
     const headers = splitMarkdownTableRow(tableLines[0]);
-    const rows = tableLines.slice(2).map(splitMarkdownTableRow).filter((row) => row.length);
+    const rows = tableLines.slice(2).map((line) => normalizeTableRow(splitMarkdownTableRow(line), headers.length)).filter((row) => row.length);
     if (!headers.length || !rows.length) return null;
     return { prefix: prefix ? prefix + "\n" : "", headers, rows };
   }
 
+  function parseInlineMarkdownTable(normalized) {
+    const separatorMatch = normalized.match(/\|\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?/);
+    if (!separatorMatch) return null;
+
+    const separator = separatorMatch[0];
+    const columnCount = splitMarkdownTableRow(separator).length;
+    if (columnCount < 2) return null;
+
+    const before = normalized.slice(0, separatorMatch.index);
+    const headerPattern = new RegExp("\\|[^|]*(?:\\|[^|]*){" + (columnCount - 1) + "}\\|?\\s*$");
+    const headerMatch = before.match(headerPattern);
+    if (!headerMatch) return null;
+
+    const headerLine = headerMatch[0];
+    const prefix = before.slice(0, before.length - headerLine.length).trim();
+    const headers = splitMarkdownTableRow(headerLine).slice(0, columnCount);
+    const after = normalized.slice(separatorMatch.index + separator.length).trim();
+    const rowCandidates = after
+      .split(/(?<=\|)\s+(?=\|)/)
+      .map((line) => line.trim())
+      .filter((line) => line.includes("|"));
+    let rows = rowCandidates.map((line) => normalizeTableRow(splitMarkdownTableRow(line), columnCount)).filter((row) => row.length);
+
+    if (!rows.length) {
+      const cells = after.split("|").map((cell) => cell.trim()).filter(Boolean);
+      for (let index = 0; index < cells.length; index += columnCount) {
+        const row = normalizeTableRow(cells.slice(index, index + columnCount), columnCount);
+        if (row.length) rows.push(row);
+      }
+    }
+
+    if (!headers.length || !rows.length) return null;
+    return { prefix: prefix ? prefix + "\n" : "", headers, rows };
+  }
+
+  function normalizeTableRow(cells, columnCount) {
+    const row = Array.isArray(cells) ? cells.slice() : [];
+    if (!row.length) return [];
+    if (row.length > columnCount) return row.slice(0, columnCount - 1).concat(row.slice(columnCount - 1).join(" "));
+    while (row.length < columnCount) row.push("");
+    return row;
+  }
   function splitMarkdownTableRow(line) {
     return String(line || "")
       .trim()
