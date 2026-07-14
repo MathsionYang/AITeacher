@@ -1383,6 +1383,37 @@ body[data-role-mode="student"] .teacher-only {
   font-size: 13px;
 }
 
+.ocr-status-panel {
+  margin-top: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e40af;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.ocr-status-panel[data-tone="ok"] {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.ocr-status-panel[data-tone="warn"],
+.ocr-status-panel[data-tone="busy"] {
+  border-color: #f8d27a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.ocr-status-panel[data-tone="error"] {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
 .practice-answer-panel {
   margin: 16px 0;
   background: #fff;

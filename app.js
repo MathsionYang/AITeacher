@@ -569,6 +569,24 @@
     status.dataset.tone = tone;
   }
 
+  function setOcrStatus(message, tone = "info") {
+    const status = $("ocrStatusPanel");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.tone = tone;
+  }
+
+  function formatOcrError(error) {
+    const raw = error?.message || String(error || "");
+    if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
+      return "没有连接到本机 OCR 服务。请先运行 start_aiteacher_ocr.bat，看到 127.0.0.1:8790/ocr 启动后再点击 OCR 识别。";
+    }
+    if (/PaddleOCR is not installed|No module named|paddleocr/i.test(raw)) {
+      return "本机 OCR 依赖未安装。请运行：python -m pip install paddlepaddle paddleocr，然后重新启动 start_aiteacher_ocr.bat。";
+    }
+    return raw || "OCR 识别失败，请确认本地 PaddleOCR 服务已启动。";
+  }
+
   function setGenerationProgress(kind, message) {
     const panel = $(`${kind}ProgressPanel`);
     const text = $(`${kind}ProgressText`);
@@ -1830,21 +1848,24 @@
     if (!file) {
       preview.style.display = "none";
       preview.removeAttribute("src");
+      setOcrStatus("请先上传答题照片；如需真实 OCR，请保持 start_aiteacher_ocr.bat 正在运行。", "info");
       return;
     }
     preview.src = URL.createObjectURL(file);
     preview.style.display = "block";
+    setOcrStatus(`已选择图片：${file.name}。点击 OCR 识别会调用本机 PaddleOCR 服务。`, "ok");
   }
 
   async function runPaddleOcr() {
-    if (!state.currentQuestions.length) {
-      setModelStatus("当前还没有练习题，请先生成或导入练习，再进行 OCR 识别。", "warn");
-      return;
-    }
     const file = $("answerImage").files && $("answerImage").files[0];
     if (!file) {
+      setOcrStatus("请先点击左侧上传答题照片，再点击 OCR 识别。", "warn");
       setModelStatus("请先上传答题照片，再点击 OCR 识别。", "warn");
       return;
+    }
+
+    if (!state.currentQuestions.length) {
+      setOcrStatus("当前还没有同步练习题，会先识别图片文字；要自动判分，请先在“同步出题”页生成或导入练习。", "warn");
     }
 
     const button = $("runOcrBtn");
@@ -1852,13 +1873,16 @@
     button.disabled = true;
     button.textContent = "识别中...";
     state.ocrRecognizing = true;
+    setOcrStatus("正在调用本机 PaddleOCR 服务。首次识别可能需要加载或下载模型，请稍等。", "busy");
     setModelStatus("正在调用本机 PaddleOCR 服务，识别结果会先进入人工校正面板。", "busy");
 
     try {
       const result = await requestLocalOcr(file);
       applyOcrResult(result);
     } catch (error) {
-      setModelStatus(error.message || "OCR 识别失败，请确认本地 PaddleOCR 服务已启动。", "error");
+      const message = formatOcrError(error);
+      setOcrStatus(message, "error");
+      setModelStatus(message, "error");
     } finally {
       state.ocrRecognizing = false;
       button.disabled = false;
@@ -1906,10 +1930,17 @@
     const summary = normalized.summary || {};
     const answeredCount = summary.answerCount || state.answerReview.entries.filter((entry) => entry.answer).length;
     const lowConfidence = summary.lowConfidenceCount || state.answerReview.summary.lowConfidenceCount || 0;
-    setModelStatus(
-      `OCR 识别完成：${answeredCount} 个答案，低置信度 ${lowConfidence} 个，请确认后判分。`,
-      lowConfidence ? "warn" : "ok"
-    );
+    const lineCount = summary.lineCount || normalized.lines.length;
+    let message = `OCR 识别完成：${answeredCount || lineCount} 条结果，低置信度 ${lowConfidence} 个。`;
+    if (!answerText) {
+      message = "OCR 服务已返回，但没有识别出可用文本。请换一张更清晰、光线更均匀的答题照片。";
+    } else if (!state.currentQuestions.length) {
+      message += " 当前还没有同步练习题，已先把识别文本填入校正区；生成或导入练习后再判分。";
+    } else {
+      message += " 请在校正区确认后点击“判分并生成解析”。";
+    }
+    setOcrStatus(message, answerText ? (lowConfidence ? "warn" : "ok") : "warn");
+    setModelStatus(message, answerText ? (lowConfidence ? "warn" : "ok") : "warn");
   }
 
   function normalizeOcrResult(result) {
