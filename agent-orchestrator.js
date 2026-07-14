@@ -101,6 +101,7 @@
       "只生成客观、易判分题型：选择题、填空题、计算填空题、单位换算填空题、数据填空题。",
       "不要生成说明理由题、综合算式题、判断改错题、开放问答题、作图题或需要人工主观判分的题。",
       "选择题必须在题干中给出 A/B/C/D 或 ①②③④ 选项，answer 只写标准选项；填空题 answer 必须是短标准答案。",
+      "如果题干问‘哪个算式结果等于 N’，必须逐项验算，确保恰好一个选项等于 N，且 answer 指向该选项。",
       "questionType 必须使用上述客观题型之一；每题必须有答案、解析、题型、详细步骤、易错点和检查方法。",
       "不要复制教材原题或商业题库题目。",
       "返回 JSON 对象：{ \"questions\": [{ \"knowledgePoint\": string, \"questionType\": string, \"difficulty\": string, \"stem\": string, \"answer\": string, \"explanation\": string, \"detailSteps\": string[], \"commonMistake\": string, \"checkMethod\": string }] }。"

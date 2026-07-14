@@ -184,6 +184,10 @@
     if (!isObjectiveQuestionType(questionType)) issues.push("题型不是选择题、填空题或计算填空题");
     if (isOpenEndedStem(stem)) issues.push("题干包含说明、改正、综合算式等开放作答要求");
     if (questionType.includes("选择") && !hasChoiceOptions(stem)) issues.push("选择题缺少 A/B/C/D 或 ①②③④ 选项");
+    if (questionType.includes("选择")) {
+      const choiceIssue = validateArithmeticChoiceQuestion(stem, answer);
+      if (choiceIssue) issues.push(choiceIssue);
+    }
     if (!isAnswerCheckable(answer)) issues.push("答案不是短标准答案，自动判分不稳定");
 
     return {
@@ -253,6 +257,135 @@
   function isOpenEndedStem(stem) {
     const text = normalizeLooseText(stem);
     return OPEN_ENDED_STEM_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+  }
+
+
+  function validateArithmeticChoiceQuestion(stem, answer) {
+    const target = extractArithmeticChoiceTarget(stem);
+    if (!Number.isFinite(target)) return "";
+
+    const options = parseChoiceOptions(stem);
+    if (options.length < 2) return "选择题选项无法结构化验算";
+
+    const evaluated = options.map((option) => ({
+      ...option,
+      value: evaluateArithmeticExpression(option.text)
+    }));
+    const invalidOption = evaluated.find((option) => !Number.isFinite(option.value));
+    if (invalidOption) return "选择题选项包含无法验算的算式";
+
+    const matching = evaluated.filter((option) => Math.abs(option.value - target) < 0.001);
+    if (matching.length !== 1) return "选择题算式验算失败：必须恰好有一个选项等于题干目标值";
+
+    const answerIndex = normalizeChoiceAnswerIndex(answer);
+    if (answerIndex !== matching[0].index) return "选择题答案与算式验算结果不一致";
+    return "";
+  }
+
+  function extractArithmeticChoiceTarget(stem) {
+    const text = normalizeText(stem);
+    if (!/[\u7b97\u5f0f\u7ed3\u679c]/.test(text)) return Number.NaN;
+    const patterns = [
+      /(?:\u7ed3\u679c\s*)?\u7b49\u4e8e\s*(-?\d+(?:\.\d+)?)/,
+      /(?:\u7ed3\u679c\s*)?(?:\u662f|\u4e3a)\s*(-?\d+(?:\.\d+)?)/,
+      /(?:equal\s+to|equals)\s*(-?\d+(?:\.\d+)?)/i
+    ];
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) return Number(match[1]);
+    }
+    return Number.NaN;
+  }
+
+  function parseChoiceOptions(stem) {
+    const text = normalizeText(stem);
+    const markerPattern = /([A-D])\s*[\.\uff0e\u3001\u3002\uff1a:]|([\u2460\u2461\u2462\u2463])/g;
+    const markers = [];
+    let match;
+    while ((match = markerPattern.exec(text)) !== null) {
+      const label = match[1] || match[2];
+      const index = normalizeChoiceAnswerIndex(label);
+      if (!index) continue;
+      markers.push({ label, index, start: match.index, end: markerPattern.lastIndex });
+    }
+    return markers.map((marker, position) => {
+      const next = markers[position + 1];
+      return {
+        label: marker.label,
+        index: marker.index,
+        text: text.slice(marker.end, next ? next.start : text.length).trim()
+      };
+    }).filter((option) => option.text);
+  }
+
+  function normalizeChoiceAnswerIndex(answer) {
+    const text = normalizeText(answer).replace(/^\u9009/, "").trim();
+    const first = text.charAt(0).toUpperCase();
+    if (first >= "A" && first <= "D") return first.charCodeAt(0) - 64;
+    const circled = { "\u2460": 1, "\u2461": 2, "\u2462": 3, "\u2463": 4 };
+    if (circled[first]) return circled[first];
+    if (/^[1-4]$/.test(first)) return Number(first);
+    return 0;
+  }
+
+  function evaluateArithmeticExpression(expression) {
+    const tokens = tokenizeArithmeticExpression(expression);
+    if (!tokens.length) return Number.NaN;
+    let cursor = 0;
+
+    function parseExpression() {
+      let value = parseTerm();
+      while (cursor < tokens.length && (tokens[cursor] === "+" || tokens[cursor] === "-")) {
+        const operator = tokens[cursor++];
+        const right = parseTerm();
+        value = operator === "+" ? value + right : value - right;
+      }
+      return value;
+    }
+
+    function parseTerm() {
+      let value = parseFactor();
+      while (cursor < tokens.length && (tokens[cursor] === "*" || tokens[cursor] === "/")) {
+        const operator = tokens[cursor++];
+        const right = parseFactor();
+        if (operator === "/" && Math.abs(right) < 0.0000001) return Number.NaN;
+        value = operator === "*" ? value * right : value / right;
+      }
+      return value;
+    }
+
+    function parseFactor() {
+      const token = tokens[cursor++];
+      if (token === "(") {
+        const value = parseExpression();
+        if (tokens[cursor] !== ")") return Number.NaN;
+        cursor += 1;
+        return value;
+      }
+      if (token === "-" || token === "+") {
+        const value = parseFactor();
+        return token === "-" ? -value : value;
+      }
+      const value = Number(token);
+      return Number.isFinite(value) ? value : Number.NaN;
+    }
+
+    const value = parseExpression();
+    return cursor === tokens.length && Number.isFinite(value) ? value : Number.NaN;
+  }
+
+  function tokenizeArithmeticExpression(expression) {
+    const normalized = normalizeText(expression)
+      .replace(/[（]/g, "(")
+      .replace(/[）]/g, ")")
+      .replace(/[×xX*]/g, "*")
+      .replace(/[÷/]/g, "/")
+      .replace(/[－—–]/g, "-");
+    const tokens = [];
+    const pattern = /\d+(?:\.\d+)?|[()+\-*/]/g;
+    let match;
+    while ((match = pattern.exec(normalized)) !== null) tokens.push(match[0]);
+    return tokens;
   }
 
   function hasChoiceOptions(stem) {

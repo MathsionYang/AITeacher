@@ -171,6 +171,34 @@ const validChoice = ruleEngine.validateQuestion({
 assert.equal(validChoice.ok, true);
 assert.equal(validChoice.question.questionType, "选择题");
 
+
+const invalidExpressionChoice = ruleEngine.validateQuestion({
+  id: "bad-expression-choice",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: unit.points[0],
+  questionType: "\u9009\u62e9\u9898",
+  difficulty: "\u57fa\u7840",
+  stem: "\u4e0b\u9762\u54ea\u4e2a\u7b97\u5f0f\u7684\u7ed3\u679c\u7b49\u4e8e 7\uff1f \u2460 56 \u00f7 (8 - 1) \u2461 56 \u00f7 8 - 1 \u2462 56 - 8 \u00f7 1 \u2463 (56 - 8) \u00f7 1",
+  answer: "\u2460",
+  explanation: "\u9700\u9010\u9879\u9a8c\u7b97\u9009\u9879\u3002"
+}, unit);
+assert.equal(invalidExpressionChoice.ok, false);
+assert.ok(invalidExpressionChoice.issues.some((issue) => issue.includes("\u9a8c\u7b97")));
+
+const validExpressionChoice = ruleEngine.validateQuestion({
+  id: "good-expression-choice",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: unit.points[0],
+  questionType: "\u9009\u62e9\u9898",
+  difficulty: "\u57fa\u7840",
+  stem: "\u4e0b\u9762\u54ea\u4e2a\u7b97\u5f0f\u7684\u7ed3\u679c\u7b49\u4e8e 7\uff1f \u2460 56 \u00f7 (8 - 1) \u2461 56 \u00f7 8 \u2462 56 - 8 \u00f7 1 \u2463 (56 - 8) \u00f7 1",
+  answer: "\u2461",
+  explanation: "56 \u00f7 8 = 7\uff0c\u6240\u4ee5\u9009\u2461\u3002"
+}, unit);
+assert.equal(validExpressionChoice.ok, true);
+
 const validFillBlank = ruleEngine.validateQuestion({
   id: "fill-ok",
   unitId: unit.id,
