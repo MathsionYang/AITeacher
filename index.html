@@ -32,6 +32,14 @@
           <select id="unitSelect"></select>
         </div>
 
+        <div class="control-block">
+          <label for="roleModeSelect">使用模式</label>
+          <select id="roleModeSelect">
+            <option value="teacher">教师模式</option>
+            <option value="student">学生模式</option>
+          </select>
+        </div>
+
         <div class="control-row">
           <div class="control-block">
             <label for="difficultySelect">难度</label>
@@ -49,7 +57,7 @@
 
         <button id="generatePaperBtn" class="primary-btn full">进入同步出题</button>
 
-        <div class="model-card">
+        <div class="model-card teacher-only">
           <div class="model-card-head">
             <span>模型与 Agent</span>
             <strong>可选增强</strong>
@@ -74,6 +82,20 @@
             <button id="testModelBtn" class="secondary-btn small" type="button">测试连接</button>
           </div>
           <p id="modelStatus" class="model-status">本地规则引擎运行中，模型为可选增强。</p>
+        </div>
+
+        <div class="data-card teacher-only">
+          <div class="model-card-head">
+            <span>本地数据</span>
+            <strong>教师可见</strong>
+          </div>
+          <div class="button-row compact">
+            <button id="exportLocalDataBtn" class="secondary-btn small" type="button">导出备份</button>
+            <button id="importLocalDataBtn" class="secondary-btn small" type="button">导入备份</button>
+            <button id="clearLocalDataBtn" class="secondary-btn small danger" type="button">清空学习数据</button>
+            <input id="importLocalDataFile" class="hidden-input" type="file" accept="application/json,.json" />
+          </div>
+          <p class="model-status">错题、成绩、审核稿和测验设置仅保存在本机，可手动备份和恢复。</p>
         </div>
 
         <div class="scope-card">
@@ -120,14 +142,14 @@
               <h3>知识点课件生成</h3>
             </div>
             <div class="button-row">
-              <button id="aiCoursewareBtn" class="primary-btn">AI 生成课件</button>
-              <button id="toggleReviewBtn" class="secondary-btn">审核编辑</button>
-              <button id="saveCoursewareBtn" class="secondary-btn">保存审核稿</button>
-              <button id="resetCoursewareBtn" class="secondary-btn">清空课件</button>
-              <button id="exportCoursewareJsonBtn" class="secondary-btn">导出课件记录</button>
-              <button id="importCoursewareBtn" class="secondary-btn">导入历史课件</button>
-              <button id="exportPdfBtn" class="primary-btn">导出 PDF</button>
-              <button id="downloadCoursewareBtn" class="secondary-btn">导出 Markdown</button>
+              <button id="aiCoursewareBtn" class="primary-btn teacher-only">AI 生成课件</button>
+              <button id="toggleReviewBtn" class="secondary-btn teacher-only">审核编辑</button>
+              <button id="saveCoursewareBtn" class="secondary-btn teacher-only">保存审核稿</button>
+              <button id="resetCoursewareBtn" class="secondary-btn teacher-only">清空课件</button>
+              <button id="exportCoursewareJsonBtn" class="secondary-btn teacher-only">导出课件记录</button>
+              <button id="importCoursewareBtn" class="secondary-btn teacher-only">导入历史课件</button>
+              <button id="exportPdfBtn" class="primary-btn teacher-only">导出 PDF</button>
+              <button id="downloadCoursewareBtn" class="secondary-btn teacher-only">导出 Markdown</button>
               <input id="importCoursewareFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>
@@ -149,10 +171,10 @@
               <h3>同步练习</h3>
             </div>
             <div class="button-row">
-              <button id="aiQuestionsBtn" class="primary-btn">AI 生成练习</button>
-              <button id="exportPracticeJsonBtn" class="secondary-btn">导出练习记录</button>
-              <button id="importPracticeBtn" class="secondary-btn">导入历史练习</button>
-              <button id="showAnswerBtn" class="secondary-btn">显示答案</button>
+              <button id="aiQuestionsBtn" class="primary-btn teacher-only">AI 生成练习</button>
+              <button id="exportPracticeJsonBtn" class="secondary-btn teacher-only">导出练习记录</button>
+              <button id="importPracticeBtn" class="secondary-btn teacher-only">导入历史练习</button>
+              <button id="showAnswerBtn" class="secondary-btn teacher-only">显示答案</button>
               <button id="copyAnswersBtn" class="secondary-btn">填入答题模板</button>
               <input id="importPracticeFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
@@ -274,6 +296,7 @@
     <script src="knowledge/rj-grade5-math-a.js"></script>
     <script src="knowledge/rj-grade6-math-a.js"></script>
     <script src="mock-data.js"></script>
+    <script src="rule-engine.js"></script>
     <script src="model-client.js"></script>
     <script src="agent-orchestrator.js"></script>
     <script src="app.js"></script>

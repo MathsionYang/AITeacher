@@ -164,6 +164,16 @@ textarea {
   background: #dce8ff;
 }
 
+.secondary-btn.danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.secondary-btn.danger:hover {
+  background: #ffe4e6;
+}
+
 .secondary-btn.small {
   padding: 7px 10px;
   font-size: 13px;
@@ -178,7 +188,8 @@ button:disabled {
   width: 100%;
 }
 
-.model-card {
+.model-card,
+.data-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -186,6 +197,10 @@ button:disabled {
   background: #162033;
   border: 1px solid #334155;
   border-radius: 8px;
+}
+
+body[data-role-mode="student"] .teacher-only {
+  display: none !important;
 }
 
 .model-card-head {

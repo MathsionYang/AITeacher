@@ -5,6 +5,16 @@
   const coursewareReviewKey = "ai-teacher-rj-math-courseware-reviews-v1";
   const scoreHistoryKey = "ai-teacher-rj-math-score-history-v1";
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
+  const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
+  const ruleEngine = window.AITeacherRuleEngine || {};
+  const exportSchemaVersion = ruleEngine.SCHEMA_VERSION || 2;
+  const localDataKeys = {
+    mistakes: mistakeKey,
+    schedule: scheduleKey,
+    coursewareReviews: coursewareReviewKey,
+    scoreHistory: scoreHistoryKey,
+    roleMode: roleModeKey
+  };
   const mockData = window.AI_TEACHER_MOCK_DATA || {};
   const mockEnabled = Boolean(mockData.enabled);
   const initialScope = mockEnabled ? mockData.initialScope || {} : {};
@@ -28,7 +38,8 @@
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
     scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
-    schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule")
+    schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule"),
+    roleMode: readRoleMode()
   };
 
   const $ = (id) => document.getElementById(id);
@@ -47,6 +58,11 @@
 
   function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function readRoleMode() {
+    const value = localStorage.getItem(roleModeKey);
+    return value === "student" ? "student" : "teacher";
   }
 
   function mockValue(field, fallback) {
@@ -75,8 +91,32 @@
     buildSelectors();
     buildModelProviderOptions();
     restoreScheduleControls();
+    restoreRoleModeControls();
     bindEvents();
     renderAll();
+  }
+
+  function restoreRoleModeControls() {
+    $("roleModeSelect").value = state.roleMode;
+    applyRoleMode();
+  }
+
+  function applyRoleMode() {
+    document.body.dataset.roleMode = state.roleMode;
+    if (!isTeacherMode()) {
+      state.coursewareEditMode = false;
+      state.answersVisible = false;
+    }
+  }
+
+  function isTeacherMode() {
+    return state.roleMode === "teacher";
+  }
+
+  function requireTeacherMode(actionLabel) {
+    if (isTeacherMode()) return true;
+    setModelStatus(`${actionLabel} 仅在教师模式开放；学生模式只保留学习、答题、解析、错题和测验。`, "warn");
+    return false;
   }
 
   function buildSelectors() {
@@ -220,6 +260,14 @@
       renderAll();
     });
 
+    $("roleModeSelect").addEventListener("change", (event) => {
+      state.roleMode = event.target.value === "student" ? "student" : "teacher";
+      localStorage.setItem(roleModeKey, state.roleMode);
+      applyRoleMode();
+      renderAll();
+      setModelStatus(state.roleMode === "teacher" ? "已切换到教师模式，可进行生成、审核和数据管理。" : "已切换到学生模式，只保留学习、答题、解析、错题和测验。", "ok");
+    });
+
     $("generatePaperBtn").addEventListener("click", () => {
       switchTab("practice");
     });
@@ -230,10 +278,14 @@
     $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
     $("exportCoursewareJsonBtn").addEventListener("click", exportCoursewareJson);
-    $("importCoursewareBtn").addEventListener("click", () => $("importCoursewareFile").click());
+    $("importCoursewareBtn").addEventListener("click", () => {
+      if (requireTeacherMode("导入历史课件")) $("importCoursewareFile").click();
+    });
     $("importCoursewareFile").addEventListener("change", importCoursewareJson);
     $("exportPracticeJsonBtn").addEventListener("click", exportPracticeJson);
-    $("importPracticeBtn").addEventListener("click", () => $("importPracticeFile").click());
+    $("importPracticeBtn").addEventListener("click", () => {
+      if (requireTeacherMode("导入历史练习")) $("importPracticeFile").click();
+    });
     $("importPracticeFile").addEventListener("change", importPracticeJson);
     $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
@@ -253,6 +305,12 @@
     $("clearMasteredBtn").addEventListener("click", clearMastered);
     $("saveScheduleBtn").addEventListener("click", saveSchedule);
     $("scheduledPaperBtn").addEventListener("click", buildScheduledPaper);
+    $("exportLocalDataBtn").addEventListener("click", exportLocalData);
+    $("importLocalDataBtn").addEventListener("click", () => {
+      if (requireTeacherMode("导入本地数据备份")) $("importLocalDataFile").click();
+    });
+    $("importLocalDataFile").addEventListener("change", importLocalData);
+    $("clearLocalDataBtn").addEventListener("click", clearLocalData);
     $("mistakeRatio").addEventListener("input", (event) => {
       $("mistakeRatioLabel").textContent = `${event.target.value}%`;
     });
@@ -297,6 +355,7 @@
   }
 
   function renderAll() {
+    applyRoleMode();
     renderScope();
     renderCourseware();
     renderPractice();
@@ -365,6 +424,7 @@
   }
 
   async function testModelConnection() {
+    if (!requireTeacherMode("测试模型连接")) return;
     await runWithModelStatus("testModelBtn", "测试中...", async () => {
       ensureAgentReady();
       const result = await agentOrchestrator.testConnection(collectModelRuntimeConfig());
@@ -373,6 +433,7 @@
   }
 
   async function generateAiCourseware() {
+    if (!requireTeacherMode("AI 生成课件")) return;
     await runWithModelStatus("aiCoursewareBtn", "生成中...", async () => {
       ensureAgentReady();
       const unit = unitData();
@@ -408,6 +469,7 @@
   }
 
   async function generateAiQuestions() {
+    if (!requireTeacherMode("AI 生成练习")) return;
     await runWithModelStatus("aiQuestionsBtn", "出题中...", async () => {
       ensureAgentReady();
       const unit = unitData();
@@ -423,19 +485,16 @@
           buildAgentScope(unit)
         );
         setGenerationProgress("practice", "题目已返回，正在检查知识点范围、题型重复和分值。");
-        const aiQuestions = rebalanceQuestionTypes(
-          normalizeAiQuestions(result.questions, unit, requestedCount),
-          requestedCount
-        );
+        const aiQuestions = normalizeAiQuestions(result.questions, unit, requestedCount);
         const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
-        const mergedQuestions = dedupeByStem([...aiQuestions, ...fallbackQuestions]).slice(0, requestedCount);
-        const scopedQuestions = enforceUnitQuestionBoundary(mergedQuestions, unit);
+        const prepared = prepareQuestionsForPaper([...aiQuestions, ...fallbackQuestions], unit, requestedCount);
 
-        if (!scopedQuestions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
-        state.currentQuestions = normalizePaperPoints(scopedQuestions);
+        if (!prepared.questions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
+        state.currentQuestions = prepared.questions;
         state.answersVisible = false;
         seedAnswerInputsWithTemplate();
-        setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”。`, "ok");
+        const rejectedHint = prepared.rejected.length ? `，已剔除 ${prepared.rejected.length} 题不合格题` : "";
+        setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”${rejectedHint}。`, "ok");
       } finally {
         state.practiceGenerating = false;
         hideGenerationProgress("practice");
@@ -549,6 +608,7 @@
     }));
   }
   function resolveKnowledgePoint(value, unit) {
+    if (ruleEngine.resolveKnowledgePoint) return ruleEngine.resolveKnowledgePoint(value, unit);
     const text = cleanText(value);
     if (!text) return "";
     const points = unit.points || [];
@@ -557,7 +617,31 @@
     return points.find((point) => point.includes(text) || text.includes(point)) || "";
   }
 
+  function prepareQuestionsForPaper(questions, unit, requestedCount) {
+    if (ruleEngine.validatePaper) {
+      const prepared = ruleEngine.validatePaper(questions, unit, { limit: requestedCount });
+      const sourceRefs = getSourceRefs(unit);
+      return {
+        ...prepared,
+        questions: prepared.questions.map((questionItem, index) => ({
+          ...questionItem,
+          id: questionItem.id || `${unit.id}-checked-${Date.now()}-${index}`,
+          sourceIds: questionItem.sourceIds || unit.sourceIds || content.defaultSourceIds || [],
+          sourceRefs: questionItem.sourceRefs || sourceRefs,
+          detailSteps: Array.isArray(questionItem.detailSteps) && questionItem.detailSteps.length
+            ? questionItem.detailSteps
+            : buildDetailSteps(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint }),
+          commonMistake: questionItem.commonMistake || buildCommonMistake(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint }),
+          checkMethod: questionItem.checkMethod || buildCheckMethod(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint })
+        }))
+      };
+    }
+    const scoped = normalizePaperPoints(rebalanceQuestionTypes(dedupeByStem(enforceUnitQuestionBoundary(questions, unit)), requestedCount).slice(0, requestedCount));
+    return { questions: scoped, rejected: [], issues: [], summary: { accepted: scoped.length, totalScore: paperTotal(scoped) } };
+  }
+
   function rebalanceQuestionTypes(questions, count) {
+    if (ruleEngine.rebalanceQuestionTypes) return ruleEngine.rebalanceQuestionTypes(questions, count);
     const safeCount = capGeneratedQuestionCount(count);
     const maxSameType = Math.max(2, Math.ceil(safeCount / 5));
     const typeCounts = {};
@@ -571,6 +655,7 @@
   }
 
   function dedupeByStem(questions) {
+    if (ruleEngine.dedupeByStem) return ruleEngine.dedupeByStem(questions);
     const seen = new Set();
     return questions.filter((questionItem) => {
       const key = cleanText(questionItem.stem);
@@ -616,7 +701,10 @@
 
     if (!hasSlides) {
       $("coursewareSlides").className = "slide-grid empty-state";
-      $("coursewareSlides").innerHTML = `<div><strong>暂无课件</strong><p>可以导入历史课件，或点击“AI 生成课件”创建当前单元课件。</p></div>`;
+      const emptyText = isTeacherMode()
+        ? "可以导入历史课件，或点击“AI 生成课件”创建当前单元课件。"
+        : "当前还没有可学习课件，请让教师模式先生成或导入课件。";
+      $("coursewareSlides").innerHTML = `<div><strong>暂无课件</strong><p>${emptyText}</p></div>`;
       return;
     }
 
@@ -725,6 +813,7 @@
   }
 
   function toggleCoursewareReview() {
+    if (!requireTeacherMode("审核编辑")) return;
     if (!buildCoursewareSlides(unitData()).length) {
       setModelStatus("当前还没有课件，请先导入历史课件或点击 AI 生成课件。", "warn");
       return;
@@ -734,6 +823,7 @@
   }
 
   function saveCoursewareReview() {
+    if (!requireTeacherMode("保存审核稿")) return;
     const unit = unitData();
     const existingSlides = buildCoursewareSlides(unit);
     if (!existingSlides.length) {
@@ -760,6 +850,7 @@
   }
 
   function resetCoursewareReview() {
+    if (!requireTeacherMode("清空课件")) return;
     delete state.coursewareReviews[coursewareKey(unitData())];
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
@@ -773,6 +864,7 @@
   }
 
   function exportCoursewarePdf() {
+    if (!requireTeacherMode("导出 PDF")) return;
     if (!buildCoursewareSlides(unitData()).length) {
       setModelStatus("当前还没有可导出 PDF 的课件。", "warn");
       return;
@@ -925,7 +1017,10 @@
     if (!hasQuestions) {
       $("practiceAnswerPanel").hidden = true;
       list.className = "question-list empty-state";
-      list.innerHTML = `<div><strong>暂无练习</strong><p>可以导入历史练习，或点击“AI 生成练习”创建当前单元同步题。</p></div>`;
+      const emptyText = isTeacherMode()
+        ? "可以导入历史练习，或点击“AI 生成练习”创建当前单元同步题。"
+        : "当前还没有可作答练习，请让教师模式先生成或导入练习。";
+      list.innerHTML = `<div><strong>暂无练习</strong><p>${emptyText}</p></div>`;
       return;
     }
 
@@ -968,12 +1063,14 @@
   function generateScopedQuestions(unit, grade, difficulty, count) {
     const safeCount = capGeneratedQuestionCount(count);
     if (!safeCount) return [];
-    let scoped = enforceUnitQuestionBoundary(generateQuestions(unit, grade, difficulty, safeCount), unit);
+    let prepared = prepareQuestionsForPaper(generateQuestions(unit, grade, difficulty, safeCount), unit, safeCount);
+    let scoped = prepared.questions;
     let attempts = 0;
 
     while (scoped.length < safeCount && attempts < 3) {
       const needed = safeCount - scoped.length;
-      scoped = scoped.concat(enforceUnitQuestionBoundary(generateQuestions(unit, grade, difficulty, needed), unit));
+      prepared = prepareQuestionsForPaper([...scoped, ...generateQuestions(unit, grade, difficulty, needed)], unit, safeCount);
+      scoped = prepared.questions;
       attempts += 1;
     }
 
@@ -981,6 +1078,7 @@
   }
 
   function enforceUnitQuestionBoundary(questions, unit) {
+    if (ruleEngine.enforceUnitQuestionBoundary) return ruleEngine.enforceUnitQuestionBoundary(questions, unit);
     const allowedPoints = new Set(unit.points || []);
     return questions.filter((questionItem) => (
       questionItem.unitId === unit.id
@@ -1276,14 +1374,15 @@
   }
 
   function capQuestionCount(value) {
-    return clamp(Number(value) || 6, 3, 20);
+    return ruleEngine.capQuestionCount ? ruleEngine.capQuestionCount(value) : clamp(Number(value) || 6, 3, 20);
   }
 
   function capGeneratedQuestionCount(value) {
-    return clamp(Number(value) || 0, 0, 20);
+    return ruleEngine.capGeneratedQuestionCount ? ruleEngine.capGeneratedQuestionCount(value) : clamp(Number(value) || 0, 0, 20);
   }
 
   function normalizePaperPoints(questions) {
+    if (ruleEngine.normalizePaperPoints) return ruleEngine.normalizePaperPoints(questions);
     const capped = questions.slice(0, 20);
     if (!capped.length) return [];
     const base = Math.floor(100 / capped.length);
@@ -1295,7 +1394,7 @@
   }
 
   function paperTotal(questions) {
-    return questions.reduce((sum, questionItem) => sum + questionItem.point, 0);
+    return ruleEngine.paperTotal ? ruleEngine.paperTotal(questions) : questions.reduce((sum, questionItem) => sum + questionItem.point, 0);
   }
 
   function includesAny(text, needles) {
@@ -1321,7 +1420,86 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function exportLocalData() {
+    if (!requireTeacherMode("导出本地数据备份")) return;
+    downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
+    setModelStatus("本地学习数据已导出，包含错题、成绩、审核稿、测验设置和角色模式。", "ok");
+  }
+
+  async function importLocalData(event) {
+    if (!requireTeacherMode("导入本地数据备份")) return;
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const data = payload.data || payload;
+      state.mistakes = Array.isArray(data.mistakes) ? data.mistakes : [];
+      state.scoreHistory = Array.isArray(data.scoreHistory) ? data.scoreHistory : [];
+      state.coursewareReviews = data.coursewareReviews && typeof data.coursewareReviews === "object" ? data.coursewareReviews : {};
+      state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10, mistakeRatio: 40 };
+      state.roleMode = data.roleMode === "student" ? "student" : "teacher";
+      writeJson(mistakeKey, state.mistakes);
+      writeJson(scoreHistoryKey, state.scoreHistory);
+      writeJson(coursewareReviewKey, state.coursewareReviews);
+      writeJson(scheduleKey, state.schedule);
+      localStorage.setItem(roleModeKey, state.roleMode);
+      restoreScheduleControls();
+      restoreRoleModeControls();
+      clearPracticeState();
+      renderAll();
+      setModelStatus("本地数据备份已导入并恢复。", "ok");
+    } catch (error) {
+      setModelStatus(error.message || "本地数据备份导入失败。", "error");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function clearLocalData() {
+    if (!requireTeacherMode("清空学习数据")) return;
+    const confirmed = window.confirm("确认清空本机错题、成绩、课件审核稿和测验设置？此操作不会删除知识点包。建议先导出备份。");
+    if (!confirmed) return;
+    Object.values(localDataKeys).forEach((key) => localStorage.removeItem(key));
+    state.mistakes = [];
+    state.scoreHistory = [];
+    state.coursewareReviews = {};
+    state.schedule = { frequency: "每周", count: 10, mistakeRatio: 40 };
+    state.roleMode = "teacher";
+    restoreScheduleControls();
+    restoreRoleModeControls();
+    clearPracticeState();
+    renderAll();
+    setModelStatus("本机学习数据已清空，知识点包和代码不受影响。", "ok");
+  }
+
+  function buildLocalDataPayload() {
+    return {
+      schemaVersion: exportSchemaVersion,
+      exportedAt: new Date().toISOString(),
+      type: "local-data-backup",
+      version: content.version,
+      subject: content.subject,
+      data: {
+        mistakes: state.mistakes,
+        scoreHistory: state.scoreHistory,
+        coursewareReviews: state.coursewareReviews,
+        schedule: state.schedule,
+        roleMode: state.roleMode
+      }
+    };
+  }
+
+  function downloadJson(payload, filename) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
   function downloadCourseware() {
+    if (!requireTeacherMode("导出 Markdown")) return;
     if (!buildCoursewareSlides(unitData()).length) {
       setModelStatus("当前还没有可导出 Markdown 的课件。", "warn");
       return;
@@ -1337,6 +1515,7 @@
   }
 
   function exportCoursewareJson() {
+    if (!requireTeacherMode("导出课件记录")) return;
     const unit = unitData();
     const slides = buildCoursewareSlides(unit);
     if (!slides.length) {
@@ -1344,7 +1523,7 @@
       return;
     }
     const payload = {
-      schemaVersion: 1,
+      schemaVersion: exportSchemaVersion,
       exportedAt: new Date().toISOString(),
       type: "courseware",
       version: content.version,
@@ -1368,6 +1547,7 @@
   }
 
   async function importCoursewareJson(event) {
+    if (!requireTeacherMode("导入历史课件")) return;
     const file = event.target.files && event.target.files[0];
     if (!file) return;
     try {
@@ -1392,13 +1572,14 @@
   }
 
   function exportPracticeJson() {
+    if (!requireTeacherMode("导出练习记录")) return;
     if (!state.currentQuestions.length) {
       setModelStatus("当前还没有可导出的练习记录。", "warn");
       return;
     }
     const unit = unitData();
     const payload = {
-      schemaVersion: 1,
+      schemaVersion: exportSchemaVersion,
       exportedAt: new Date().toISOString(),
       type: "practice",
       version: content.version,
@@ -1427,6 +1608,7 @@
   }
 
   async function importPracticeJson(event) {
+    if (!requireTeacherMode("导入历史练习")) return;
     const file = event.target.files && event.target.files[0];
     if (!file) return;
     try {
@@ -1436,8 +1618,9 @@
       applyScopeFromPayload(payload);
       const unit = unitData();
       const questions = normalizeImportedQuestions(rawQuestions, unit);
-      if (!questions.length) throw new Error("导入题目未通过当前单元知识点边界校验。");
-      state.currentQuestions = normalizePaperPoints(questions);
+      const prepared = prepareQuestionsForPaper(questions, unit, capQuestionCount(questions.length));
+      if (!prepared.questions.length) throw new Error("导入题目未通过当前单元知识点边界校验。");
+      state.currentQuestions = prepared.questions;
       state.answersVisible = false;
       seedAnswerInputsWithTemplate();
       if (payload.answersText) {
@@ -1569,7 +1752,7 @@
       setModelStatus("当前还没有可判分的练习题，请先生成或导入练习。", "warn");
       return;
     }
-    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(state.currentQuestions, unitData()));
+    state.currentQuestions = prepareQuestionsForPaper(state.currentQuestions, unitData(), state.currentQuestions.length).questions;
     const answers = parseAnswers(answerText || "");
     const results = state.currentQuestions.map((question, index) => {
       const submitted = answers[index + 1] || "";
@@ -1615,6 +1798,7 @@
   }
 
   function isCorrectAnswer(submitted, expected) {
+    if (ruleEngine.isCorrectAnswer) return ruleEngine.isCorrectAnswer(submitted, expected);
     const cleanSubmitted = normalizeAnswer(submitted);
     const cleanExpected = normalizeAnswer(expected);
     if (!cleanSubmitted) return false;
@@ -1630,6 +1814,7 @@
   }
 
   function normalizeAnswer(value) {
+    if (ruleEngine.normalizeAnswer) return ruleEngine.normalizeAnswer(value);
     return String(value)
       .replace(/\s+/g, "")
       .replace(/[，。；;]/g, "")
@@ -1640,6 +1825,7 @@
   }
 
   function parseNumberLike(value) {
+    if (ruleEngine.parseNumberLike) return ruleEngine.parseNumberLike(value);
     const text = normalizeAnswer(value).replace(/^x=/, "");
     if (/^-?\d+(\.\d+)?%$/.test(text)) return Number(text.replace("%", "")) / 100;
     const fraction = text.match(/^(-?\d+)\/(\d+)$/);
@@ -2122,7 +2308,7 @@
       switchTab("mistakes");
       return;
     }
-    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(activeMistakes.map((item, index) => ({
+    state.currentQuestions = prepareQuestionsForPaper(activeMistakes.map((item, index) => ({
       id: `mistake-${item.id}-${index}`,
       unitId: unitData().id,
       unitTitle: item.unitTitle,
@@ -2137,7 +2323,7 @@
       checkMethod: item.checkMethod,
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
-    })), unitData()));
+    })), unitData(), activeMistakes.length).questions;
     state.answersVisible = false;
     seedAnswerInputsWithTemplate();
     switchTab("practice");
@@ -2196,7 +2382,7 @@
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
     }));
-    state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(shuffle([...mistakeQuestions, ...newQuestions]), unitData()));
+    state.currentQuestions = prepareQuestionsForPaper(shuffle([...mistakeQuestions, ...newQuestions]), unitData(), count).questions;
     seedAnswerInputsWithTemplate();
     $("scheduledPaper").className = "question-list";
     $("scheduledPaper").innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
