@@ -8,6 +8,13 @@
     "厘米", "分米", "千米", "毫米", "米", "cm²", "cm³", "cm2", "cm3", "cm",
     "元", "角", "分", "克", "千克", "吨", "小时", "分钟", "秒", "分"
   ];
+  const OBJECTIVE_TYPE_KEYWORDS = ["选择", "填空", "计算", "口算", "单位换算", "图形识别", "数据读取"];
+  const OPEN_ENDED_STEM_KEYWORDS = [
+    "说明", "为什么", "理由", "解释", "简述", "请描述", "描述过程", "描述理由", "描述思路",
+    "写出过程", "解题过程", "请写出", "写出对应", "综合算式", "合并成", "合并为",
+    "写成综合", "列综合", "列式说明", "如果不对", "不对请", "对吗", "错在哪里",
+    "改正", "纠正", "改一改", "请改", "请说明", "证明", "作图"
+  ];
 
   function clamp(value, min, max) {
     const number = Number(value);
@@ -149,7 +156,7 @@
 
   function rebalanceQuestionTypes(questions, count) {
     const safeCount = capGeneratedQuestionCount(count || questions?.length || 0);
-    const maxSameType = Math.max(2, Math.ceil(Math.max(safeCount, 1) / 5));
+    const maxSameType = Math.max(4, Math.ceil(Math.max(safeCount, 1) / 3));
     const typeCounts = {};
     return (Array.isArray(questions) ? questions : []).filter((questionItem) => {
       const type = normalizeText(questionItem?.questionType) || "同步练习题";
@@ -167,14 +174,17 @@
     const stem = normalizeText(questionItem?.stem);
     const answer = normalizeText(questionItem?.answer);
     const explanation = normalizeText(questionItem?.explanation);
-    const questionType = normalizeText(questionItem?.questionType) || "同步练习题";
+    const questionType = normalizeObjectiveQuestionType(questionItem?.questionType, stem);
     const difficulty = DIFFICULTIES.has(questionItem?.difficulty) ? questionItem.difficulty : "基础";
 
     if (!stem) issues.push("题干为空");
     if (!answer) issues.push("答案为空");
     if (!explanation) warnings.push("解析为空或过短");
     if (!knowledgePoint) issues.push("知识点不在当前单元边界内");
-    if (!isAnswerCheckable(answer)) warnings.push("答案不易规则验算，需要人工复核");
+    if (!isObjectiveQuestionType(questionType)) issues.push("题型不是选择题、填空题或计算填空题");
+    if (isOpenEndedStem(stem)) issues.push("题干包含说明、改正、综合算式等开放作答要求");
+    if (questionType.includes("选择") && !hasChoiceOptions(stem)) issues.push("选择题缺少 A/B/C/D 或 ①②③④ 选项");
+    if (!isAnswerCheckable(answer)) issues.push("答案不是短标准答案，自动判分不稳定");
 
     return {
       ok: issues.length === 0,
@@ -225,13 +235,40 @@
     };
   }
 
+  function normalizeObjectiveQuestionType(questionType, stem = "") {
+    const type = normalizeText(questionType);
+    if (type.includes("选择") || hasChoiceOptions(stem)) return type.includes("图形") ? "图形选择题" : "选择题";
+    if (type.includes("单位")) return "单位换算填空题";
+    if (type.includes("数据") || type.includes("统计")) return "数据填空题";
+    if (type.includes("计算") || type.includes("口算") || type.includes("竖式")) return "计算填空题";
+    if (type.includes("填空")) return "填空题";
+    return type || "填空题";
+  }
+
+  function isObjectiveQuestionType(questionType) {
+    const type = normalizeText(questionType);
+    return OBJECTIVE_TYPE_KEYWORDS.some((keyword) => type.includes(keyword));
+  }
+
+  function isOpenEndedStem(stem) {
+    const text = normalizeLooseText(stem);
+    return OPEN_ENDED_STEM_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+  }
+
+  function hasChoiceOptions(stem) {
+    const text = normalizeText(stem);
+    return /(?:A[.．、:：]|B[.．、:：]|C[.．、:：]|D[.．、:：])/.test(text) || /(?:①|②|③|④)/.test(text);
+  }
+
   function isAnswerCheckable(answer) {
     const text = normalizeAnswer(answer);
     if (!text) return false;
+    if (/^[a-d]$/.test(text) || /^选?[a-d]$/.test(text)) return true;
+    if (/^[①②③④]$/.test(text)) return true;
     if (Number.isFinite(parseNumberLike(text))) return true;
-    if (/^(锐角|直角|钝角|是|否|对|错|正确|错误)$/.test(text)) return true;
-    if (splitCompositeAnswer(text).length > 1) return true;
-    return text.length <= 24;
+    if (/^(锐角|直角|钝角|平角|周角|是|否|对|错|正确|错误|正面|侧面|上面|左面|右面|参照点)$/.test(text)) return true;
+    if (splitCompositeAnswer(text).length > 1) return splitCompositeAnswer(text).every((part) => Number.isFinite(parseNumberLike(part)) || part.length <= 8);
+    return text.length <= 12;
   }
 
   const api = {
@@ -249,6 +286,8 @@
     parseNumberLike,
     rebalanceQuestionTypes,
     resolveKnowledgePoint,
+    isOpenEndedStem,
+    isObjectiveQuestionType,
     validatePaper,
     validateQuestion
   };

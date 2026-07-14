@@ -776,7 +776,7 @@
       },
       {
         title: "课堂练习",
-        body: "由易到难安排基础题、变式题和小应用题。",
+        body: "由易到难安排基础题、变式题和标准情境题。",
         bullets: [`基础：${unit.tags[0] || "概念"}直接应用`, "提高：改变条件或表达方式", "挑战：结合生活场景解释结果"],
         visualType: "practice",
         sources
@@ -981,7 +981,7 @@
       <div class="flow-visual ${size}">
         <strong class="visual-title">${escapeHtml(point)}</strong>
         <span>条件</span><span>关系</span><span>算式</span><span>结果</span>
-        <small class="visual-caption">每一步都回答“为什么这样列式”。</small>
+        <small class="visual-caption">每一步都对应一个标准填空结果，方便检查。</small>
       </div>
     `;
   }
@@ -1090,7 +1090,7 @@
   function generateQuestions(unit, grade, difficulty, count) {
     const safeCount = capGeneratedQuestionCount(count);
     const questions = [];
-    const modes = ["概念理解", "基础计算", "情境应用", "变式判断", "综合提升"];
+    const modes = ["计算填空题", "选择题", "填空题", "计算填空题", "选择题"];
     const maxSameType = Math.max(2, Math.ceil(safeCount / modes.length));
     const typeCounts = {};
     let cursor = 0;
@@ -1143,8 +1143,8 @@
     const b = Math.max(2, Math.floor(base / 2) + index + 4);
     const isSubtract = index % 2 === 1;
     const stem = isSubtract
-      ? `${a + b} - ${b} = ?`
-      : `${a} + ${b} = ?`;
+      ? `填空：${a + b} - ${b} = ____。`
+      : `填空：${a} + ${b} = ____。`;
     const answer = String(isSubtract ? a : a + b);
     return question(unit, tag, difficulty, stem, answer, `先看运算符号，再按数位或口算策略计算，结果是 ${answer}。`, index);
   }
@@ -1156,11 +1156,11 @@
     if (index % 3 === 2) {
       const total = a * b + (difficulty === "基础" ? 0 : index + 1);
       const answer = difficulty === "基础" ? String(b) : `${b} 余 ${index + 1}`;
-      const stem = `${total} ÷ ${a} = ?`;
+      const stem = `填空：${total} ÷ ${a} = ____。`;
       return question(unit, tag, difficulty, stem, answer, `用乘法口诀或试商：${a} × ${b} = ${a * b}，${total} 除以 ${a} 的结果为 ${answer}。`, index);
     }
     const answer = String(a * b);
-    return question(unit, tag, difficulty, `${a} × ${b} = ?`, answer, `把 ${a} 个 ${b} 相加，或用乘法口诀/竖式计算，积是 ${answer}。`, index);
+    return question(unit, tag, difficulty, `填空：${a} × ${b} = ____。`, answer, `把 ${a} 个 ${b} 相加，或用乘法口诀/竖式计算，积是 ${answer}。`, index);
   }
 
   function decimalQuestion({ unit, difficulty, tag, index }) {
@@ -1170,7 +1170,7 @@
     const multiply = difficulty === "挑战" && index % 2 === 0;
     const answerNumber = multiply ? a * b : a + b;
     const answer = trimNumber(answerNumber);
-    const stem = multiply ? `${trimNumber(a)} × ${trimNumber(b)} = ?` : `${trimNumber(a)} + ${trimNumber(b)} = ?`;
+    const stem = multiply ? `填空：${trimNumber(a)} × ${trimNumber(b)} = ____。` : `填空：${trimNumber(a)} + ${trimNumber(b)} = ____。`;
     return question(unit, tag, difficulty, stem, answer, `小数计算要先确定运算方法，再处理小数点位置，结果是 ${answer}。`, index);
   }
 
@@ -1180,7 +1180,7 @@
     const b = difficulty === "挑战" ? 2 + (index % 4) : 1 + (index % 2);
     const numerator = a + b;
     const answer = reduceFraction(numerator, denominator);
-    const stem = `${a}/${denominator} + ${b}/${denominator} = ?`;
+    const stem = `填空：${a}/${denominator} + ${b}/${denominator} = ____。`;
     return question(unit, tag, difficulty, stem, answer, `同分母分数相加，分母不变，分子相加：${a}+${b}=${numerator}，再化简为 ${answer}。`, index);
   }
 
@@ -1188,7 +1188,7 @@
     const amount = difficulty === "基础" ? 80 + index * 10 : 120 + index * 20;
     const rate = difficulty === "挑战" ? 35 : difficulty === "提高" ? 25 : 10;
     const answer = trimNumber((amount * rate) / 100);
-    const stem = `${amount} 的 ${rate}% 是多少？`;
+    const stem = `填空：${amount} 的 ${rate}% 是 ____。`;
     return question(unit, tag, difficulty, stem, answer, `百分数可以转化为小数：${rate}% = ${rate / 100}，所以 ${amount} × ${rate / 100} = ${answer}。`, index);
   }
 
@@ -1196,9 +1196,9 @@
     const a = 2 + (index % 3);
     const b = difficulty === "挑战" ? 5 + (index % 4) : 3 + (index % 3);
     const total = (a + b) * (difficulty === "基础" ? 6 : 8);
-    const answer = `${(total * a) / (a + b)} 和 ${(total * b) / (a + b)}`;
-    const stem = `把 ${total} 按 ${a}:${b} 分成两部分，两部分分别是多少？`;
-    return question(unit, tag, difficulty, stem, answer, `总份数是 ${a + b}，每份是 ${total} ÷ ${a + b}，再分别乘 ${a} 和 ${b}。`, index);
+    const answer = String((total * a) / (a + b));
+    const stem = `填空：把 ${total} 按 ${a}:${b} 分成两部分，第一部分是 ____。`;
+    return question(unit, tag, difficulty, stem, answer, `总份数是 ${a + b}，每份是 ${total} ÷ ${a + b}，第一部分是 ${answer}。`, index);
   }
 
   function equationQuestion({ unit, difficulty, tag, index }) {
@@ -1206,15 +1206,15 @@
     const a = difficulty === "基础" ? 2 : 3;
     const b = difficulty === "挑战" ? 11 : 5;
     const c = a * x + b;
-    const stem = `解方程：${a}x + ${b} = ${c}`;
-    return question(unit, tag, difficulty, stem, `x=${x}`, `先两边同时减 ${b}，得 ${a}x=${a * x}；再两边同时除以 ${a}，得 x=${x}。`, index);
+    const stem = `填空：若 ${a}x + ${b} = ${c}，则 x = ____。`;
+    return question(unit, tag, difficulty, stem, String(x), `先两边同时减 ${b}，得 ${a}x=${a * x}；再两边同时除以 ${a}，得 x=${x}。`, index);
   }
 
   function areaQuestion({ unit, difficulty, tag, index }) {
     const length = 8 + index + (difficulty === "挑战" ? 7 : 0);
     const width = 5 + (index % 5);
     const answer = String(length * width);
-    const stem = `一个长方形长 ${length} cm，宽 ${width} cm，面积是多少平方厘米？`;
+    const stem = `填空：长方形长 ${length} cm，宽 ${width} cm，面积是 ____ 平方厘米。`;
     return question(unit, tag, difficulty, stem, answer, `长方形面积 = 长 × 宽，所以 ${length} × ${width} = ${answer} 平方厘米。`, index);
   }
 
@@ -1223,7 +1223,7 @@
     const width = 3 + (index % 3);
     const height = difficulty === "基础" ? 2 : 5;
     const answer = String(length * width * height);
-    const stem = `一个长方体长 ${length} cm，宽 ${width} cm，高 ${height} cm，体积是多少立方厘米？`;
+    const stem = `填空：长方体长 ${length} cm，宽 ${width} cm，高 ${height} cm，体积是 ____ 立方厘米。`;
     return question(unit, tag, difficulty, stem, answer, `长方体体积 = 长 × 宽 × 高，所以 ${length} × ${width} × ${height} = ${answer}。`, index);
   }
 
@@ -1232,11 +1232,11 @@
       const yuan = 3 + index;
       const jiao = difficulty === "基础" ? 5 : 8;
       const answer = String(yuan * 10 + jiao);
-      return question(unit, tag, difficulty, `${yuan} 元 ${jiao} 角 = ? 角`, answer, `1 元 = 10 角，所以 ${yuan} 元是 ${yuan * 10} 角，再加 ${jiao} 角，共 ${answer} 角。`, index);
+      return question(unit, tag, difficulty, `填空：${yuan} 元 ${jiao} 角 = ____ 角。`, answer, `1 元 = 10 角，所以 ${yuan} 元是 ${yuan * 10} 角，再加 ${jiao} 角，共 ${answer} 角。`, index);
     }
     const meters = 2 + index;
     const answer = String(meters * 100);
-    return question(unit, tag, difficulty, `${meters} 米 = ? 厘米`, answer, `1 米 = 100 厘米，所以 ${meters} 米 = ${answer} 厘米。`, index);
+    return question(unit, tag, difficulty, `填空：${meters} 米 = ____ 厘米。`, answer, `1 米 = 100 厘米，所以 ${meters} 米 = ${answer} 厘米。`, index);
   }
 
   function timeQuestion({ unit, difficulty, tag, index }) {
@@ -1245,14 +1245,14 @@
     const endMinutes = minutes % 60;
     const endHour = startHour + Math.floor(minutes / 60);
     const answer = `${endHour}:${String(endMinutes).padStart(2, "0")}`;
-    const stem = `${startHour}:00 开始上课，经过 ${minutes} 分钟后是几点？`;
+    const stem = `填空：${startHour}:00 开始上课，经过 ${minutes} 分钟后是 ____。`;
     return question(unit, tag, difficulty, stem, answer, `经过时间要按 60 分钟进 1 小时计算，${startHour}:00 加 ${minutes} 分钟是 ${answer}。`, index);
   }
 
   function statisticsQuestion({ unit, difficulty, tag, index }) {
     const values = difficulty === "基础" ? [6 + index, 8 + index, 10 + index] : [12 + index, 15 + index, 18 + index];
     const answer = String(values.reduce((sum, value) => sum + value, 0) / values.length);
-    const stem = `三次数学练习得分分别是 ${values.join("、")} 分，平均分是多少？`;
+    const stem = `填空：三次数学练习得分分别是 ${values.join("、")} 分，平均分是 ____ 分。`;
     return question(unit, tag, difficulty, stem, answer, `平均数 = 总数 ÷ 份数，先求和再除以 ${values.length}，平均分是 ${answer}。`, index);
   }
 
@@ -1260,10 +1260,12 @@
     if (tag.includes("角")) {
       const angle = difficulty === "基础" ? 90 : 35 + index * 10;
       const type = angle === 90 ? "直角" : angle < 90 ? "锐角" : "钝角";
-      return question(unit, tag, difficulty, `${angle}° 的角属于锐角、直角还是钝角？`, type, `小于 90° 是锐角，等于 90° 是直角，大于 90° 小于 180° 是钝角，所以答案是${type}。`, index);
+      const options = ["锐角", "直角", "钝角", "平角"];
+      const answer = ["A", "B", "C", "D"][options.indexOf(type)];
+      return question(unit, tag, difficulty, `选择题：${angle}° 的角属于哪一类？ A. 锐角 B. 直角 C. 钝角 D. 平角`, answer, `小于 90° 是锐角，等于 90° 是直角，大于 90° 小于 180° 是钝角，所以选 ${answer}。`, index);
     }
-    const answer = "先确定参照点，再按方向和距离描述";
-    return question(unit, tag, difficulty, "描述位置时，通常要先确定什么，再说明方向和距离？", answer, "位置与方向问题要先确定观测点或参照点，再描述方向、角度和距离。", index);
+    const answer = "A";
+    return question(unit, tag, difficulty, "选择题：确定位置或观察方向时，通常要先确定什么？ A. 参照点 B. 颜色 C. 重量 D. 价格", answer, "位置与方向问题要先确定观测点或参照点，再处理方向、角度和距离，所以选 A。", index);
   }
 
   function question(unit, knowledgePoint, difficulty, stem, answer, explanation, index) {
@@ -1299,13 +1301,11 @@
   }
 
   function pickQuestionType(mode, tag) {
-    if (mode === "概念理解") return "概念辨析题";
-    if (mode === "情境应用") return "生活应用题";
-    if (mode === "变式判断") return includesAny(tag, ["图形", "角", "方向", "统计"]) ? "图表判断题" : "变式计算题";
-    if (mode === "综合提升") return "综合提升题";
-    if (includesAny(tag, ["图形", "角", "面积", "体积"])) return "图形计算题";
-    if (includesAny(tag, ["统计"])) return "数据分析题";
-    return "基础计算题";
+    if (includesAny(tag, ["图形", "角", "方向", "观察"]) || String(mode).includes("选择")) return "选择题";
+    if (includesAny(tag, ["单位", "长度", "人民币", "时间"])) return "单位换算填空题";
+    if (includesAny(tag, ["统计"])) return "数据填空题";
+    if (String(mode).includes("计算")) return "计算填空题";
+    return "填空题";
   }
 
   function buildDetailSteps(questionItem, context) {
@@ -1984,7 +1984,7 @@
           </div>
           <div>
             <strong>高分稳定区</strong>
-            <p>接下来可以减少重复基础题，增加变式题和综合应用题，保持手感。</p>
+            <p>接下来可以减少重复基础题，增加变式题和综合标准题，保持手感。</p>
           </div>
         </article>
       `;
