@@ -154,13 +154,25 @@ function createProxyServer(config) {
         clearTimeout(timeoutId);
       }
 
-      const payload = Buffer.from(await upstreamResponse.arrayBuffer());
       response.writeHead(upstreamResponse.status, {
         ...corsHeaders(),
         "Content-Type": upstreamResponse.headers.get("content-type") || "application/json",
         "Cache-Control": "no-cache"
       });
-      response.end(payload);
+
+      if (!upstreamResponse.body || typeof upstreamResponse.body.getReader !== "function") {
+        const payload = Buffer.from(await upstreamResponse.arrayBuffer());
+        response.end(payload);
+        return;
+      }
+
+      const reader = upstreamResponse.body.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        response.write(Buffer.from(value));
+      }
+      response.end();
     } catch (error) {
       sendJson(response, 502, { error: error.message || String(error) });
     }

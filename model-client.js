@@ -47,6 +47,16 @@
       return parseJsonResponse(content);
     }
 
+    async function generateJsonStream(input, messages, options = {}, onToken) {
+      const content = await requestChatStream(input, messages, {
+        ...options,
+        response_format: { type: "json_object" },
+        temperature: input.temperature ?? 0,
+        seed: input.seed ?? 20260713
+      }, onToken);
+      return parseJsonResponse(content);
+    }
+
     async function requestChat(input, messages, options = {}) {
       if (typeof fetchImpl !== "function") throw new Error("当前浏览器不支持 fetch。");
       if (typeof AbortControllerImpl !== "function") throw new Error("当前浏览器不支持 AbortController。");
@@ -90,6 +100,99 @@
       if (!content) throw new Error("模型返回为空或格式不兼容。");
       return content;
     }
+    async function requestChatStream(input, messages, options = {}, onToken) {
+      if (typeof fetchImpl !== "function") throw new Error("当前浏览器不支持 fetch。");
+      if (typeof AbortControllerImpl !== "function") throw new Error("当前浏览器不支持 AbortController。");
+      if (requiresApiKey(input) && !input?.apiKey) throw new Error("请先填写临时 API Key，或选择本地代理。");
+      if (!input?.model) throw new Error("请先填写模型名称。");
+
+      const controller = new AbortControllerImpl();
+      const timeoutId = global.setTimeout?.(() => controller.abort(), input.timeoutMs || timeoutMs);
+      const headers = {
+        "Content-Type": "application/json",
+        ...(input?.apiKey ? { Authorization: `Bearer ${input.apiKey}` } : {})
+      };
+      let response;
+
+      try {
+        response = await fetchImpl(resolveChatCompletionsEndpoint(input), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: input.model,
+            messages,
+            temperature: options.temperature ?? input.temperature ?? 0,
+            seed: options.seed ?? input.seed ?? 20260713,
+            stream: true,
+            ...(options.response_format ? { response_format: options.response_format } : {})
+          }),
+          signal: controller.signal
+        });
+      } finally {
+        if (timeoutId !== undefined) global.clearTimeout?.(timeoutId);
+      }
+
+      if (!response.ok) {
+        const text = await safeReadText(response);
+        throw new Error(formatHttpError(response, text));
+      }
+
+      if (!response.body || typeof response.body.getReader !== "function") {
+        return requestChat(input, messages, options);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let rawText = "";
+      let content = "";
+      const processStreamLine = (line) => {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) return;
+        const payload = trimmed.replace(/^data:\s*/, "");
+        if (payload === "[DONE]") return;
+        try {
+          const event = JSON.parse(payload);
+          const token = event?.choices?.[0]?.delta?.content ?? event?.choices?.[0]?.message?.content ?? "";
+          if (token) {
+            content += token;
+            if (typeof onToken === "function") onToken(token, content);
+          }
+        } catch {
+          // Ignore keepalive or non-JSON SSE lines.
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunkText = decoder.decode(value, { stream: true });
+        rawText += chunkText;
+        buffer += chunkText;
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
+        lines.forEach(processStreamLine);
+      }
+
+      const tailText = decoder.decode();
+      if (tailText) {
+        rawText += tailText;
+        buffer += tailText;
+      }
+      if (buffer.trim()) {
+        buffer.split(/\r?\n/).forEach(processStreamLine);
+      }
+
+      if (!content) {
+        const fallbackContent = parseChatCompletionContent(rawText);
+        if (fallbackContent) {
+          if (typeof onToken === "function") onToken(fallbackContent, fallbackContent);
+          return fallbackContent;
+        }
+        throw new Error("模型流式返回为空或格式不兼容。");
+      }
+      return content;
+    }
 
     function resolveChatCompletionsEndpoint(input) {
       const baseUrl = resolveBaseUrl(input).trim().replace(/\/+$/, "");
@@ -107,12 +210,21 @@
 
     return {
       generateJson,
+      generateJsonStream,
       requestChat,
       resolveChatCompletionsEndpoint,
       testModelConnection
     };
   }
 
+  function parseChatCompletionContent(rawText) {
+    try {
+      const data = JSON.parse(String(rawText || "").trim());
+      return data?.choices?.[0]?.message?.content || "";
+    } catch {
+      return "";
+    }
+  }
   function parseJsonResponse(content) {
     try {
       return JSON.parse(stripJsonFence(content));

@@ -206,6 +206,9 @@
     $("aiCoursewareBtn").addEventListener("click", generateAiCourseware);
     $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
+    $("exportCoursewareJsonBtn").addEventListener("click", exportCoursewareJson);
+    $("importCoursewareBtn").addEventListener("click", () => $("importCoursewareFile").click());
+    $("importCoursewareFile").addEventListener("change", importCoursewareJson);
     $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
     $("saveCoursewareBtn").addEventListener("click", saveCoursewareReview);
@@ -330,16 +333,19 @@
       ensureAgentReady();
       const unit = unitData();
       const fallbackSlides = buildCoursewareSlides(unit);
-      const result = await agentOrchestrator.generateCourseware(
+      switchTab("courseware");
+      resetCoursewareStream("正在请求模型，流式内容会显示在这里...\n");
+      const generator = agentOrchestrator.generateCoursewareStream || agentOrchestrator.generateCourseware;
+      const result = await generator(
         collectModelRuntimeConfig(),
         buildAgentScope(unit),
-        fallbackSlides
+        fallbackSlides,
+        (token, fullText) => appendCoursewareStream(token, fullText)
       );
       const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
       state.coursewareReviews[coursewareKey(unit)] = slides;
       writeJson(coursewareReviewKey, state.coursewareReviews);
       state.coursewareEditMode = false;
-      switchTab("courseware");
       renderCourseware();
       setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
     });
@@ -397,6 +403,23 @@
     if (!status) return;
     status.textContent = message;
     status.dataset.tone = tone;
+  }
+
+  function resetCoursewareStream(initialText = "") {
+    const panel = $("coursewareStreamPanel");
+    const output = $("coursewareStreamOutput");
+    if (!panel || !output) return;
+    panel.hidden = false;
+    output.textContent = initialText;
+  }
+
+  function appendCoursewareStream(token, fullText) {
+    const panel = $("coursewareStreamPanel");
+    const output = $("coursewareStreamOutput");
+    if (!panel || !output) return;
+    panel.hidden = false;
+    output.textContent = fullText;
+    output.scrollTop = output.scrollHeight;
   }
 
   function normalizeAiCoursewareSlides(slides, fallbackSlides, unit) {
@@ -1180,6 +1203,52 @@
     URL.revokeObjectURL(url);
   }
 
+  function exportCoursewareJson() {
+    const unit = unitData();
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      version: content.version,
+      subject: content.subject,
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      slides: buildCoursewareSlides(unit)
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${gradeData().name}${volumeData().name}-${unit.title}-课件审核稿.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setModelStatus("课件 JSON 已导出，可用于人工审核、备份或迁移。", "ok");
+  }
+
+  async function importCoursewareJson(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const rawSlides = Array.isArray(payload) ? payload : payload.slides;
+      if (!Array.isArray(rawSlides) || !rawSlides.length) throw new Error("JSON 中未找到 slides 数组。");
+      const unit = unitData();
+      const slides = normalizeAiCoursewareSlides(rawSlides, buildCoursewareSlides(unit), unit);
+      state.coursewareReviews[coursewareKey(unit)] = slides;
+      writeJson(coursewareReviewKey, state.coursewareReviews);
+      state.coursewareEditMode = false;
+      renderCourseware();
+      switchTab("courseware");
+      setModelStatus(`已导入 ${slides.length} 页课件到当前单元审核稿。`, "ok");
+    } catch (error) {
+      setModelStatus(error.message || "课件 JSON 导入失败。", "error");
+    } finally {
+      event.target.value = "";
+    }
+  }
   function buildCoursewareMarkdown() {
     const unit = unitData();
     const slides = buildCoursewareSlides(unit);

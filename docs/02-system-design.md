@@ -50,14 +50,15 @@ index.html
 - 输出导入、讲解、例题、练习、小结、作业。
 - 同一输入在同一模板版本下保持大致稳定。
 - 每页优先使用图形、表格、数轴、流程或动画表达；图形必须服务知识点理解，而不是装饰。
-- 支持人工审核修改、PDF/Markdown 导出。
+- 支持人工审核修改、JSON 导入导出、PDF/Markdown 导出。
 
 当前实现：
 
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
 - `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
 - 审核稿保存在 `localStorage` 的 `ai-teacher-rj-math-courseware-reviews-v1`。
-- AI 课件生成结果先进入审核稿，用户可继续编辑、保存或重置。
+- AI 课件按钮放在“知识点课件”页面内，生成过程通过流式输出面板展示，生成结果先进入审核稿。
+- 课件审核稿可导出为 JSON，也可从 JSON 导入到当前单元，便于人工审核、备份和迁移。
 - `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF。
 
 正式实现：
@@ -65,7 +66,7 @@ index.html
 - 本地前端提交教材范围、教学目标和知识点 JSON。
 - 本地 Agent 或用户配置的大模型生成结构化初稿；模型配置参考 `.env.example`，Agent 声明参考 `agents/ai-teacher-agents.yaml`。
 - 规则引擎校验知识点覆盖、来源、题型重复和版权风险。
-- 用户审核后导出 PDF/Markdown，后续可扩展本地 PPTX 导出。
+- 用户审核后导出 JSON、PDF 或 Markdown，后续可扩展本地 PPTX 导出。
 
 ### 出题系统
 

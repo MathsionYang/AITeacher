@@ -72,8 +72,6 @@
           </div>
           <div class="button-row compact">
             <button id="testModelBtn" class="secondary-btn small" type="button">测试连接</button>
-            <button id="aiCoursewareBtn" class="secondary-btn small" type="button">AI 课件</button>
-            <button id="aiQuestionsBtn" class="secondary-btn small" type="button">AI 出题</button>
           </div>
           <p id="modelStatus" class="model-status">本地规则引擎运行中，模型为可选增强。</p>
         </div>
@@ -122,12 +120,23 @@
               <h3>知识点课件生成</h3>
             </div>
             <div class="button-row">
+              <button id="aiCoursewareBtn" class="primary-btn">AI 生成课件</button>
               <button id="toggleReviewBtn" class="secondary-btn">审核编辑</button>
               <button id="saveCoursewareBtn" class="secondary-btn">保存审核稿</button>
               <button id="resetCoursewareBtn" class="secondary-btn">重置课件</button>
+              <button id="exportCoursewareJsonBtn" class="secondary-btn">导出课件</button>
+              <button id="importCoursewareBtn" class="secondary-btn">导入课件</button>
               <button id="exportPdfBtn" class="primary-btn">导出 PDF</button>
               <button id="downloadCoursewareBtn" class="secondary-btn">导出 Markdown</button>
+              <input id="importCoursewareFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
+          </div>
+          <div id="coursewareStreamPanel" class="stream-panel" hidden>
+            <div class="stream-head">
+              <strong>AI 流式输出</strong>
+              <span>生成完成后会进入可审核课件稿</span>
+            </div>
+            <pre id="coursewareStreamOutput"></pre>
           </div>
           <div id="knowledgePoints" class="tag-grid"></div>
           <div id="coursewareSlides" class="slide-grid"></div>
@@ -140,6 +149,7 @@
               <h3>同步练习</h3>
             </div>
             <div class="button-row">
+              <button id="aiQuestionsBtn" class="primary-btn">AI 生成练习</button>
               <button id="showAnswerBtn" class="secondary-btn">显示答案</button>
               <button id="copyAnswersBtn" class="secondary-btn">复制答题模板</button>
             </div>

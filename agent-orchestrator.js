@@ -23,6 +23,21 @@
       };
     }
 
+    async function generateCoursewareStream(runtimeConfig, scope, fallbackSlides, onToken) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const generate = modelClient.generateJsonStream || modelClient.generateJson;
+      const payload = await generate(runtimeConfig, [
+        { role: "system", content: buildCoursewareSystemPrompt() },
+        { role: "user", content: JSON.stringify({ scope, fallbackSlides }) }
+      ], {}, onToken);
+      return {
+        source: "llm",
+        agent: "courseware_agent",
+        slides: Array.isArray(payload?.slides) ? payload.slides : []
+      };
+    }
+
     async function generateQuestions(runtimeConfig, scope) {
       ensureModelClient();
       ensureRuntime(runtimeConfig);
@@ -43,6 +58,7 @@
 
     return {
       generateCourseware,
+      generateCoursewareStream,
       generateQuestions,
       testConnection
     };

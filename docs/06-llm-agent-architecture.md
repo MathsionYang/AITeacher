@@ -46,8 +46,8 @@ LOCAL_LLM_PROXY_BASE_URL=http://127.0.0.1:8787
 - 页面侧栏默认提供“本地代理（推荐）”，Base URL 为 `http://127.0.0.1:8787`，API Key 可留空。
 - `model-client.js` 提供 OpenAI-compatible 连接测试、Chat Completions 调用和 JSON 输出解析；`scripts/local_proxy_node.js` 与 `scripts/local_proxy.py` 负责本地转发。
 - `agent-orchestrator.js` 已接入课件 Agent 和出题 Agent。
-- AI 课件通过“AI 课件”按钮生成审核稿，用户保存前仍可人工修改。
-- AI 出题通过“AI 出题”按钮生成候选题，进入试卷前仍经过当前单元边界、题型重复和 100 分制规则处理。
+- AI 课件入口放在“知识点课件”页面内，支持流式输出模型内容，完成后生成审核稿，用户保存前仍可人工修改，并可导入/导出 JSON。
+- AI 出题入口放在“同步出题”页面内，生成候选题后进入当前单元边界、题型重复和 100 分制规则处理。
 - 批改 Agent、错题复习 Agent 和周期测验 Agent 当前仍按架构预留，后续接入 OCR、步骤评分和复习计划。
 
 ## 3. 大模型适用环节
@@ -279,7 +279,7 @@ ocr-adapter
   本地 OCR 或客户自有 OCR 接口
 
 exporter
-  Markdown、PDF、后续 PPTX
+  JSON、Markdown、PDF、后续 PPTX
 
 mock-data
   可替换测试数据，覆盖初始范围、错题、成绩趋势、周期测验设置

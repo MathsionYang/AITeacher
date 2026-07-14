@@ -208,7 +208,7 @@ button:disabled {
 
 .button-row.compact {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .button-row.compact .secondary-btn {
@@ -361,6 +361,44 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.stream-panel {
+  border: 1px solid #b8d4cc;
+  background: #f4fffb;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.stream-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #ecfdf5;
+  color: var(--brand-strong);
+  font-size: 13px;
+}
+
+.stream-head span {
+  color: var(--muted);
+}
+
+.stream-panel pre {
+  max-height: 220px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #263244;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .tag-grid {
