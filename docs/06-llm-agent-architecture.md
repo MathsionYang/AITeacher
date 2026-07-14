@@ -18,8 +18,8 @@
 本项目新增 `.env.example`，字段与 OfferAgent 的配置思路保持一致：
 
 ```text
-LLM_PROVIDER=openai
-LLM_MODEL=
+LLM_PROVIDER=qwen
+LLM_MODEL=qwen-plus
 LLM_TEMPERATURE=0
 LLM_SEED=20260713
 LLM_TIMEOUT_MS=90000
@@ -29,7 +29,7 @@ QWEN_API_KEY=
 KIMI_API_KEY=
 CUSTOM_LLM_BASE_URL=
 CUSTOM_LLM_API_KEY=
-LOCAL_LLM_PROXY_BASE_URL=
+LOCAL_LLM_PROXY_BASE_URL=http://127.0.0.1:8787
 ```
 
 运行策略：
@@ -37,14 +37,14 @@ LOCAL_LLM_PROXY_BASE_URL=
 - MVP 无需真实模型即可运行，默认走本地模板和规则。
 - 真实模型调用使用 OpenAI-compatible `/chat/completions`。
 - 同一输入尽量使用 `temperature: 0` 和固定 `seed`，减少课件和题目漂移。
-- API Key 不写入仓库，不放入可提交代码，不建议持久化到浏览器 `localStorage`。
-- 浏览器直连失败时，可使用客户电脑上的本地代理或客户自有模型网关。
+- API Key 不写入仓库，不放入可提交代码，不写入浏览器 `localStorage`；推荐由本地代理读取 `1.md` 或 `.env`。
+- 浏览器页面默认走客户电脑上的本地代理；如需直连云模型，才临时在页面填写 Key 和服务商 Base URL。
 - OCR 与 LLM 分离：OCR 识别文字/数字，LLM 理解过程和错因。
 
 当前 MVP 已落地的运行时：
 
-- 页面侧栏提供模型服务商、模型名、Base URL 和临时 API Key 配置。
-- `model-client.js` 提供 OpenAI-compatible 连接测试、Chat Completions 调用和 JSON 输出解析。
+- 页面侧栏默认提供“本地代理（推荐）”，Base URL 为 `http://127.0.0.1:8787`，API Key 可留空。
+- `model-client.js` 提供 OpenAI-compatible 连接测试、Chat Completions 调用和 JSON 输出解析；`scripts/local_proxy_node.js` 与 `scripts/local_proxy.py` 负责本地转发。
 - `agent-orchestrator.js` 已接入课件 Agent 和出题 Agent。
 - AI 课件通过“AI 课件”按钮生成审核稿，用户保存前仍可人工修改。
 - AI 出题通过“AI 出题”按钮生成候选题，进入试卷前仍经过当前单元边界、题型重复和 100 分制规则处理。
@@ -289,7 +289,7 @@ mock-data
 
 - 未配置模型时，MVP 仍能使用本地模板完成课件、出题、判分和错题流程。
 - 配置模型后，只有生成、解析、诊断、规划环节调用模型。
-- 模型 API Key 只在页面内存中使用，不写入 `localStorage`。
+- 本地代理模式下，模型 API Key 不进入页面；直连模式下，Key 只在页面内存中使用，不写入 `localStorage`。
 - 同一输入在同一 seed 和模板版本下输出大致稳定。
 - 每个模型输出都必须经过规则校验或人工审核后进入正式内容库。
 - 判分、来源、权限、版权风险不依赖模型自由判断。

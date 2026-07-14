@@ -43,14 +43,38 @@ D:\AITeacher\index.html
 
 MVP 不配置模型也能运行，默认走本地模板、规则出题和确定性判分。页面左侧“模型与 Agent”是可选增强入口：
 
-- 配置位置：在页面侧栏选择服务商、模型、Base URL，并填写临时 API Key
+- 配置位置：推荐选择页面侧栏的“本地代理”，模型名可改，Base URL 默认 `http://127.0.0.1:8787`，API Key 留空
 - 代码入口：`model-client.js` 负责 OpenAI-compatible `/chat/completions` 调用；`agent-orchestrator.js` 负责编排课件 Agent 和出题 Agent
 - 当前能力：支持测试连接、AI 生成课件审核稿、AI 生成同步练习候选题
-- 安全策略：真实 Key 不提交、不写入代码、不持久化到浏览器 localStorage，只在当前页面内存中使用
+- 安全策略：真实 Key 不提交、不写入代码；本地代理模式下 Key 只保存在客户电脑的 `1.md` 或 `.env`，不会进入浏览器
 - 规则边界：AI 题目进入试卷前仍会做当前单元 `unitId`、`unitTitle`、`knowledgePoint` 校验，题量最多 20 题，总分归一为 100 分
 - 本地部署：浏览器直连模型接口遇到 CORS 时，可把 Base URL 指向客户电脑上的本地代理或客户自有模型网关
 
 环境变量样例见 `.env.example`，Agent 声明见 `agents/ai-teacher-agents.yaml`。
+
+## 本地模型代理
+
+连接真实模型时需要启动本地代理，避免浏览器 CORS，也避免把真实 Key 暴露给页面。两种方式任选一种：
+
+```powershell
+# Node 18+，推荐
+start_aiteacher_node.bat
+
+# 或直接运行
+node scripts\local_proxy_node.js --key-file 1.md
+
+# Python 3，参考 OfferAgent 的 local_proxy.py
+python scripts\local_proxy.py --key-file 1.md
+```
+
+本地 Key 文件 `1.md` 放在仓库根目录，格式如下，已加入 `.gitignore`，不要提交：
+
+```text
+KEY:你的模型 Key
+URL:模型服务商 OpenAI-Compatible Base URL
+```
+
+启动后访问 `http://127.0.0.1:5173/`。页面中选择“本地代理（推荐）”，模型名按实际服务商填写，Base URL 保持 `http://127.0.0.1:8787`，页面 API Key 留空。
 
 ## Mock Data
 

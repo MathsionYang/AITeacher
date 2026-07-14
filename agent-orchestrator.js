@@ -49,7 +49,6 @@
   }
 
   function ensureRuntime(runtimeConfig) {
-    if (!runtimeConfig?.apiKey) throw new Error("请先填写临时 API Key。");
     if (!runtimeConfig?.model) throw new Error("请先填写模型名称。");
   }
 

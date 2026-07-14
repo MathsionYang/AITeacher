@@ -11,7 +11,7 @@
 - 完成分数段反馈：低分鼓励图、肯定奖状、撒花特效、领奖台动画。
 - 完成成绩保存、趋势图和薄弱知识点分析。
 - 增加 `mock-data.js`，测试数据与正式知识包分离，便于随时替换。
-- 接入 `model-client.js` 和 `agent-orchestrator.js`，支持可选模型连接测试、AI 课件审核稿和 AI 出题候选题。
+- 接入 `model-client.js`、`agent-orchestrator.js`、Node/Python 本地模型代理，支持可选模型连接测试、AI 课件审核稿和 AI 出题候选题。
 - 完成 PRD、系统设计、交付计划、版权合规、AI 课件规范、LLM/Agent 架构文档。
 
 ## 阶段 1：可演示 MVP

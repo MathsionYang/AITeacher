@@ -142,6 +142,21 @@
     const provider = providerDefaults[$("modelProvider").value] || {};
     $("modelName").value = provider.model || "";
     $("modelBaseUrl").value = provider.baseUrl || "";
+    updateModelApiKeyField(provider);
+    setModelStatus(
+      provider.requiresApiKey === false
+        ? "本地代理模式：Key 和上游 URL 放在本机 1.md 或 .env，页面 API Key 可留空。"
+        : "直连模式：临时 API Key 仅保存在当前页面内存中。",
+      "info"
+    );
+  }
+
+  function updateModelApiKeyField(provider) {
+    const keyInput = $("modelApiKey");
+    const localProxyMode = provider.requiresApiKey === false;
+    keyInput.disabled = localProxyMode;
+    if (localProxyMode) keyInput.value = "";
+    keyInput.placeholder = localProxyMode ? "本地代理已托管 Key，可留空" : "仅本次页面使用";
   }
 
   function bindEvents() {

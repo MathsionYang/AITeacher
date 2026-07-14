@@ -9,6 +9,8 @@ index.html
   -> knowledge/    按年级和册别拆分的知识点 JS 数据包
   -> agents/       大模型与 Agent 配置声明
   -> mock-data.js  本地测试数据，可替换
+  -> scripts/local_proxy_node.js Node 本地模型代理
+  -> scripts/local_proxy.py      Python 本地模型代理
   -> model-client.js       OpenAI-compatible 模型客户端
   -> agent-orchestrator.js 课件 Agent 与出题 Agent 编排
   -> app.js        课件生成、出题、判分、错题库、周期测验
@@ -205,8 +207,8 @@ score_records
 ## 4. AI/OCR 接入建议
 
 - 模型协议：参考 OfferAgent，采用 OpenAI-compatible Chat Completions；provider、model、apiKey、baseUrl、timeout、temperature、seed 均可配置。
-- 当前实现：`model-client.js` 提供连接测试和 JSON 生成；页面侧栏提供服务商、模型、Base URL 和临时 API Key 配置。
-- 安全策略：API Key 不提交、不写入代码、不建议持久化到 `localStorage`；浏览器直连失败时使用客户电脑上的本地代理或客户自有模型网关。
+- 当前实现：`model-client.js` 提供连接测试和 JSON 生成；页面侧栏默认选择“本地代理”，由 `scripts/local_proxy_node.js` 或 `scripts/local_proxy.py` 读取本机 `1.md`/`.env` 后转发模型请求。
+- 安全策略：API Key 不提交、不写入代码、不写入 `localStorage`；推荐本地代理模式，页面 API Key 留空，Key 只存在客户电脑本地配置文件中。
 - 课件：大模型只基于结构化客观知识点生成课件 JSON，固定模板和低随机性参数保证稳定性。
 - 视觉：Agent 负责把知识点映射为分数格、几何图、统计柱、数轴、流程图等参数化图形。
 - OCR：可用本地 PaddleOCR/TrOCR，也可接入用户配置的云 OCR；手写数学建议保留人工确认。

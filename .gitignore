@@ -1,4 +1,6 @@
 # Dependencies
+__pycache__/
+*.pyc
 node_modules/
 
 # Logs
@@ -17,6 +19,7 @@ build/
 books/
 
 # Local environment
+1.md
 .env
 .env.*
 !.env.example

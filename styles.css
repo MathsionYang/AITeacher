@@ -126,6 +126,12 @@ textarea {
   border-color: #334155;
 }
 
+.sidebar input:disabled {
+  color: #94a3b8;
+  background: #111827;
+  border-color: #263244;
+}
+
 textarea {
   resize: vertical;
   line-height: 1.65;

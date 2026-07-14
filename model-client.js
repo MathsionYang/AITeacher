@@ -2,6 +2,12 @@
   "use strict";
 
   const providerDefaults = {
+    local_proxy: {
+      label: "本地代理（推荐）",
+      model: "qwen-plus",
+      baseUrl: "http://127.0.0.1:8787",
+      requiresApiKey: false
+    },
     openai: { label: "OpenAI", model: "gpt-4.1-mini", baseUrl: "https://api.openai.com/v1" },
     deepseek: { label: "DeepSeek", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1" },
     qwen: { label: "通义千问", model: "qwen-plus", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" },
@@ -44,20 +50,21 @@
     async function requestChat(input, messages, options = {}) {
       if (typeof fetchImpl !== "function") throw new Error("当前浏览器不支持 fetch。");
       if (typeof AbortControllerImpl !== "function") throw new Error("当前浏览器不支持 AbortController。");
-      if (!input?.apiKey) throw new Error("请先填写临时 API Key。");
+      if (requiresApiKey(input) && !input?.apiKey) throw new Error("请先填写临时 API Key，或选择本地代理。");
       if (!input?.model) throw new Error("请先填写模型名称。");
 
       const controller = new AbortControllerImpl();
       const timeoutId = global.setTimeout?.(() => controller.abort(), input.timeoutMs || timeoutMs);
       let response;
+      const headers = {
+        "Content-Type": "application/json",
+        ...(input?.apiKey ? { Authorization: `Bearer ${input.apiKey}` } : {})
+      };
 
       try {
         response = await fetchImpl(resolveChatCompletionsEndpoint(input), {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${input.apiKey}`
-          },
+          headers,
           body: JSON.stringify({
             model: input.model,
             messages,
@@ -92,6 +99,10 @@
 
     function resolveBaseUrl(input) {
       return input.baseUrl || providerDefaults[input.provider]?.baseUrl || "";
+    }
+
+    function requiresApiKey(input) {
+      return providerDefaults[input?.provider]?.requiresApiKey !== false;
     }
 
     return {
