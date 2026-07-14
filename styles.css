@@ -1360,6 +1360,15 @@ button:disabled {
   font-size: 13px;
 }
 
+.practice-answer-panel {
+  margin: 16px 0;
+  background: #fff;
+}
+
+.answer-actions {
+  margin-top: 10px;
+}
+
 .paper-meta {
   margin: 0 0 14px;
   padding: 10px 12px;
@@ -1822,6 +1831,32 @@ button:disabled {
   border-left-color: var(--red);
 }
 
+.mistake-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mistake-stats article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.mistake-stats strong {
+  display: block;
+  font-size: 24px;
+  color: var(--brand-strong);
+}
+
+.mistake-stats span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .mistake-card {
   padding: 16px;
 }
@@ -1891,6 +1926,7 @@ button:disabled {
   .slide-grid,
   .tag-grid,
   .grading-grid,
+  .mistake-stats,
   .schedule-grid {
     grid-template-columns: 1fr;
   }

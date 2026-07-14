@@ -244,6 +244,8 @@
       renderPractice();
     });
     $("copyAnswersBtn").addEventListener("click", copyAnswerTemplate);
+    $("gradePracticeBtn").addEventListener("click", gradePracticeAnswers);
+    $("syncPracticeToGradingBtn").addEventListener("click", syncPracticeAnswersToGrading);
     $("simulateOcrBtn").addEventListener("click", simulateOcr);
     $("gradeBtn").addEventListener("click", gradeAnswers);
     $("answerImage").addEventListener("change", previewAnswerImage);
@@ -288,6 +290,10 @@
     $("gradingResults").innerHTML = "";
     $("performanceFeedback").innerHTML = "";
     $("answerInput").value = "";
+    $("practiceAnswerInput").value = "";
+    $("practiceGradingSummary").classList.remove("active");
+    $("practiceGradingSummary").innerHTML = "";
+    $("practiceResults").innerHTML = "";
   }
 
   function renderAll() {
@@ -428,6 +434,7 @@
         if (!scopedQuestions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
         state.currentQuestions = normalizePaperPoints(scopedQuestions);
         state.answersVisible = false;
+        seedAnswerInputsWithTemplate();
         setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”。`, "ok");
       } finally {
         state.practiceGenerating = false;
@@ -897,23 +904,26 @@
     const hasQuestions = state.currentQuestions.length > 0;
     $("aiQuestionsBtn").textContent = state.practiceGenerating ? "出题中..." : hasQuestions ? "重新生成练习" : "AI 生成练习";
     $("showAnswerBtn").textContent = state.answersVisible ? "隐藏答案" : "显示答案";
-    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn"].forEach((id) => {
+    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn", "gradePracticeBtn", "syncPracticeToGradingBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.practiceGenerating || !hasQuestions;
     });
     $("importPracticeBtn").disabled = state.practiceGenerating;
+    $("practiceAnswerPanel").hidden = !hasQuestions;
     $("paperMeta").hidden = !hasQuestions;
     $("paperMeta").textContent = hasQuestions
       ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。`
       : "";
 
     if (state.practiceGenerating) {
+      $("practiceAnswerPanel").hidden = true;
       list.className = "question-list empty-state";
       list.innerHTML = `<div><strong>练习生成中</strong><p>AI 正在生成并校验题目，完成后会一次性展示整卷。</p></div>`;
       return;
     }
 
     if (!hasQuestions) {
+      $("practiceAnswerPanel").hidden = true;
       list.className = "question-list empty-state";
       list.innerHTML = `<div><strong>暂无练习</strong><p>可以导入历史练习，或点击“AI 生成练习”创建当前单元同步题。</p></div>`;
       return;
@@ -947,6 +957,7 @@
     const unit = unitData();
     state.questionCount = capQuestionCount(state.questionCount);
     state.currentQuestions = normalizePaperPoints(generateScopedQuestions(unit, Number(state.grade), state.difficulty, state.questionCount));
+    seedAnswerInputsWithTemplate();
     state.gradingResults = [];
     $("gradingSummary").classList.remove("active");
     $("gradingSummary").innerHTML = "";
@@ -1401,6 +1412,8 @@
       difficulty: state.difficulty,
       questionCount: state.currentQuestions.length,
       totalScore: paperTotal(state.currentQuestions),
+      answersText: $("practiceAnswerInput").value || $("answerInput").value || "",
+      gradingResults: state.gradingResults,
       questions: state.currentQuestions
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
@@ -1426,6 +1439,11 @@
       if (!questions.length) throw new Error("导入题目未通过当前单元知识点边界校验。");
       state.currentQuestions = normalizePaperPoints(questions);
       state.answersVisible = false;
+      seedAnswerInputsWithTemplate();
+      if (payload.answersText) {
+        $("practiceAnswerInput").value = payload.answersText;
+        $("answerInput").value = payload.answersText;
+      }
       state.practiceGenerating = false;
       hideGenerationProgress("practice");
       switchTab("practice");
@@ -1469,14 +1487,38 @@
       setModelStatus("当前还没有练习题，请先导入历史练习或点击 AI 生成练习。", "warn");
       return;
     }
-    const template = state.currentQuestions.map((_, index) => `${index + 1}. `).join("\n");
+    const template = buildAnswerTemplate();
+    $("practiceAnswerInput").value = template;
     $("answerInput").value = template;
-    switchTab("grading");
     try {
       await navigator.clipboard.writeText(template);
+      setModelStatus("答题模板已填入同步出题页，并同步到拍照批改页。", "ok");
     } catch (error) {
-      // Clipboard access can be blocked on file://, the textarea still receives the template.
+      setModelStatus("答题模板已填入同步出题页，并同步到拍照批改页。", "ok");
     }
+  }
+
+  function buildAnswerTemplate() {
+    return state.currentQuestions.map((_, index) => `${index + 1}. `).join("\n");
+  }
+
+  function seedAnswerInputsWithTemplate() {
+    const template = buildAnswerTemplate();
+    $("practiceAnswerInput").value = template;
+    $("answerInput").value = template;
+    $("practiceGradingSummary").classList.remove("active");
+    $("practiceGradingSummary").innerHTML = "";
+    $("practiceResults").innerHTML = "";
+  }
+
+  function syncPracticeAnswersToGrading() {
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有练习题，请先生成或导入练习。", "warn");
+      return;
+    }
+    $("answerInput").value = $("practiceAnswerInput").value;
+    switchTab("grading");
+    setModelStatus("同步出题页答案已同步到拍照批改页。", "ok");
   }
 
   function previewAnswerImage(event) {
@@ -1502,6 +1544,7 @@
       return `${index + 1}. ${answer}`;
     });
     $("answerInput").value = lines.join("\n");
+    $("practiceAnswerInput").value = lines.join("\n");
   }
 
   function makeNearbyWrongAnswer(answer, index) {
@@ -1514,12 +1557,20 @@
   }
 
   function gradeAnswers() {
+    gradeCurrentAnswers($("answerInput").value, { origin: "grading" });
+  }
+
+  function gradePracticeAnswers() {
+    gradeCurrentAnswers($("practiceAnswerInput").value, { origin: "practice" });
+  }
+
+  function gradeCurrentAnswers(answerText, options = {}) {
     if (!state.currentQuestions.length) {
       setModelStatus("当前还没有可判分的练习题，请先生成或导入练习。", "warn");
       return;
     }
     state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(state.currentQuestions, unitData()));
-    const answers = parseAnswers($("answerInput").value);
+    const answers = parseAnswers(answerText || "");
     const results = state.currentQuestions.map((question, index) => {
       const submitted = answers[index + 1] || "";
       const correct = isCorrectAnswer(submitted, question.answer);
@@ -1533,12 +1584,16 @@
     });
     const summary = buildScoreSummary(results);
     state.gradingResults = results;
+    $("answerInput").value = answerText || "";
+    $("practiceAnswerInput").value = answerText || "";
     saveScoreHistory(summary, results);
     saveMistakesFromResults(results);
     renderGradingResults(results, summary);
+    renderPracticeGradingResults(results, summary);
     renderMistakes();
     renderScoreTrends();
     renderMetrics();
+    setModelStatus(options.origin === "practice" ? "同步练习已判分，解析已同步到拍照批改页。" : "答案已判分并生成解析。", "ok");
   }
 
   function parseAnswers(text) {
@@ -1594,21 +1649,29 @@
   }
 
   function renderGradingResults(results, summary = buildScoreSummary(results)) {
-    const total = summary.total;
-    const score = summary.score;
-    const correctCount = summary.correctCount;
-    const accuracy = summary.accuracy;
-
     $("gradingSummary").classList.add("active");
-    $("gradingSummary").innerHTML = `
-      <div><strong>${score}/${total}</strong><span>总分</span></div>
-      <div><strong>${accuracy}%</strong><span>正确率</span></div>
-      <div><strong>${correctCount}</strong><span>答对题数</span></div>
-      <div><strong>${results.length - correctCount}</strong><span>新增错题</span></div>
-    `;
+    $("gradingSummary").innerHTML = renderScoreSummaryHtml(results, summary);
     renderPerformanceFeedback(summary, results);
+    $("gradingResults").innerHTML = renderResultCardsHtml(results);
+  }
 
-    $("gradingResults").innerHTML = results
+  function renderPracticeGradingResults(results, summary = buildScoreSummary(results)) {
+    $("practiceGradingSummary").classList.add("active");
+    $("practiceGradingSummary").innerHTML = renderScoreSummaryHtml(results, summary);
+    $("practiceResults").innerHTML = renderResultCardsHtml(results);
+  }
+
+  function renderScoreSummaryHtml(results, summary) {
+    return `
+      <div><strong>${summary.score}/${summary.total}</strong><span>总分</span></div>
+      <div><strong>${summary.accuracy}%</strong><span>正确率</span></div>
+      <div><strong>${summary.correctCount}</strong><span>答对题数</span></div>
+      <div><strong>${results.length - summary.correctCount}</strong><span>错题数</span></div>
+    `;
+  }
+
+  function renderResultCardsHtml(results) {
+    return results
       .map((item) => {
         const { question } = item;
         return `
@@ -1973,6 +2036,7 @@
 
   function renderMistakes() {
     const activeMistakes = state.mistakes.filter((item) => item.status !== "已掌握");
+    renderMistakeStats(activeMistakes);
     const list = $("mistakeList");
     if (!activeMistakes.length) {
       list.className = "mistake-list empty-state";
@@ -1999,7 +2063,7 @@
             ${renderExplanationDetail(item)}
             <div class="mistake-actions">
               <button class="secondary-btn small" data-action="master" data-id="${item.id}">标记已掌握</button>
-              <button class="secondary-btn small" data-action="delete" data-id="${item.id}">删除</button>
+              <button class="secondary-btn small" data-action="delete" data-id="${item.id}">移除错题</button>
             </div>
           </article>
         `
@@ -2007,6 +2071,15 @@
       .join("");
   }
 
+  function renderMistakeStats(activeMistakes) {
+    const completedCount = state.scoreHistory.reduce((sum, record) => sum + (Number(record.questionCount) || 0), 0);
+    const masteredCount = state.mistakes.filter((item) => item.status === "已掌握").length;
+    $("mistakeStats").innerHTML = `
+      <article><strong>${completedCount}</strong><span>已完成题目</span></article>
+      <article><strong>${activeMistakes.length}</strong><span>错题数量</span></article>
+      <article><strong>${masteredCount}</strong><span>已掌握错题</span></article>
+    `;
+  }
   function markMistakeMastered(id) {
     const item = state.mistakes.find((mistake) => mistake.id === id);
     if (!item) return;
@@ -2066,6 +2139,7 @@
       point: item.point
     })), unitData()));
     state.answersVisible = false;
+    seedAnswerInputsWithTemplate();
     switchTab("practice");
     renderAll();
   }
@@ -2123,6 +2197,7 @@
       point: item.point
     }));
     state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(shuffle([...mistakeQuestions, ...newQuestions]), unitData()));
+    seedAnswerInputsWithTemplate();
     $("scheduledPaper").className = "question-list";
     $("scheduledPaper").innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
     renderPractice();

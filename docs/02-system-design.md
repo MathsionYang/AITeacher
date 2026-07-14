@@ -85,7 +85,8 @@ index.html
 - 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
 - `agent-orchestrator.js` 可选调用出题 Agent 生成候选题，进入试卷前仍会经过单元边界、题型重复和分值规则处理。
 - 同步出题页面默认空白；点击 AI 生成练习时先显示进度动画，题目全部生成并通过单元边界、题型重复和 100 分制校验后再展示。
-- `state.currentQuestions` 保存当前试卷，当前练习可导出为 JSON，也可导入历史练习 JSON。
+- `state.currentQuestions` 保存当前试卷，当前练习可导出为 JSON，也可导入历史练习 JSON；导出内容包含题目、答案草稿和最近判分结果。
+- 同步出题页提供 `practiceAnswerInput`，可直接填写答案并调用共享判分逻辑，结果同步写入拍照批改页的 `answerInput`、成绩面板和逐题解析。
 
 正式实现：
 
@@ -105,8 +106,8 @@ index.html
 当前实现：
 
 - 文件上传和图片预览已完成。
-- `answerInput` 作为 OCR 识别文本/人工校正区。
-- `gradeAnswers()` 完成结构化判分。
+- `answerInput` 作为 OCR 识别文本/人工校正区，也接收同步出题页答案同步。
+- `gradeCurrentAnswers()` 是共享判分入口，`gradeAnswers()` 和同步出题页判分按钮都复用它。
 - `scoreHistoryKey` 将每次成绩保存到浏览器本地存储。
 - `renderPerformanceFeedback()` 根据分数段展示鼓励图、奖状、撒花或领奖台动画。
 - `renderScoreTrends()` 根据历史成绩绘制趋势图，并按知识点统计薄弱程度。
@@ -136,7 +137,8 @@ index.html
 
 - `localStorage` 保存 `ai-teacher-rj-math-mistakes-v1`。
 - `saveMistakesFromResults()` 自动入库。
-- `buildMistakePaper()` 随机生成错题卷。
+- `renderMistakeStats()` 展示已完成题目数量、当前错题数量和已掌握错题数量。
+- `deleteMistake()` 支持从错题库移除单题，`buildMistakePaper()` 随机生成错题卷。
 
 正式实现：
 
