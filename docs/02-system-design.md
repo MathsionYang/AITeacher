@@ -81,6 +81,7 @@ index.html
 当前实现：
 
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
+- `renderScenarioVisual()` 会把情境导入和例题精讲优先渲染为数量关系图，例如文具购物题显示 3 个笔记本、1 支钢笔和总价算式，剩余平均分题显示总量条和 4 人分组。
 - `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
 - 审核稿通过 `storage-adapter.js` 写入本地 local-json 数据层，当前底层兼容 localStorage，记录包含 `reviewStatus`、`exportVersion`、`schemaVersion` 和时间戳。
 - 知识点课件默认不展示模板课件；AI 课件按钮放在“知识点课件”页面内，生成过程只展示进度动画，完成模型返回和规则校验后再一次性展示审核稿。

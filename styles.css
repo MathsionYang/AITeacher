@@ -597,7 +597,8 @@ body[data-role-mode="student"] .teacher-only {
 .geometry-visual,
 .bar-visual,
 .numberline-visual,
-.flow-visual {
+.flow-visual,
+.scenario-visual {
   width: 100%;
   min-height: 96px;
 }
@@ -935,7 +936,8 @@ body[data-role-mode="student"] .teacher-only {
 .geometry-visual,
 .bar-visual,
 .numberline-visual,
-.flow-visual {
+.flow-visual,
+.scenario-visual {
   padding: 12px;
 }
 
@@ -1217,6 +1219,218 @@ body[data-role-mode="student"] .teacher-only {
 .flow-visual .visual-caption {
   grid-column: 1 / -1;
   margin-top: 0;
+}
+
+.scenario-visual {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  justify-items: center;
+  min-height: 132px;
+}
+
+.stationery-scenario {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.78), rgba(240, 253, 250, 0.92));
+}
+
+.craft-scenario {
+  background: linear-gradient(180deg, rgba(255, 247, 237, 0.74), rgba(240, 253, 244, 0.92));
+}
+
+.object-equation {
+  width: min(300px, 94%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.object-group {
+  display: flex;
+  gap: 5px;
+}
+
+.notebook {
+  width: 34px;
+  height: 46px;
+  border-radius: 5px;
+  border: 2px solid #2563eb;
+  background: linear-gradient(90deg, #bfdbfe 0 8px, #eff6ff 8px);
+  position: relative;
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.14);
+  animation: lift-in 520ms ease both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+.notebook i {
+  position: absolute;
+  left: 11px;
+  top: 8px;
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  background: #93c5fd;
+  box-shadow: 0 9px 0 #93c5fd, 0 18px 0 #93c5fd;
+}
+
+.notebook b,
+.pen-object b {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  transform: translateX(-50%);
+  color: #172033;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.pen-object {
+  width: 18px;
+  height: 58px;
+  border-radius: 999px;
+  background: linear-gradient(#111827 0 8px, #f97316 8px 48px, #fed7aa 48px);
+  border: 2px solid #9a3412;
+  position: relative;
+  transform: rotate(18deg);
+  box-shadow: 0 6px 12px rgba(249, 115, 22, 0.18);
+  animation: lift-in 560ms ease both;
+  animation-delay: 240ms;
+}
+
+.pen-object i {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 12px solid #9a3412;
+  transform: translateX(-50%);
+}
+
+.pen-object b {
+  transform: translateX(-50%) rotate(-18deg);
+  bottom: -24px;
+}
+
+.math-mark {
+  color: #0f766e;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.total-badge {
+  min-width: 68px;
+  border: 2px solid #0f766e;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  padding: 7px 8px;
+}
+
+.craft-bars {
+  width: min(300px, 94%);
+  display: grid;
+  gap: 10px;
+}
+
+.total-strip {
+  display: flex;
+  height: 32px;
+  border: 2px solid #2563eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eff6ff;
+}
+
+.total-strip span {
+  width: var(--w);
+  display: grid;
+  place-items: center;
+  color: #172033;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.total-strip .done {
+  background: #bfdbfe;
+}
+
+.total-strip .remain {
+  background: #dcfce7;
+}
+
+.share-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.share-row span {
+  min-height: 46px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  display: grid;
+  place-items: center;
+  position: relative;
+  animation: lift-in 520ms ease both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+.share-row i {
+  width: 20px;
+  height: 20px;
+  border-radius: 50% 50% 45% 45%;
+  background: #f97316;
+  box-shadow: -8px 4px 0 #fdba74, 8px 4px 0 #fdba74, 0 10px 0 #22c55e;
+}
+
+.share-row b {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  color: #166534;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.quantity-bars {
+  width: min(300px, 94%);
+  display: grid;
+  gap: 8px;
+}
+
+.quantity-bars div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantity-bars span {
+  width: var(--w);
+  min-width: 72px;
+  border-radius: 999px;
+  background: #dbeafe;
+  border: 2px solid #2563eb;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+  padding: 7px 10px;
+}
+
+.quantity-bars em {
+  font-style: normal;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 @keyframes lift-in {

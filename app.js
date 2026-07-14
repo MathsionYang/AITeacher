@@ -620,7 +620,7 @@
 
   function normalizeAiCoursewareSlides(slides, fallbackSlides, unit) {
     const sourceRefs = getSourceRefs(unit);
-    const allowedVisuals = new Set(["goals", "context", "concept", "example", "practice", "summary"]);
+    const allowedVisuals = new Set(["goals", "context", "scenario", "concept", "example", "practice", "summary"]);
     return fallbackSlides.map((fallbackSlide, index) => {
       const candidate = Array.isArray(slides) ? slides[index] || {} : {};
       const visualType = allowedVisuals.has(candidate.visualType) ? candidate.visualType : fallbackSlide.visualType;
@@ -869,7 +869,7 @@
         title: "情境导入",
         body: "从生活问题进入数学表达，让学生先观察、再表达、再列式。",
         bullets: [`用熟悉情境引出 ${unit.tags[0] || "核心概念"}`, "让学生说出已知条件和问题", "鼓励用图、表、式三种方式表达"],
-        visualType: "context",
+        visualType: "scenario",
         sources
       },
       {
@@ -883,7 +883,7 @@
         title: "例题精讲",
         body: "用一道典型题示范审题、建模、计算和检查。",
         bullets: ["先圈关键词", "再确定数量关系", "最后用估算或逆运算检查"],
-        visualType: "example",
+        visualType: "scenario",
         sources
       },
       {
@@ -1028,7 +1028,9 @@
         </div>
       `;
     }
-    if (slide.visualType === "context") return renderTopicVisual(unit, "large");
+    if (slide.visualType === "context" || slide.visualType === "scenario" || slide.visualType === "example") {
+      return renderScenarioVisual(slide, unit, slide.visualType === "example" ? "focus" : "large");
+    }
     if (slide.visualType === "concept") {
       return `
         <div class="concept-map">
@@ -1036,7 +1038,6 @@
         </div>
       `;
     }
-    if (slide.visualType === "example") return renderTopicVisual(unit, "focus");
     if (slide.visualType === "practice") {
       return `
         <div class="practice-ladder">
@@ -1127,6 +1128,81 @@
         <strong class="visual-title">${escapeHtml(point)}</strong>
         <span>条件</span><span>关系</span><span>算式</span><span>结果</span>
         <small class="visual-caption">每一步都对应一个标准填空结果，方便检查。</small>
+      </div>
+    `;
+  }
+
+  function renderScenarioVisual(slide, unit, size) {
+    const scenarioText = [
+      slide.title,
+      slide.body,
+      ...(slide.bullets || []),
+      unit.title,
+      unit.summary,
+      ...(unit.tags || []),
+      ...(unit.points || [])
+    ].join(" ");
+
+    if (includesAny(scenarioText, ["文具", "笔记本", "钢笔", "单价", "总价", "买了", "花了", "元"])) {
+      return renderStationeryScenario(size);
+    }
+
+    if (includesAny(scenarioText, ["纸花", "做花", "已经做", "剩下", "剩余", "平均分", "每人"])) {
+      return renderCraftShareScenario(size);
+    }
+
+    if (includesAny(scenarioText, ["线段图", "表格", "数量关系", "单位 1"])) {
+      return renderQuantityBarScenario(size);
+    }
+
+    return renderTopicVisual(unit, size);
+  }
+
+  function renderStationeryScenario(size) {
+    return `
+      <div class="scenario-visual stationery-scenario ${size}">
+        <strong class="visual-title">图解：3 个笔记本 + 1 支钢笔</strong>
+        <div class="object-equation" aria-label="3 个笔记本，每个 6 元，加 1 支钢笔 15 元">
+          <div class="object-group">
+            ${Array.from({ length: 3 }, (_, index) => `<span class="notebook" style="--i:${index}"><i></i><b>6元</b></span>`).join("")}
+          </div>
+          <span class="math-mark">+</span>
+          <span class="pen-object"><i></i><b>15元</b></span>
+          <span class="math-mark">=</span>
+          <span class="total-badge">3×6+15</span>
+        </div>
+        <small class="visual-caption">先看“3 个同价笔记本”，再把钢笔价格合进去。</small>
+      </div>
+    `;
+  }
+
+  function renderCraftShareScenario(size) {
+    return `
+      <div class="scenario-visual craft-scenario ${size}">
+        <strong class="visual-title">图解：总量 - 已做，再平均分</strong>
+        <div class="craft-bars" aria-label="24 朵纸花，已做 8 朵，剩下 16 朵平均分给 4 人">
+          <div class="total-strip">
+            <span class="done" style="--w:33%">已做 8</span>
+            <span class="remain" style="--w:67%">剩余 16</span>
+          </div>
+          <div class="share-row">
+            ${Array.from({ length: 4 }, (_, index) => `<span style="--i:${index}"><i></i><b>4朵</b></span>`).join("")}
+          </div>
+        </div>
+        <small class="visual-caption">先求剩余 24-8=16，再把 16 平均分成 4 份。</small>
+      </div>
+    `;
+  }
+
+  function renderQuantityBarScenario(size) {
+    return `
+      <div class="scenario-visual quantity-scenario ${size}">
+        <strong class="visual-title">图解：用线段表示数量关系</strong>
+        <div class="quantity-bars">
+          <div><span style="--w:62%">已知部分</span><em>?</em></div>
+          <div><span style="--w:38%">剩余部分</span><em>总量</em></div>
+        </div>
+        <small class="visual-caption">把文字条件先变成“部分 + 部分 = 总量”。</small>
       </div>
     `;
   }
