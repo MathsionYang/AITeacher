@@ -516,17 +516,26 @@
       ensureAgentReady();
       const unit = unitData();
       const requestedCount = capQuestionCount(state.questionCount);
+      let receivedChars = 0;
       switchTab("practice");
       clearPracticeState();
       state.practiceGenerating = true;
       setGenerationProgress("practice", "AI 正在按当前单元边界生成题目，全部校验完成后统一展示。");
       renderPractice();
       try {
-        const result = await agentOrchestrator.generateQuestions(
+        const generator = agentOrchestrator.generateQuestionsStream || agentOrchestrator.generateQuestions;
+        const result = await generator(
           collectModelRuntimeConfig(),
-          buildAgentScope(unit)
+          buildAgentScope(unit),
+          (token) => {
+            receivedChars += String(token || "").length;
+            setGenerationProgress("practice", `已接收 ${receivedChars} 字内容，正在等待完整试卷返回。`);
+          }
         );
-        setGenerationProgress("practice", "题目已返回，正在检查知识点范围、题型重复和分值。");
+        setGenerationProgress(
+          "practice",
+          receivedChars ? `题目已返回，共接收 ${receivedChars} 字内容，正在检查知识点范围、题型重复和分值。` : "题目已返回，正在检查知识点范围、题型重复和分值。"
+        );
         const aiQuestions = normalizeAiQuestions(result.questions, unit, requestedCount);
         const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
         const prepared = prepareQuestionsForPaper([...aiQuestions, ...fallbackQuestions], unit, requestedCount);

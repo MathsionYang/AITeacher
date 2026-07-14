@@ -52,6 +52,21 @@
       };
     }
 
+    async function generateQuestionsStream(runtimeConfig, scope, onToken) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const generate = modelClient.generateJsonStream || modelClient.generateJson;
+      const payload = await generate(runtimeConfig, [
+        { role: "system", content: buildQuestionSystemPrompt() },
+        { role: "user", content: JSON.stringify(scope) }
+      ], {}, onToken);
+      return {
+        source: "llm",
+        agent: "question_agent",
+        questions: Array.isArray(payload?.questions) ? payload.questions : []
+      };
+    }
+
     function ensureModelClient() {
       if (!modelClient) throw new Error("模型客户端未加载。");
     }
@@ -60,6 +75,7 @@
       generateCourseware,
       generateCoursewareStream,
       generateQuestions,
+      generateQuestionsStream,
       testConnection
     };
   }
