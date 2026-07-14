@@ -1174,7 +1174,6 @@
           <span class="pill orange">${escapeHtml(question.difficulty)}</span>
           <span class="pill">${question.point} 分</span>
         </div>
-        <p class="source-note">知识点来源：${renderSourceLinks(question.sourceRefs || getSourceRefs(unitData()))}</p>
         <div class="answer-block">
           <p><strong>答案：</strong>${escapeHtml(question.answer)}</p>
           <p><strong>解析：</strong>${escapeHtml(question.explanation)}</p>
