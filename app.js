@@ -2789,6 +2789,19 @@
     return escapeHtml(value).replace(/`/g, "&#096;");
   }
 
+  function formatDateTime(value) {
+    if (!value) return "未知";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "未知";
+    return date.toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
   function sourceNames(sourceRefs) {
     return sourceRefs.map((source) => source.name).join("、");
   }

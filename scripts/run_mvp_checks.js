@@ -22,6 +22,7 @@ const indexSource = fs.readFileSync(path.join(rootDir, "index.html"), "utf8");
 const ocrProxySource = fs.readFileSync(path.join(rootDir, "scripts", "local_ocr_paddle.py"), "utf8");
 assert.ok(indexSource.includes("id=\"runOcrBtn\""));
 assert.ok(appSource.includes("http://127.0.0.1:8790"));
+assert.ok(appSource.includes("function formatDateTime"));
 assert.ok(appSource.includes("parseAnswerReview(answerText, \"paddleocr\""));
 assert.ok(ocrProxySource.includes("class PaddleOcrRuntime"));
 assert.ok(ocrProxySource.includes("PP-OCRv6_small"));
