@@ -8,6 +8,9 @@
   const mockData = window.AI_TEACHER_MOCK_DATA || {};
   const mockEnabled = Boolean(mockData.enabled);
   const initialScope = mockEnabled ? mockData.initialScope || {} : {};
+  const providerDefaults = window.AITeacherModelClient?.providerDefaults || {};
+  const modelClient = window.AITeacherModelClient?.createModelClient?.();
+  const agentOrchestrator = window.AITeacherAgentOrchestrator?.createAgentOrchestrator?.({ modelClient });
 
   const state = {
     grade: String(initialScope.grade || "3"),
@@ -68,6 +71,7 @@
 
   function init() {
     buildSelectors();
+    buildModelProviderOptions();
     restoreScheduleControls();
     bindEvents();
     generatePractice();
@@ -121,6 +125,25 @@
     $("unitSelect").value = state.unitId;
   }
 
+  function buildModelProviderOptions() {
+    const entries = Object.entries(providerDefaults);
+    if (!entries.length) {
+      setModelStatus("模型客户端未加载，本地规则引擎仍可使用。", "warn");
+      return;
+    }
+    $("modelProvider").innerHTML = entries
+      .map(([id, provider]) => `<option value="${id}">${escapeHtml(provider.label || id)}</option>`)
+      .join("");
+    $("modelProvider").value = entries[0][0];
+    applyModelProviderDefaults();
+  }
+
+  function applyModelProviderDefaults() {
+    const provider = providerDefaults[$("modelProvider").value] || {};
+    $("modelName").value = provider.model || "";
+    $("modelBaseUrl").value = provider.baseUrl || "";
+  }
+
   function bindEvents() {
     $("gradeSelect").addEventListener("change", (event) => {
       state.grade = event.target.value;
@@ -163,6 +186,10 @@
       renderAll();
     });
 
+    $("modelProvider").addEventListener("change", applyModelProviderDefaults);
+    $("testModelBtn").addEventListener("click", testModelConnection);
+    $("aiCoursewareBtn").addEventListener("click", generateAiCourseware);
+    $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
     $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
@@ -229,6 +256,234 @@
     $("scheduleMetric").textContent = state.schedule ? state.schedule.frequency : "未设置";
   }
 
+  function collectModelRuntimeConfig() {
+    return {
+      provider: $("modelProvider").value,
+      model: $("modelName").value.trim(),
+      baseUrl: $("modelBaseUrl").value.trim(),
+      apiKey: $("modelApiKey").value.trim(),
+      temperature: 0,
+      seed: 20260713,
+      timeoutMs: 90000
+    };
+  }
+
+  function buildAgentScope(unit) {
+    const sources = getSourceRefs(unit).map((source) => ({
+      name: source.name,
+      usage: source.usage,
+      url: source.url
+    }));
+    return {
+      version: content.version,
+      subject: content.subject,
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      unitSummary: unit.summary,
+      knowledgePoints: unit.points,
+      tags: unit.tags,
+      sources,
+      difficulty: state.difficulty,
+      questionCount: capQuestionCount(state.questionCount),
+      rules: [
+        "只允许使用当前单元 knowledgePoints 内的知识点",
+        "不得复制教材原文、课本例题或商业题库题目",
+        "题量最多 20 题，总分由本地规则统一归一为 100 分",
+        "同一题型不要过度重复，解析必须包含审题、建模、计算、检查"
+      ]
+    };
+  }
+
+  function ensureAgentReady() {
+    if (!agentOrchestrator) throw new Error("Agent 运行时未加载，请确认 model-client.js 和 agent-orchestrator.js 已引入。");
+  }
+
+  async function testModelConnection() {
+    await runWithModelStatus("testModelBtn", "测试中...", async () => {
+      ensureAgentReady();
+      const result = await agentOrchestrator.testConnection(collectModelRuntimeConfig());
+      setModelStatus(`连接成功：${result.sample || "OK"}，延迟 ${result.latency_ms}ms。`, "ok");
+    });
+  }
+
+  async function generateAiCourseware() {
+    await runWithModelStatus("aiCoursewareBtn", "生成中...", async () => {
+      ensureAgentReady();
+      const unit = unitData();
+      const fallbackSlides = buildCoursewareSlides(unit);
+      const result = await agentOrchestrator.generateCourseware(
+        collectModelRuntimeConfig(),
+        buildAgentScope(unit),
+        fallbackSlides
+      );
+      const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
+      state.coursewareReviews[coursewareKey(unit)] = slides;
+      writeJson(coursewareReviewKey, state.coursewareReviews);
+      state.coursewareEditMode = false;
+      switchTab("courseware");
+      renderCourseware();
+      setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
+    });
+  }
+
+  async function generateAiQuestions() {
+    await runWithModelStatus("aiQuestionsBtn", "出题中...", async () => {
+      ensureAgentReady();
+      const unit = unitData();
+      const requestedCount = capQuestionCount(state.questionCount);
+      const result = await agentOrchestrator.generateQuestions(
+        collectModelRuntimeConfig(),
+        buildAgentScope(unit)
+      );
+      const aiQuestions = rebalanceQuestionTypes(
+        normalizeAiQuestions(result.questions, unit, requestedCount),
+        requestedCount
+      );
+      const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
+      const mergedQuestions = dedupeByStem([...aiQuestions, ...fallbackQuestions]).slice(0, requestedCount);
+      const scopedQuestions = enforceUnitQuestionBoundary(mergedQuestions, unit);
+
+      if (!scopedQuestions.length) throw new Error("模型返回题目未通过单元边界校验，已保留本地题目。");
+      state.currentQuestions = normalizePaperPoints(scopedQuestions);
+      state.answersVisible = false;
+      state.gradingResults = [];
+      $("gradingSummary").classList.remove("active");
+      $("gradingSummary").innerHTML = "";
+      $("gradingResults").innerHTML = "";
+      $("performanceFeedback").innerHTML = "";
+      switchTab("practice");
+      renderAll();
+      setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”。`, "ok");
+    });
+  }
+
+  async function runWithModelStatus(buttonId, busyText, action) {
+    const button = $(buttonId);
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = busyText;
+    setModelStatus("正在调用模型，默认本地内容不会被覆盖。", "busy");
+    try {
+      await action();
+    } catch (error) {
+      setModelStatus(error.message || "模型调用失败，已保留本地生成内容。", "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+
+  function setModelStatus(message, tone = "info") {
+    const status = $("modelStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.tone = tone;
+  }
+
+  function normalizeAiCoursewareSlides(slides, fallbackSlides, unit) {
+    const sourceRefs = getSourceRefs(unit);
+    const allowedVisuals = new Set(["goals", "context", "concept", "example", "practice", "summary"]);
+    return fallbackSlides.map((fallbackSlide, index) => {
+      const candidate = Array.isArray(slides) ? slides[index] || {} : {};
+      const visualType = allowedVisuals.has(candidate.visualType) ? candidate.visualType : fallbackSlide.visualType;
+      return {
+        title: cleanText(candidate.title) || fallbackSlide.title,
+        body: cleanText(candidate.body) || fallbackSlide.body,
+        bullets: cleanTextList(candidate.bullets).length ? cleanTextList(candidate.bullets).slice(0, 5) : fallbackSlide.bullets,
+        visualType,
+        sources: sourceRefs
+      };
+    });
+  }
+
+  function normalizeAiQuestions(questions, unit, count) {
+    if (!Array.isArray(questions)) return [];
+    const sourceRefs = getSourceRefs(unit);
+    const sourceIds = unit.sourceIds || content.defaultSourceIds || [];
+    const normalized = [];
+
+    questions.slice(0, capGeneratedQuestionCount(count)).forEach((item, index) => {
+      const knowledgePoint = resolveKnowledgePoint(item?.knowledgePoint, unit);
+      const stem = cleanText(item?.stem);
+      const answer = cleanText(item?.answer);
+      const explanation = cleanText(item?.explanation);
+      if (!knowledgePoint || !stem || !answer || !explanation) return;
+
+      const questionType = cleanText(item?.questionType) || "同步练习题";
+      const enriched = {
+        id: `${unit.id}-ai-${Date.now()}-${index}`,
+        unitId: unit.id,
+        unitTitle: unit.title,
+        knowledgePoint,
+        questionType,
+        difficulty: cleanText(item?.difficulty) || state.difficulty,
+        stem,
+        answer,
+        explanation,
+        detailSteps: cleanTextList(item?.detailSteps),
+        commonMistake: cleanText(item?.commonMistake),
+        checkMethod: cleanText(item?.checkMethod),
+        sourceIds,
+        sourceRefs,
+        point: 0
+      };
+      const context = { unit, tag: knowledgePoint, mode: questionType, knowledgePoint };
+      normalized.push({
+        ...enriched,
+        detailSteps: enriched.detailSteps.length ? enriched.detailSteps.slice(0, 5) : buildDetailSteps(enriched, context),
+        commonMistake: enriched.commonMistake || buildCommonMistake(enriched, context),
+        checkMethod: enriched.checkMethod || buildCheckMethod(enriched, context)
+      });
+    });
+
+    return enforceUnitQuestionBoundary(normalized, unit);
+  }
+
+  function resolveKnowledgePoint(value, unit) {
+    const text = cleanText(value);
+    if (!text) return "";
+    const points = unit.points || [];
+    const exact = points.find((point) => point === text);
+    if (exact) return exact;
+    return points.find((point) => point.includes(text) || text.includes(point)) || "";
+  }
+
+  function rebalanceQuestionTypes(questions, count) {
+    const safeCount = capGeneratedQuestionCount(count);
+    const maxSameType = Math.max(2, Math.ceil(safeCount / 5));
+    const typeCounts = {};
+    return questions.filter((questionItem) => {
+      const type = questionItem.questionType || "同步练习题";
+      const used = typeCounts[type] || 0;
+      if (used >= maxSameType) return false;
+      typeCounts[type] = used + 1;
+      return true;
+    });
+  }
+
+  function dedupeByStem(questions) {
+    const seen = new Set();
+    return questions.filter((questionItem) => {
+      const key = cleanText(questionItem.stem);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function cleanText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function cleanTextList(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map(cleanText).filter(Boolean);
+  }
+
   function renderCourseware() {
     const unit = unitData();
     const sourceRefs = getSourceRefs(unit);
@@ -253,7 +508,7 @@
             <h4 data-edit="title" contenteditable="${state.coursewareEditMode}">${index + 1}. ${escapeHtml(slide.title)}</h4>
             <p data-edit="body" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.body)}</p>
             <ul>${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}</ul>
-            <div class="source-note">参考来源：${renderSourceLinks(slide.sources)}</div>
+            <div class="source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</div>
           </article>
         `
       )
@@ -328,7 +583,9 @@
       ...slide,
       title: review[index]?.title || slide.title,
       body: review[index]?.body || slide.body,
-      bullets: Array.isArray(review[index]?.bullets) && review[index].bullets.length ? review[index].bullets : slide.bullets
+      bullets: Array.isArray(review[index]?.bullets) && review[index].bullets.length ? review[index].bullets : slide.bullets,
+      visualType: review[index]?.visualType || slide.visualType,
+      sources: Array.isArray(review[index]?.sources) && review[index].sources.length ? review[index].sources : slide.sources
     }));
   }
 
@@ -339,13 +596,19 @@
 
   function saveCoursewareReview() {
     const unit = unitData();
-    const slides = Array.from(document.querySelectorAll("#coursewareSlides .slide-card")).map((card) => ({
-      title: cleanEditableText(card.querySelector('[data-edit="title"]')?.innerText || "").replace(/^\d+\.\s*/, ""),
-      body: cleanEditableText(card.querySelector('[data-edit="body"]')?.innerText || ""),
-      bullets: Array.from(card.querySelectorAll('[data-edit="bullet"]'))
-        .map((item) => cleanEditableText(item.innerText))
-        .filter(Boolean)
-    }));
+    const existingSlides = buildCoursewareSlides(unit);
+    const slides = Array.from(document.querySelectorAll("#coursewareSlides .slide-card")).map((card, index) => {
+      const existingSlide = existingSlides[index] || {};
+      return {
+        title: cleanEditableText(card.querySelector('[data-edit="title"]')?.innerText || "").replace(/^\d+\.\s*/, ""),
+        body: cleanEditableText(card.querySelector('[data-edit="body"]')?.innerText || ""),
+        bullets: Array.from(card.querySelectorAll('[data-edit="bullet"]'))
+          .map((item) => cleanEditableText(item.innerText))
+          .filter(Boolean),
+        visualType: existingSlide.visualType || "concept",
+        sources: existingSlide.sources || getSourceRefs(unit)
+      };
+    });
     state.coursewareReviews[coursewareKey(unit)] = slides;
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;

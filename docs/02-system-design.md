@@ -9,6 +9,8 @@ index.html
   -> knowledge/    按年级和册别拆分的知识点 JS 数据包
   -> agents/       大模型与 Agent 配置声明
   -> mock-data.js  本地测试数据，可替换
+  -> model-client.js       OpenAI-compatible 模型客户端
+  -> agent-orchestrator.js 课件 Agent 与出题 Agent 编排
   -> app.js        课件生成、出题、判分、错题库、周期测验
   -> localStorage  本地错题库和测验设置
 ```
@@ -51,7 +53,9 @@ index.html
 当前实现：
 
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
+- `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
 - 审核稿保存在 `localStorage` 的 `ai-teacher-rj-math-courseware-reviews-v1`。
+- AI 课件生成结果先进入审核稿，用户可继续编辑、保存或重置。
 - `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF。
 
 正式实现：
@@ -76,6 +80,7 @@ index.html
 - `normalizePaperPoints()` 将当前试卷分值归一为 100 分。
 - `enforceUnitQuestionBoundary()` 对进入当前试卷的题目做 `unitId`、`unitTitle`、`knowledgePoint` 校验，确保同步练习只出现所选单元知识点。
 - 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
+- `agent-orchestrator.js` 可选调用出题 Agent 生成候选题，进入试卷前仍会经过单元边界、题型重复和分值规则处理。
 - `state.currentQuestions` 保存当前试卷。
 
 正式实现：
@@ -200,6 +205,7 @@ score_records
 ## 4. AI/OCR 接入建议
 
 - 模型协议：参考 OfferAgent，采用 OpenAI-compatible Chat Completions；provider、model、apiKey、baseUrl、timeout、temperature、seed 均可配置。
+- 当前实现：`model-client.js` 提供连接测试和 JSON 生成；页面侧栏提供服务商、模型、Base URL 和临时 API Key 配置。
 - 安全策略：API Key 不提交、不写入代码、不建议持久化到 `localStorage`；浏览器直连失败时使用客户电脑上的本地代理或客户自有模型网关。
 - 课件：大模型只基于结构化客观知识点生成课件 JSON，固定模板和低随机性参数保证稳定性。
 - 视觉：Agent 负责把知识点映射为分数格、几何图、统计柱、数轴、流程图等参数化图形。

@@ -49,6 +49,35 @@
 
         <button id="generatePaperBtn" class="primary-btn full">生成同步练习</button>
 
+        <div class="model-card">
+          <div class="model-card-head">
+            <span>模型与 Agent</span>
+            <strong>可选增强</strong>
+          </div>
+          <div class="control-block">
+            <label for="modelProvider">服务商</label>
+            <select id="modelProvider"></select>
+          </div>
+          <div class="control-block">
+            <label for="modelName">模型</label>
+            <input id="modelName" type="text" placeholder="选择服务商后自动填充" autocomplete="off" />
+          </div>
+          <div class="control-block">
+            <label for="modelBaseUrl">Base URL</label>
+            <input id="modelBaseUrl" type="text" placeholder="OpenAI-compatible 地址" autocomplete="off" />
+          </div>
+          <div class="control-block">
+            <label for="modelApiKey">临时 API Key</label>
+            <input id="modelApiKey" type="password" placeholder="仅本次页面使用" autocomplete="off" />
+          </div>
+          <div class="button-row compact">
+            <button id="testModelBtn" class="secondary-btn small" type="button">测试连接</button>
+            <button id="aiCoursewareBtn" class="secondary-btn small" type="button">AI 课件</button>
+            <button id="aiQuestionsBtn" class="secondary-btn small" type="button">AI 出题</button>
+          </div>
+          <p id="modelStatus" class="model-status">本地规则引擎运行中，模型为可选增强。</p>
+        </div>
+
         <div class="scope-card">
           <span>当前范围</span>
           <strong id="scopeLabel"></strong>
@@ -211,6 +240,8 @@
     <script src="knowledge/rj-grade5-math-a.js"></script>
     <script src="knowledge/rj-grade6-math-a.js"></script>
     <script src="mock-data.js"></script>
+    <script src="model-client.js"></script>
+    <script src="agent-orchestrator.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -163,8 +163,71 @@ textarea {
   font-size: 13px;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .full {
   width: 100%;
+}
+
+.model-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #162033;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+
+.model-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.model-card-head span {
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.model-card-head strong {
+  color: #99f6e4;
+  font-size: 12px;
+}
+
+.button-row.compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.button-row.compact .secondary-btn {
+  min-width: 0;
+  padding-inline: 6px;
+}
+
+.model-status {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.model-status[data-tone="ok"] {
+  color: #99f6e4;
+}
+
+.model-status[data-tone="warn"],
+.model-status[data-tone="busy"] {
+  color: #fde68a;
+}
+
+.model-status[data-tone="error"] {
+  color: #fecaca;
 }
 
 .scope-card {

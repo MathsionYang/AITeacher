@@ -39,14 +39,18 @@ D:\AITeacher\index.html
 
 每个 JS 文件对应 `docs/knowledge/` 下的一份客观知识点提炼文档。新增下册或其他教材版本时，新增一个知识包并在 `index.html` 中引入即可。
 
-## 模型配置
+## 模型配置与 Agent
 
-MVP 不配置模型也能运行。后续接入真实模型时，可参考 `.env.example` 和 `agents/ai-teacher-agents.yaml`：
+MVP 不配置模型也能运行，默认走本地模板、规则出题和确定性判分。页面左侧“模型与 Agent”是可选增强入口：
 
-- 模型协议：OpenAI-compatible `/chat/completions`
-- 推荐参数：`temperature=0`、固定 `seed`
-- Key 策略：真实 Key 不提交、不写入代码、不持久化到浏览器 localStorage
-- 分工原则：模型做生成/解析/诊断/规划，判分/来源/题库/权限/版权校验走规则化模块
+- 配置位置：在页面侧栏选择服务商、模型、Base URL，并填写临时 API Key
+- 代码入口：`model-client.js` 负责 OpenAI-compatible `/chat/completions` 调用；`agent-orchestrator.js` 负责编排课件 Agent 和出题 Agent
+- 当前能力：支持测试连接、AI 生成课件审核稿、AI 生成同步练习候选题
+- 安全策略：真实 Key 不提交、不写入代码、不持久化到浏览器 localStorage，只在当前页面内存中使用
+- 规则边界：AI 题目进入试卷前仍会做当前单元 `unitId`、`unitTitle`、`knowledgePoint` 校验，题量最多 20 题，总分归一为 100 分
+- 本地部署：浏览器直连模型接口遇到 CORS 时，可把 Base URL 指向客户电脑上的本地代理或客户自有模型网关
+
+环境变量样例见 `.env.example`，Agent 声明见 `agents/ai-teacher-agents.yaml`。
 
 ## Mock Data
 
