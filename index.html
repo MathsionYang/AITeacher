@@ -47,7 +47,7 @@
           </div>
         </div>
 
-        <button id="generatePaperBtn" class="primary-btn full">生成同步练习</button>
+        <button id="generatePaperBtn" class="primary-btn full">进入同步出题</button>
 
         <div class="model-card">
           <div class="model-card-head">
@@ -123,20 +123,20 @@
               <button id="aiCoursewareBtn" class="primary-btn">AI 生成课件</button>
               <button id="toggleReviewBtn" class="secondary-btn">审核编辑</button>
               <button id="saveCoursewareBtn" class="secondary-btn">保存审核稿</button>
-              <button id="resetCoursewareBtn" class="secondary-btn">重置课件</button>
-              <button id="exportCoursewareJsonBtn" class="secondary-btn">导出课件</button>
-              <button id="importCoursewareBtn" class="secondary-btn">导入课件</button>
+              <button id="resetCoursewareBtn" class="secondary-btn">清空课件</button>
+              <button id="exportCoursewareJsonBtn" class="secondary-btn">导出课件记录</button>
+              <button id="importCoursewareBtn" class="secondary-btn">导入历史课件</button>
               <button id="exportPdfBtn" class="primary-btn">导出 PDF</button>
               <button id="downloadCoursewareBtn" class="secondary-btn">导出 Markdown</button>
               <input id="importCoursewareFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>
-          <div id="coursewareStreamPanel" class="stream-panel" hidden>
-            <div class="stream-head">
-              <strong>AI 流式输出</strong>
-              <span>生成完成后会进入可审核课件稿</span>
+          <div id="coursewareProgressPanel" class="generation-panel" hidden>
+            <div class="progress-orbit" aria-hidden="true"></div>
+            <div>
+              <strong>正在生成课件</strong>
+              <p id="coursewareProgressText">AI 正在根据当前单元知识点组织课件内容，完成后统一展示。</p>
             </div>
-            <pre id="coursewareStreamOutput"></pre>
           </div>
           <div id="knowledgePoints" class="tag-grid"></div>
           <div id="coursewareSlides" class="slide-grid"></div>
@@ -150,8 +150,18 @@
             </div>
             <div class="button-row">
               <button id="aiQuestionsBtn" class="primary-btn">AI 生成练习</button>
+              <button id="exportPracticeJsonBtn" class="secondary-btn">导出练习记录</button>
+              <button id="importPracticeBtn" class="secondary-btn">导入历史练习</button>
               <button id="showAnswerBtn" class="secondary-btn">显示答案</button>
               <button id="copyAnswersBtn" class="secondary-btn">复制答题模板</button>
+              <input id="importPracticeFile" class="hidden-input" type="file" accept="application/json,.json" />
+            </div>
+          </div>
+          <div id="practiceProgressPanel" class="generation-panel" hidden>
+            <div class="progress-orbit" aria-hidden="true"></div>
+            <div>
+              <strong>正在生成练习</strong>
+              <p id="practiceProgressText">AI 正在按当前单元边界生成题目，全部校验完成后统一展示。</p>
             </div>
           </div>
           <div id="paperMeta" class="paper-meta"></div>

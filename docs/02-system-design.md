@@ -57,8 +57,8 @@ index.html
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
 - `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
 - 审核稿保存在 `localStorage` 的 `ai-teacher-rj-math-courseware-reviews-v1`。
-- AI 课件按钮放在“知识点课件”页面内，生成过程通过流式输出面板展示，生成结果先进入审核稿。
-- 课件审核稿可导出为 JSON，也可从 JSON 导入到当前单元，便于人工审核、备份和迁移。
+- 知识点课件默认不展示模板课件；AI 课件按钮放在“知识点课件”页面内，生成过程只展示进度动画，完成模型返回和规则校验后再一次性展示审核稿。
+- 课件审核稿可导出为 JSON，也可从历史 JSON 导入；导入时优先根据文件中的年级、册别、单元恢复范围。
 - `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF。
 
 正式实现：
@@ -84,7 +84,8 @@ index.html
 - `enforceUnitQuestionBoundary()` 对进入当前试卷的题目做 `unitId`、`unitTitle`、`knowledgePoint` 校验，确保同步练习只出现所选单元知识点。
 - 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
 - `agent-orchestrator.js` 可选调用出题 Agent 生成候选题，进入试卷前仍会经过单元边界、题型重复和分值规则处理。
-- `state.currentQuestions` 保存当前试卷。
+- 同步出题页面默认空白；点击 AI 生成练习时先显示进度动画，题目全部生成并通过单元边界、题型重复和 100 分制校验后再展示。
+- `state.currentQuestions` 保存当前试卷，当前练习可导出为 JSON，也可导入历史练习 JSON。
 
 正式实现：
 

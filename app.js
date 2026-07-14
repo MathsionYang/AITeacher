@@ -22,6 +22,8 @@
     answersVisible: false,
     activeTab: "courseware",
     coursewareEditMode: false,
+    coursewareGenerating: false,
+    practiceGenerating: false,
     gradingResults: [],
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
@@ -74,7 +76,6 @@
     buildModelProviderOptions();
     restoreScheduleControls();
     bindEvents();
-    generatePractice();
     renderAll();
   }
 
@@ -125,6 +126,30 @@
     $("unitSelect").value = state.unitId;
   }
 
+  function applyScopeFromPayload(payload = {}) {
+    const gradeId = String(payload.gradeId || payload.grade || state.grade);
+    const grade = content.grades[gradeId];
+    if (!grade) return false;
+    const volumeId = payload.volumeId || payload.volume || state.volume;
+    const volume = grade.volumes[volumeId];
+    if (!volume) return false;
+    const unitId = payload.unitId || state.unitId;
+    if (!volume.units.some((unit) => unit.id === unitId)) return false;
+
+    state.grade = gradeId;
+    state.volume = volumeId;
+    state.unitId = unitId;
+    if (["基础", "提高", "挑战"].includes(payload.difficulty)) state.difficulty = payload.difficulty;
+    if (payload.questionCount) state.questionCount = capQuestionCount(Number(payload.questionCount) || state.questionCount);
+
+    $("gradeSelect").value = state.grade;
+    refreshVolumeOptions();
+    refreshUnitOptions();
+    $("difficultySelect").value = state.difficulty;
+    $("questionCount").value = state.questionCount;
+    clearPracticeState();
+    return true;
+  }
   function buildModelProviderOptions() {
     const entries = Object.entries(providerDefaults);
     if (!entries.length) {
@@ -165,40 +190,38 @@
       state.volume = firstVolumeId(gradeData());
       refreshVolumeOptions();
       refreshUnitOptions();
-      generatePractice();
+      clearPracticeState();
       renderAll();
     });
 
     $("volumeSelect").addEventListener("change", (event) => {
       state.volume = event.target.value;
       refreshUnitOptions();
-      generatePractice();
+      clearPracticeState();
       renderAll();
     });
 
     $("unitSelect").addEventListener("change", (event) => {
       state.unitId = event.target.value;
-      generatePractice();
+      clearPracticeState();
       renderAll();
     });
 
     $("difficultySelect").addEventListener("change", (event) => {
       state.difficulty = event.target.value;
-      generatePractice();
+      clearPracticeState();
       renderAll();
     });
 
     $("questionCount").addEventListener("change", (event) => {
       state.questionCount = capQuestionCount(Number(event.target.value) || 6);
       event.target.value = state.questionCount;
-      generatePractice();
+      clearPracticeState();
       renderAll();
     });
 
     $("generatePaperBtn").addEventListener("click", () => {
-      generatePractice();
       switchTab("practice");
-      renderAll();
     });
 
     $("modelProvider").addEventListener("change", applyModelProviderDefaults);
@@ -209,6 +232,9 @@
     $("exportCoursewareJsonBtn").addEventListener("click", exportCoursewareJson);
     $("importCoursewareBtn").addEventListener("click", () => $("importCoursewareFile").click());
     $("importCoursewareFile").addEventListener("change", importCoursewareJson);
+    $("exportPracticeJsonBtn").addEventListener("click", exportPracticeJson);
+    $("importPracticeBtn").addEventListener("click", () => $("importPracticeFile").click());
+    $("importPracticeFile").addEventListener("change", importPracticeJson);
     $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
     $("saveCoursewareBtn").addEventListener("click", saveCoursewareReview);
@@ -250,6 +276,18 @@
     document.querySelectorAll(".tab-panel").forEach((panel) => {
       panel.classList.toggle("active", panel.id === tab);
     });
+  }
+
+  function clearPracticeState() {
+    state.currentQuestions = [];
+    state.answersVisible = false;
+    state.gradingResults = [];
+    hideGenerationProgress("practice");
+    $("gradingSummary").classList.remove("active");
+    $("gradingSummary").innerHTML = "";
+    $("gradingResults").innerHTML = "";
+    $("performanceFeedback").innerHTML = "";
+    $("answerInput").value = "";
   }
 
   function renderAll() {
@@ -332,23 +370,35 @@
     await runWithModelStatus("aiCoursewareBtn", "生成中...", async () => {
       ensureAgentReady();
       const unit = unitData();
-      const fallbackSlides = buildCoursewareSlides(unit);
+      const fallbackSlides = buildBaseCoursewareSlides(unit);
+      let receivedChars = 0;
       switchTab("courseware");
-      resetCoursewareStream("正在请求模型，流式内容会显示在这里...\n");
-      const generator = agentOrchestrator.generateCoursewareStream || agentOrchestrator.generateCourseware;
-      const result = await generator(
-        collectModelRuntimeConfig(),
-        buildAgentScope(unit),
-        fallbackSlides,
-        (token, fullText) => appendCoursewareStream(token, fullText)
-      );
-      const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
-      state.coursewareReviews[coursewareKey(unit)] = slides;
-      writeJson(coursewareReviewKey, state.coursewareReviews);
+      state.coursewareGenerating = true;
       state.coursewareEditMode = false;
+      setGenerationProgress("courseware", "AI 正在根据当前单元知识点组织课件内容，完成后统一展示。");
       renderCourseware();
-      setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
+      try {
+        const generator = agentOrchestrator.generateCoursewareStream || agentOrchestrator.generateCourseware;
+        const result = await generator(
+          collectModelRuntimeConfig(),
+          buildAgentScope(unit),
+          fallbackSlides,
+          (token) => {
+            receivedChars += String(token || "").length;
+            setGenerationProgress("courseware", `已接收 ${receivedChars} 字内容，正在校验知识点边界与来源。`);
+          }
+        );
+        const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
+        state.coursewareReviews[coursewareKey(unit)] = slides;
+        writeJson(coursewareReviewKey, state.coursewareReviews);
+        setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
+      } finally {
+        state.coursewareGenerating = false;
+        hideGenerationProgress("courseware");
+        renderCourseware();
+      }
     });
+    renderCourseware();
   }
 
   async function generateAiQuestions() {
@@ -356,30 +406,36 @@
       ensureAgentReady();
       const unit = unitData();
       const requestedCount = capQuestionCount(state.questionCount);
-      const result = await agentOrchestrator.generateQuestions(
-        collectModelRuntimeConfig(),
-        buildAgentScope(unit)
-      );
-      const aiQuestions = rebalanceQuestionTypes(
-        normalizeAiQuestions(result.questions, unit, requestedCount),
-        requestedCount
-      );
-      const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
-      const mergedQuestions = dedupeByStem([...aiQuestions, ...fallbackQuestions]).slice(0, requestedCount);
-      const scopedQuestions = enforceUnitQuestionBoundary(mergedQuestions, unit);
-
-      if (!scopedQuestions.length) throw new Error("模型返回题目未通过单元边界校验，已保留本地题目。");
-      state.currentQuestions = normalizePaperPoints(scopedQuestions);
-      state.answersVisible = false;
-      state.gradingResults = [];
-      $("gradingSummary").classList.remove("active");
-      $("gradingSummary").innerHTML = "";
-      $("gradingResults").innerHTML = "";
-      $("performanceFeedback").innerHTML = "";
       switchTab("practice");
-      renderAll();
-      setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”。`, "ok");
+      clearPracticeState();
+      state.practiceGenerating = true;
+      setGenerationProgress("practice", "AI 正在按当前单元边界生成题目，全部校验完成后统一展示。");
+      renderPractice();
+      try {
+        const result = await agentOrchestrator.generateQuestions(
+          collectModelRuntimeConfig(),
+          buildAgentScope(unit)
+        );
+        setGenerationProgress("practice", "题目已返回，正在检查知识点范围、题型重复和分值。");
+        const aiQuestions = rebalanceQuestionTypes(
+          normalizeAiQuestions(result.questions, unit, requestedCount),
+          requestedCount
+        );
+        const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
+        const mergedQuestions = dedupeByStem([...aiQuestions, ...fallbackQuestions]).slice(0, requestedCount);
+        const scopedQuestions = enforceUnitQuestionBoundary(mergedQuestions, unit);
+
+        if (!scopedQuestions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
+        state.currentQuestions = normalizePaperPoints(scopedQuestions);
+        state.answersVisible = false;
+        setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”。`, "ok");
+      } finally {
+        state.practiceGenerating = false;
+        hideGenerationProgress("practice");
+        renderAll();
+      }
     });
+    renderPractice();
   }
 
   async function runWithModelStatus(buttonId, busyText, action) {
@@ -387,11 +443,11 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = busyText;
-    setModelStatus("正在调用模型，默认本地内容不会被覆盖。", "busy");
+    setModelStatus("正在调用模型，结果完成校验后才会展示。", "busy");
     try {
       await action();
     } catch (error) {
-      setModelStatus(error.message || "模型调用失败，已保留本地生成内容。", "error");
+      setModelStatus(error.message || "模型调用失败，未更新当前内容。", "error");
     } finally {
       button.disabled = false;
       button.textContent = originalText;
@@ -405,21 +461,17 @@
     status.dataset.tone = tone;
   }
 
-  function resetCoursewareStream(initialText = "") {
-    const panel = $("coursewareStreamPanel");
-    const output = $("coursewareStreamOutput");
-    if (!panel || !output) return;
+  function setGenerationProgress(kind, message) {
+    const panel = $(`${kind}ProgressPanel`);
+    const text = $(`${kind}ProgressText`);
+    if (!panel || !text) return;
     panel.hidden = false;
-    output.textContent = initialText;
+    text.textContent = message;
   }
 
-  function appendCoursewareStream(token, fullText) {
-    const panel = $("coursewareStreamPanel");
-    const output = $("coursewareStreamOutput");
-    if (!panel || !output) return;
-    panel.hidden = false;
-    output.textContent = fullText;
-    output.scrollTop = output.scrollHeight;
+  function hideGenerationProgress(kind) {
+    const panel = $(`${kind}ProgressPanel`);
+    if (panel) panel.hidden = true;
   }
 
   function normalizeAiCoursewareSlides(slides, fallbackSlides, unit) {
@@ -481,6 +533,14 @@
     return enforceUnitQuestionBoundary(normalized, unit);
   }
 
+  function normalizeImportedQuestions(questions, unit) {
+    const safeQuestions = normalizeAiQuestions(questions, unit, capGeneratedQuestionCount(questions.length));
+    return safeQuestions.map((questionItem, index) => ({
+      ...questionItem,
+      id: questionItem.id || `${unit.id}-import-${Date.now()}-${index}`,
+      sourceRefs: questionItem.sourceRefs || getSourceRefs(unit)
+    }));
+  }
   function resolveKnowledgePoint(value, unit) {
     const text = cleanText(value);
     if (!text) return "";
@@ -525,6 +585,9 @@
   function renderCourseware() {
     const unit = unitData();
     const sourceRefs = getSourceRefs(unit);
+    const slides = buildCoursewareSlides(unit);
+    const hasSlides = slides.length > 0;
+    if (!hasSlides) state.coursewareEditMode = false;
     $("knowledgePoints").innerHTML = unit.points
       .map(
         (point) => `
@@ -536,7 +599,22 @@
       )
       .join("");
 
-    $("coursewareSlides").innerHTML = buildCoursewareSlides(unit)
+    updateCoursewareButtons(hasSlides);
+
+    if (state.coursewareGenerating) {
+      $("coursewareSlides").className = "slide-grid empty-state";
+      $("coursewareSlides").innerHTML = `<div><strong>课件生成中</strong><p>AI 正在生成并校验内容，完成后会一次性展示。</p></div>`;
+      return;
+    }
+
+    if (!hasSlides) {
+      $("coursewareSlides").className = "slide-grid empty-state";
+      $("coursewareSlides").innerHTML = `<div><strong>暂无课件</strong><p>可以导入历史课件，或点击“AI 生成课件”创建当前单元课件。</p></div>`;
+      return;
+    }
+
+    $("coursewareSlides").className = "slide-grid";
+    $("coursewareSlides").innerHTML = slides
       .map(
         (slide, index) => `
           <article class="slide-card ${state.coursewareEditMode ? "editing" : ""}" data-slide-index="${index}">
@@ -551,13 +629,28 @@
         `
       )
       .join("");
+  }
+
+  function updateCoursewareButtons(hasSlides) {
+    $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
+    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn"].forEach((id) => {
+      const button = $(id);
+      if (button) button.disabled = state.coursewareGenerating || !hasSlides;
+    });
+    $("importCoursewareBtn").disabled = state.coursewareGenerating;
   }
 
   function buildCoursewareSlides(unit) {
+    const review = state.coursewareReviews[coursewareKey(unit)];
+    if (!Array.isArray(review) || !review.length) return [];
+    return applyCoursewareReview(buildBaseCoursewareSlides(unit), review);
+  }
+
+  function buildBaseCoursewareSlides(unit) {
     const [firstPoint, secondPoint, thirdPoint] = padPoints(unit.points);
     const sources = getSourceRefs(unit);
-    const baseSlides = [
+    return [
       {
         title: "学习目标",
         body: `本节围绕“${unit.title}”建立清晰概念和可迁移方法。`,
@@ -601,7 +694,6 @@
         sources
       }
     ];
-    return applyCoursewareReview(unit, baseSlides);
   }
 
   function padPoints(points) {
@@ -614,9 +706,7 @@
     return `${state.grade}-${state.volume}-${unit.id}`;
   }
 
-  function applyCoursewareReview(unit, slides) {
-    const review = state.coursewareReviews[coursewareKey(unit)];
-    if (!Array.isArray(review)) return slides;
+  function applyCoursewareReview(slides, review) {
     return slides.map((slide, index) => ({
       ...slide,
       title: review[index]?.title || slide.title,
@@ -628,6 +718,10 @@
   }
 
   function toggleCoursewareReview() {
+    if (!buildCoursewareSlides(unitData()).length) {
+      setModelStatus("当前还没有课件，请先导入历史课件或点击 AI 生成课件。", "warn");
+      return;
+    }
     state.coursewareEditMode = !state.coursewareEditMode;
     renderCourseware();
   }
@@ -635,6 +729,10 @@
   function saveCoursewareReview() {
     const unit = unitData();
     const existingSlides = buildCoursewareSlides(unit);
+    if (!existingSlides.length) {
+      setModelStatus("当前还没有可保存的课件。", "warn");
+      return;
+    }
     const slides = Array.from(document.querySelectorAll("#coursewareSlides .slide-card")).map((card, index) => {
       const existingSlide = existingSlides[index] || {};
       return {
@@ -651,13 +749,16 @@
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
     renderCourseware();
+    setModelStatus("课件审核稿已保存到本机历史记录。", "ok");
   }
 
   function resetCoursewareReview() {
     delete state.coursewareReviews[coursewareKey(unitData())];
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
+    hideGenerationProgress("courseware");
     renderCourseware();
+    setModelStatus("当前单元课件已清空，可重新生成或导入历史课件。", "ok");
   }
 
   function cleanEditableText(value) {
@@ -665,6 +766,10 @@
   }
 
   function exportCoursewarePdf() {
+    if (!buildCoursewareSlides(unitData()).length) {
+      setModelStatus("当前还没有可导出 PDF 的课件。", "warn");
+      return;
+    }
     switchTab("courseware");
     window.print();
   }
@@ -789,15 +894,28 @@
 
   function renderPractice() {
     const list = $("practiceList");
-    list.classList.toggle("show-answers", state.answersVisible);
+    const hasQuestions = state.currentQuestions.length > 0;
+    $("aiQuestionsBtn").textContent = state.practiceGenerating ? "出题中..." : hasQuestions ? "重新生成练习" : "AI 生成练习";
     $("showAnswerBtn").textContent = state.answersVisible ? "隐藏答案" : "显示答案";
-    $("paperMeta").textContent = state.currentQuestions.length
+    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn"].forEach((id) => {
+      const button = $(id);
+      if (button) button.disabled = state.practiceGenerating || !hasQuestions;
+    });
+    $("importPracticeBtn").disabled = state.practiceGenerating;
+    $("paperMeta").hidden = !hasQuestions;
+    $("paperMeta").textContent = hasQuestions
       ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。`
       : "";
 
-    if (!state.currentQuestions.length) {
+    if (state.practiceGenerating) {
       list.className = "question-list empty-state";
-      list.textContent = "还没有生成题目，点击左侧生成同步练习。";
+      list.innerHTML = `<div><strong>练习生成中</strong><p>AI 正在生成并校验题目，完成后会一次性展示整卷。</p></div>`;
+      return;
+    }
+
+    if (!hasQuestions) {
+      list.className = "question-list empty-state";
+      list.innerHTML = `<div><strong>暂无练习</strong><p>可以导入历史练习，或点击“AI 生成练习”创建当前单元同步题。</p></div>`;
       return;
     }
 
@@ -1193,6 +1311,10 @@
   }
 
   function downloadCourseware() {
+    if (!buildCoursewareSlides(unitData()).length) {
+      setModelStatus("当前还没有可导出 Markdown 的课件。", "warn");
+      return;
+    }
     const markdown = buildCoursewareMarkdown();
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1205,9 +1327,15 @@
 
   function exportCoursewareJson() {
     const unit = unitData();
+    const slides = buildCoursewareSlides(unit);
+    if (!slides.length) {
+      setModelStatus("当前还没有可导出的课件记录。", "warn");
+      return;
+    }
     const payload = {
       schemaVersion: 1,
       exportedAt: new Date().toISOString(),
+      type: "courseware",
       version: content.version,
       subject: content.subject,
       gradeId: state.grade,
@@ -1216,16 +1344,16 @@
       volumeName: volumeData().name,
       unitId: unit.id,
       unitTitle: unit.title,
-      slides: buildCoursewareSlides(unit)
+      slides
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${gradeData().name}${volumeData().name}-${unit.title}-课件审核稿.json`;
+    anchor.download = `${gradeData().name}${volumeData().name}-${unit.title}-课件历史记录.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setModelStatus("课件 JSON 已导出，可用于人工审核、备份或迁移。", "ok");
+    setModelStatus("课件历史记录已导出，可用于审核、备份或迁移。", "ok");
   }
 
   async function importCoursewareJson(event) {
@@ -1235,20 +1363,81 @@
       const payload = JSON.parse(await file.text());
       const rawSlides = Array.isArray(payload) ? payload : payload.slides;
       if (!Array.isArray(rawSlides) || !rawSlides.length) throw new Error("JSON 中未找到 slides 数组。");
+      applyScopeFromPayload(payload);
       const unit = unitData();
-      const slides = normalizeAiCoursewareSlides(rawSlides, buildCoursewareSlides(unit), unit);
+      const slides = normalizeAiCoursewareSlides(rawSlides, buildBaseCoursewareSlides(unit), unit);
       state.coursewareReviews[coursewareKey(unit)] = slides;
       writeJson(coursewareReviewKey, state.coursewareReviews);
       state.coursewareEditMode = false;
-      renderCourseware();
+      hideGenerationProgress("courseware");
+      renderAll();
       switchTab("courseware");
-      setModelStatus(`已导入 ${slides.length} 页课件到当前单元审核稿。`, "ok");
+      setModelStatus(`已导入 ${slides.length} 页历史课件到“${unit.title}”。`, "ok");
     } catch (error) {
       setModelStatus(error.message || "课件 JSON 导入失败。", "error");
     } finally {
       event.target.value = "";
     }
   }
+
+  function exportPracticeJson() {
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有可导出的练习记录。", "warn");
+      return;
+    }
+    const unit = unitData();
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      type: "practice",
+      version: content.version,
+      subject: content.subject,
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      difficulty: state.difficulty,
+      questionCount: state.currentQuestions.length,
+      totalScore: paperTotal(state.currentQuestions),
+      questions: state.currentQuestions
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${gradeData().name}${volumeData().name}-${unit.title}-练习历史记录.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setModelStatus("练习历史记录已导出。", "ok");
+  }
+
+  async function importPracticeJson(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const rawQuestions = Array.isArray(payload) ? payload : payload.questions;
+      if (!Array.isArray(rawQuestions) || !rawQuestions.length) throw new Error("JSON 中未找到 questions 数组。");
+      applyScopeFromPayload(payload);
+      const unit = unitData();
+      const questions = normalizeImportedQuestions(rawQuestions, unit);
+      if (!questions.length) throw new Error("导入题目未通过当前单元知识点边界校验。");
+      state.currentQuestions = normalizePaperPoints(questions);
+      state.answersVisible = false;
+      state.practiceGenerating = false;
+      hideGenerationProgress("practice");
+      switchTab("practice");
+      renderAll();
+      setModelStatus(`已导入 ${state.currentQuestions.length} 题历史练习到“${unit.title}”。`, "ok");
+    } catch (error) {
+      setModelStatus(error.message || "练习 JSON 导入失败。", "error");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
   function buildCoursewareMarkdown() {
     const unit = unitData();
     const slides = buildCoursewareSlides(unit);
@@ -1276,6 +1465,10 @@
   }
 
   async function copyAnswerTemplate() {
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有练习题，请先导入历史练习或点击 AI 生成练习。", "warn");
+      return;
+    }
     const template = state.currentQuestions.map((_, index) => `${index + 1}. `).join("\n");
     $("answerInput").value = template;
     switchTab("grading");
@@ -1299,7 +1492,10 @@
   }
 
   function simulateOcr() {
-    if (!state.currentQuestions.length) generatePractice();
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有练习题，请先导入历史练习或点击 AI 生成练习。", "warn");
+      return;
+    }
     const lines = state.currentQuestions.map((question, index) => {
       const shouldMiss = index % 4 === 2;
       const answer = shouldMiss ? makeNearbyWrongAnswer(question.answer, index) : question.answer;
@@ -1318,7 +1514,10 @@
   }
 
   function gradeAnswers() {
-    if (!state.currentQuestions.length) generatePractice();
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有可判分的练习题，请先生成或导入练习。", "warn");
+      return;
+    }
     state.currentQuestions = normalizePaperPoints(enforceUnitQuestionBoundary(state.currentQuestions, unitData()));
     const answers = parseAnswers($("answerInput").value);
     const results = state.currentQuestions.map((question, index) => {
