@@ -98,14 +98,15 @@ index.html
 
 职责：
 
-- 按单元、题量、难度生成题目。
+- 按单元和难度生成题目，题量固定为 10 题。
 - 每题必须有答案、分值、解析、考点。
 - 支持练习卷、测验卷、错题卷。
 
 当前实现：
 
 - `generateQuestions()` 根据知识点标签生成原创选择题、填空题、计算填空题、单位换算填空题和数据填空题。
-- `capQuestionCount()` 将每次题量限制在 20 题以内。
+- `capQuestionCount()` 将每次组卷题量固定为 10 题。
+- `validatePaper()` 要求每套同步练习覆盖当前单元全部知识点，每个知识点至少出现 1 题。
 - `normalizePaperPoints()` 将当前试卷分值归一为 100 分。
 - `enforceUnitQuestionBoundary()` 对进入当前试卷的题目做 `unitId`、`unitTitle`、`knowledgePoint` 校验，确保同步练习只出现所选单元知识点。
 - `validateKnowledgePointRelevance()` 进一步检查题干证据，避免普通加法、乘法等无关题目只贴上当前单元知识点标签后进入试卷。

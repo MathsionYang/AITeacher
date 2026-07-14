@@ -2,6 +2,7 @@
   "use strict";
 
   const SCHEMA_VERSION = 2;
+  const REQUIRED_QUESTION_COUNT = 10;
   const DIFFICULTIES = new Set(["基础", "提高", "挑战"]);
   const UNIT_WORDS = [
     "平方厘米", "立方厘米", "平方分米", "立方分米", "平方米", "立方米",
@@ -23,7 +24,7 @@
   }
 
   function capQuestionCount(value) {
-    return clamp(Number(value) || 6, 3, 20);
+    return REQUIRED_QUESTION_COUNT;
   }
 
   function capGeneratedQuestionCount(value) {
@@ -213,7 +214,9 @@
   }
 
   function validatePaper(questions, unit, options = {}) {
-    const limit = capGeneratedQuestionCount(options.limit || questions?.length || 0);
+    const exactCount = options.exactCount !== false;
+    const requireKnowledgeCoverage = options.requireKnowledgeCoverage !== false;
+    const limit = exactCount ? capQuestionCount(options.limit) : capGeneratedQuestionCount(options.limit || questions?.length || 0);
     const rejected = [];
     const accepted = [];
     dedupeByStem(questions).forEach((questionItem) => {
@@ -223,11 +226,15 @@
     });
 
     const scoped = enforceUnitQuestionBoundary(accepted, unit);
-    const balanced = rebalanceQuestionTypes(scoped, limit);
-    const normalized = normalizePaperPoints(balanced.slice(0, limit || 20));
+    const selected = requireKnowledgeCoverage ? selectQuestionsForKnowledgeCoverage(scoped, unit, limit) : rebalanceQuestionTypes(scoped, limit).slice(0, limit || 20);
+    const normalized = normalizePaperPoints(selected.slice(0, limit || 20));
+    const missingKnowledgePoints = requireKnowledgeCoverage ? findMissingKnowledgePoints(normalized, unit) : [];
     const issues = [];
     if (!normalized.length && questions?.length) issues.push("没有题目通过规则校验");
-    if (normalized.length > 20) issues.push("题量超过 20 题");
+    if (exactCount && normalized.length !== REQUIRED_QUESTION_COUNT) issues.push(`题量必须为 ${REQUIRED_QUESTION_COUNT} 题`);
+    if (missingKnowledgePoints.length) issues.push(`未覆盖知识点：${missingKnowledgePoints.join("、")}`);
+    if ((unit?.points || []).length > limit) issues.push(`当前单元知识点超过 ${limit} 个，无法用 ${limit} 题全部覆盖`);
+    if (normalized.length > REQUIRED_QUESTION_COUNT) issues.push(`题量超过 ${REQUIRED_QUESTION_COUNT} 题`);
     if (normalized.length && paperTotal(normalized) !== 100) issues.push("总分未归一为 100 分");
 
     return {
@@ -238,9 +245,56 @@
         requested: limit,
         accepted: normalized.length,
         rejected: rejected.length,
+        missingKnowledgePoints,
         totalScore: paperTotal(normalized)
       }
     };
+  }
+
+  function selectQuestionsForKnowledgeCoverage(questions, unit, limit = REQUIRED_QUESTION_COUNT) {
+    const safeLimit = limit || REQUIRED_QUESTION_COUNT;
+    const selected = [];
+    const used = new Set();
+    const points = (unit?.points || []).filter(Boolean).slice(0, safeLimit);
+
+    points.forEach((point) => {
+      const index = questions.findIndex((questionItem, questionIndex) => (
+        !used.has(questionIndex) && questionItem.knowledgePoint === point
+      ));
+      if (index >= 0) {
+        selected.push(questions[index]);
+        used.add(index);
+      }
+    });
+
+    const typeCounts = {};
+    selected.forEach((questionItem) => {
+      const type = normalizeText(questionItem?.questionType) || "同步练习题";
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+    const maxSameType = Math.max(4, Math.ceil(Math.max(safeLimit, 1) / 3));
+
+    questions.forEach((questionItem, questionIndex) => {
+      if (selected.length >= safeLimit || used.has(questionIndex)) return;
+      const type = normalizeText(questionItem?.questionType) || "同步练习题";
+      if ((typeCounts[type] || 0) >= maxSameType) return;
+      selected.push(questionItem);
+      used.add(questionIndex);
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+
+    questions.forEach((questionItem, questionIndex) => {
+      if (selected.length >= safeLimit || used.has(questionIndex)) return;
+      selected.push(questionItem);
+      used.add(questionIndex);
+    });
+
+    return selected;
+  }
+
+  function findMissingKnowledgePoints(questions, unit) {
+    const covered = new Set((Array.isArray(questions) ? questions : []).map((questionItem) => questionItem.knowledgePoint).filter(Boolean));
+    return (unit?.points || []).filter((point) => !covered.has(point));
   }
 
   function normalizeObjectiveQuestionType(questionType, stem = "") {
@@ -529,6 +583,7 @@
 
   const api = {
     SCHEMA_VERSION,
+    REQUIRED_QUESTION_COUNT,
     capQuestionCount,
     capGeneratedQuestionCount,
     clamp,
@@ -542,8 +597,10 @@
     parseNumberLike,
     rebalanceQuestionTypes,
     resolveKnowledgePoint,
+    findMissingKnowledgePoints,
     isOpenEndedStem,
     isObjectiveQuestionType,
+    selectQuestionsForKnowledgeCoverage,
     validateKnowledgePointRelevance,
     validatePaper,
     validateQuestion

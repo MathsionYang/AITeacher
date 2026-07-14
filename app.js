@@ -28,13 +28,14 @@
   const providerDefaults = window.AITeacherModelClient?.providerDefaults || {};
   const modelClient = window.AITeacherModelClient?.createModelClient?.();
   const agentOrchestrator = window.AITeacherAgentOrchestrator?.createAgentOrchestrator?.({ modelClient });
+  const requiredQuestionCount = ruleEngine.REQUIRED_QUESTION_COUNT || 10;
 
   const state = {
     grade: String(initialScope.grade || "3"),
     volume: initialScope.volume || "A",
     unitId: initialScope.unitId || "",
     difficulty: initialScope.difficulty || "基础",
-    questionCount: initialScope.questionCount || 6,
+    questionCount: requiredQuestionCount,
     currentQuestions: [],
     answerReview: { entries: [], summary: { averageConfidence: 0, lowConfidenceCount: 0, missingCount: 0 } },
     lastOcrResult: null,
@@ -220,7 +221,7 @@
     state.volume = volumeId;
     state.unitId = unitId;
     if (["基础", "提高", "挑战"].includes(payload.difficulty)) state.difficulty = payload.difficulty;
-    if (payload.questionCount) state.questionCount = capQuestionCount(Number(payload.questionCount) || state.questionCount);
+    state.questionCount = capQuestionCount(payload.questionCount);
 
     $("gradeSelect").value = state.grade;
     refreshVolumeOptions();
@@ -294,7 +295,7 @@
     });
 
     $("questionCount").addEventListener("change", (event) => {
-      state.questionCount = capQuestionCount(Number(event.target.value) || 6);
+      state.questionCount = capQuestionCount(event.target.value);
       event.target.value = state.questionCount;
       clearPracticeState();
       renderAll();
@@ -454,8 +455,10 @@
       questionCount: capQuestionCount(state.questionCount),
       rules: [
         "只允许使用当前单元 knowledgePoints 内的知识点",
+        "固定生成 10 道题",
+        "必须覆盖当前单元全部 knowledgePoints，每个知识点至少 1 题",
         "不得复制教材原文、课本例题或商业题库题目",
-        "题量最多 20 题，总分由本地规则统一归一为 100 分",
+        "总分由本地规则统一归一为 100 分",
         "同一题型不要过度重复，解析必须包含审题、建模、计算、检查"
       ]
     };
@@ -541,6 +544,9 @@
         const prepared = prepareQuestionsForPaper([...aiQuestions, ...fallbackQuestions], unit, requestedCount);
 
         if (!prepared.questions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
+        if (prepared.questions.length !== requestedCount || !hasKnowledgeCoverage(prepared.questions, unit)) {
+          throw new Error("模型返回题目未满足 10 题且覆盖全部知识点的规则，请重新生成。");
+        }
         state.currentQuestions = prepared.questions;
         state.answersVisible = false;
         seedAnswerInputsWithTemplate();
@@ -1199,15 +1205,16 @@
   }
 
   function generateScopedQuestions(unit, grade, difficulty, count) {
-    const safeCount = capGeneratedQuestionCount(count);
+    const safeCount = capQuestionCount(count);
     if (!safeCount) return [];
-    let prepared = prepareQuestionsForPaper(generateQuestions(unit, grade, difficulty, safeCount), unit, safeCount);
+    let candidates = [];
+    let prepared = { questions: [] };
     let scoped = prepared.questions;
     let attempts = 0;
 
-    while (scoped.length < safeCount && attempts < 3) {
-      const needed = safeCount - scoped.length;
-      prepared = prepareQuestionsForPaper([...scoped, ...generateQuestions(unit, grade, difficulty, needed)], unit, safeCount);
+    while ((!scoped.length || scoped.length < safeCount || !hasKnowledgeCoverage(scoped, unit)) && attempts < 6) {
+      candidates = [...candidates, ...generateQuestions(unit, grade, difficulty, safeCount, attempts * safeCount)];
+      prepared = prepareQuestionsForPaper(candidates, unit, safeCount);
       scoped = prepared.questions;
       attempts += 1;
     }
@@ -1225,19 +1232,35 @@
     ));
   }
 
-  function generateQuestions(unit, grade, difficulty, count) {
-    const safeCount = capGeneratedQuestionCount(count);
+  function hasKnowledgeCoverage(questions, unit) {
+    if (ruleEngine.findMissingKnowledgePoints) return ruleEngine.findMissingKnowledgePoints(questions, unit).length === 0;
+    const covered = new Set((questions || []).map((questionItem) => questionItem.knowledgePoint));
+    return (unit.points || []).every((point) => covered.has(point));
+  }
+
+  function generateQuestions(unit, grade, difficulty, count, startIndex = 0) {
+    const safeCount = capQuestionCount(count);
     const questions = [];
     const modes = ["计算填空题", "选择题", "填空题", "计算填空题", "选择题"];
     const maxSameType = Math.max(2, Math.ceil(safeCount / modes.length));
     const typeCounts = {};
+    const tags = unit.tags?.length ? unit.tags : ["综合"];
+    const points = unit.points?.length ? unit.points : tags;
     let cursor = 0;
 
+    points.slice(0, safeCount).forEach((knowledgePoint, pointIndex) => {
+      const tag = tags[pointIndex % tags.length] || knowledgePoint;
+      const mode = modes[pointIndex % modes.length];
+      const candidate = makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode, index: startIndex + pointIndex });
+      questions.push({ ...candidate, id: `${unit.id}-q${Date.now()}-${questions.length}` });
+      typeCounts[candidate.questionType] = (typeCounts[candidate.questionType] || 0) + 1;
+    });
+
     while (questions.length < safeCount && cursor < safeCount * 6) {
-      const tag = unit.tags[cursor % unit.tags.length] || "综合";
-      const knowledgePoint = unit.points[cursor % unit.points.length] || tag;
+      const tag = tags[cursor % tags.length] || "综合";
+      const knowledgePoint = points[cursor % points.length] || tag;
       const mode = modes[cursor % modes.length];
-      const candidate = makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode, index: cursor });
+      const candidate = makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode, index: startIndex + points.length + cursor });
       const used = typeCounts[candidate.questionType] || 0;
       const canUse = used < maxSameType || questions.length + Object.keys(typeCounts).length >= safeCount;
       if (canUse) {
@@ -1249,9 +1272,9 @@
 
     while (questions.length < safeCount) {
       const index = questions.length;
-      const tag = unit.tags[index % unit.tags.length] || "综合";
-      const knowledgePoint = unit.points[index % unit.points.length] || tag;
-      questions.push(makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode: modes[index % modes.length], index }));
+      const tag = tags[index % tags.length] || "综合";
+      const knowledgePoint = points[index % points.length] || tag;
+      questions.push(makeQuestion({ unit, grade, difficulty, tag, knowledgePoint, mode: modes[index % modes.length], index: startIndex + index }));
     }
     return questions;
   }
@@ -1601,9 +1624,10 @@
   }
 
   function pickQuestionType(mode, tag) {
+    if (includesAny(tag, ["统计", "表格", "线段图", "数量关系"])) return "数据填空题";
+    if (includesAny(tag, ["可能性"])) return "选择题";
     if (includesAny(tag, ["图形", "角", "方向", "观察"]) || String(mode).includes("选择")) return "选择题";
     if (includesAny(tag, ["单位", "长度", "人民币", "时间"])) return "单位换算填空题";
-    if (includesAny(tag, ["统计", "表格", "线段图", "数量关系", "可能性"])) return "数据填空题";
     if (String(mode).includes("计算")) return "计算填空题";
     return "填空题";
   }
@@ -1770,7 +1794,7 @@
   }
 
   function capQuestionCount(value) {
-    return ruleEngine.capQuestionCount ? ruleEngine.capQuestionCount(value) : clamp(Number(value) || 6, 3, 20);
+    return ruleEngine.capQuestionCount ? ruleEngine.capQuestionCount(value) : requiredQuestionCount;
   }
 
   function capGeneratedQuestionCount(value) {
@@ -2974,12 +2998,13 @@
   }
 
   function buildMistakePaper() {
-    const activeMistakes = shuffle(currentUnitMistakes()).slice(0, capQuestionCount(state.questionCount));
+    const targetCount = capQuestionCount(state.questionCount);
+    const activeMistakes = shuffle(currentUnitMistakes()).slice(0, targetCount);
     if (!activeMistakes.length) {
       switchTab("mistakes");
       return;
     }
-    state.currentQuestions = prepareQuestionsForPaper(activeMistakes.map((item, index) => ({
+    const mistakeQuestions = activeMistakes.map((item, index) => ({
       id: `mistake-${item.id}-${index}`,
       unitId: unitData().id,
       unitTitle: item.unitTitle,
@@ -2994,7 +3019,9 @@
       checkMethod: item.checkMethod,
       sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
       point: item.point
-    })), unitData(), activeMistakes.length).questions;
+    }));
+    const newQuestions = generateScopedQuestions(unitData(), Number(state.grade), state.difficulty, targetCount);
+    state.currentQuestions = prepareQuestionsForPaper([...mistakeQuestions, ...newQuestions], unitData(), targetCount).questions;
     state.answersVisible = false;
     seedAnswerInputsWithTemplate();
     switchTab("practice");
@@ -3003,7 +3030,7 @@
 
   function restoreScheduleControls() {
     $("frequencySelect").value = state.schedule.frequency;
-    state.schedule.count = clamp(Number(state.schedule.count) || 10, 5, 20);
+    state.schedule.count = capQuestionCount(state.schedule.count);
     $("scheduledCount").value = state.schedule.count;
     $("mistakeRatio").value = state.schedule.mistakeRatio;
     $("mistakeRatioLabel").textContent = `${state.schedule.mistakeRatio}%`;
@@ -3012,7 +3039,7 @@
   function saveSchedule() {
     state.schedule = {
       frequency: $("frequencySelect").value,
-      count: clamp(Number($("scheduledCount").value) || 10, 5, 20),
+      count: capQuestionCount($("scheduledCount").value),
       mistakeRatio: clamp(Number($("mistakeRatio").value) || 0, 0, 80),
       updatedAt: new Date().toISOString()
     };
@@ -3032,11 +3059,10 @@
 
   function buildScheduledPaper() {
     saveSchedule();
-    const count = clamp(state.schedule.count, 5, 20);
+    const count = capQuestionCount(state.schedule.count);
     const mistakeCount = Math.round((count * state.schedule.mistakeRatio) / 100);
     const activeMistakes = shuffle(currentUnitMistakes()).slice(0, mistakeCount);
-    const newQuestionCount = Math.max(0, count - activeMistakes.length);
-    const newQuestions = generateScopedQuestions(unitData(), Number(state.grade), state.difficulty, newQuestionCount);
+    const newQuestions = generateScopedQuestions(unitData(), Number(state.grade), state.difficulty, count);
     const mistakeQuestions = activeMistakes.map((item, index) => ({
       id: `scheduled-mistake-${item.id}-${index}`,
       unitId: unitData().id,
