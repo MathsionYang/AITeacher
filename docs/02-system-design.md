@@ -14,7 +14,7 @@ index.html
   -> model-client.js       OpenAI-compatible 模型客户端
   -> agent-orchestrator.js 课件 Agent 与出题 Agent 编排
   -> app.js        课件生成、出题、判分、错题库、周期测验
-  -> localStorage  本地错题库和测验设置
+  -> storage-adapter.js  local-json 本地数据层 / SQLite 迁移 schema
 ```
 
 当前 MVP 是纯前端单机原型，覆盖人教版小学数学 3-6 年级，适合快速验证流程、交互和数据结构。产品方向保持客户电脑本地部署，不要求自建服务器；后续可把内容库、AI 调用、OCR、PDF/PPTX 导出封装为本地模块，或接入用户自行配置的模型/OCR API。
@@ -82,7 +82,7 @@ index.html
 
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
 - `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
-- 审核稿保存在 `localStorage` 的 `ai-teacher-rj-math-courseware-reviews-v1`。
+- 审核稿通过 `storage-adapter.js` 写入本地 local-json 数据层，当前底层兼容 localStorage，记录包含 `reviewStatus`、`exportVersion`、`schemaVersion` 和时间戳。
 - 知识点课件默认不展示模板课件；AI 课件按钮放在“知识点课件”页面内，生成过程只展示进度动画，完成模型返回和规则校验后再一次性展示审核稿。
 - 课件审核稿可导出为 JSON，也可从历史 JSON 导入；导入时优先根据文件中的年级、册别、单元恢复范围。
 - `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF。
@@ -132,7 +132,7 @@ index.html
 当前实现：
 
 - 文件上传和图片预览已完成。
-- `answerInput` 作为 OCR 识别文本/人工校正区，也接收同步出题页答案同步。
+- `answerInput` 作为 OCR 识别文本/人工校正区，也接收同步出题页答案同步；`parseAnswerReview()` 会结构化题号、答案、置信度和低置信状态。
 - `gradeCurrentAnswers()` 是共享判分入口，`gradeAnswers()` 和同步出题页判分按钮都复用它。
 - `scoreHistoryKey` 将每次成绩保存到浏览器本地存储。
 - `renderPerformanceFeedback()` 根据分数段展示鼓励图、奖状、撒花或领奖台动画。
@@ -147,6 +147,7 @@ index.html
   -> 题号答案结构化
   -> 置信度判断
   -> 低置信度人工确认
+  -> 结构化题号答案进入判分
   -> 判分
   -> 解析与错因归类
 ```
@@ -161,7 +162,7 @@ index.html
 
 当前实现：
 
-- `localStorage` 保存 `ai-teacher-rj-math-mistakes-v1`。
+- `storage-adapter.js` local-json 层保存 `ai-teacher-rj-math-mistakes-v1`，并在备份中提供 SQLite 迁移计划。
 - `saveMistakesFromResults()` 自动入库。
 - `renderMistakeStats()` 展示已完成题目数量、当前错题数量和已掌握错题数量。
 - `deleteMistake()` 支持从错题库移除单题，`buildMistakePaper()` 随机生成错题卷。

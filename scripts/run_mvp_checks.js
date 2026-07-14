@@ -1,5 +1,18 @@
 const assert = require("node:assert/strict");
 const ruleEngine = require("../rule-engine.js");
+const storageApi = require("../storage-adapter.js");
+
+assert.equal(storageApi.STORAGE_SCHEMA_VERSION, 3);
+assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("courseware_reviews")));
+assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("grading_submissions")));
+
+const storage = storageApi.createLocalJsonStorage({ namespace: "test-ai-teacher" });
+const envelope = storage.buildEnvelope("local-data-backup", { mistakes: [] });
+assert.equal(envelope.storageKind, "local-json");
+assert.equal(envelope.schemaVersion, 3);
+assert.equal(envelope.namespace, "test-ai-teacher");
+assert.equal(envelope.type, "local-data-backup");
+assert.ok(storage.sqliteMigrationPlan().schema.some((sql) => sql.includes("score_history")));
 
 const unit = {
   id: "g3a-u2",

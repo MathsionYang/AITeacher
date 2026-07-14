@@ -2081,3 +2081,92 @@ body[data-role-mode="student"] .teacher-only {
     background: transparent;
   }
 }
+.review-status-card,
+.ocr-review-panel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.review-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-status-card strong,
+.ocr-review-head strong {
+  display: block;
+  color: var(--ink);
+}
+
+.review-status-card p,
+.ocr-review-head span {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ocr-review-panel {
+  margin: 16px 0;
+  background: #fff;
+}
+
+.ocr-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ocr-review-table {
+  display: grid;
+  gap: 8px;
+}
+
+.ocr-review-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 72px 112px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.ocr-review-row span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 900;
+}
+
+.ocr-review-row strong {
+  overflow-wrap: anywhere;
+}
+
+.ocr-review-row em,
+.ocr-review-row small {
+  font-style: normal;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.ocr-review-row.needs_review {
+  border-color: #f8d27a;
+  background: #fffbeb;
+}
+
+.ocr-review-row.missing {
+  border-color: #fecaca;
+  background: #fff7f7;
+}

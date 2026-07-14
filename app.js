@@ -7,7 +7,13 @@
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
   const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
   const ruleEngine = window.AITeacherRuleEngine || {};
-  const exportSchemaVersion = ruleEngine.SCHEMA_VERSION || 2;
+  const storage = window.AITeacherStorage?.createLocalJsonStorage?.({
+    namespace: "ai-teacher-rj-math",
+    schemaVersion: Math.max(ruleEngine.SCHEMA_VERSION || 2, window.AITeacherStorage?.STORAGE_SCHEMA_VERSION || 3)
+  }) || createFallbackStorage();
+  const exportSchemaVersion = Math.max(ruleEngine.SCHEMA_VERSION || 2, storage.schemaVersion || 3);
+  const reviewExportVersion = `review-v${exportSchemaVersion}`;
+  const practiceExportVersion = `practice-v${exportSchemaVersion}`;
   const localDataKeys = {
     mistakes: mistakeKey,
     schedule: scheduleKey,
@@ -29,6 +35,7 @@
     difficulty: initialScope.difficulty || "基础",
     questionCount: initialScope.questionCount || 6,
     currentQuestions: [],
+    answerReview: { entries: [], summary: { averageConfidence: 0, lowConfidenceCount: 0, missingCount: 0 } },
     answersVisible: false,
     activeTab: "courseware",
     coursewareEditMode: false,
@@ -47,7 +54,7 @@
 
   function readJson(key, fallback, mockField) {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = storage.getString(key, "");
       const shouldReplace = mockEnabled && mockField && mockData.mode === "replace";
       if (raw && !shouldReplace) return JSON.parse(raw);
       return cloneJson(mockValue(mockField, fallback));
@@ -57,12 +64,41 @@
   }
 
   function writeJson(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+    storage.setJson(key, value);
   }
 
   function readRoleMode() {
-    const value = localStorage.getItem(roleModeKey);
+    const value = storage.getString(roleModeKey, "teacher");
     return value === "student" ? "student" : "teacher";
+  }
+
+  function createFallbackStorage() {
+    return {
+      kind: "local-json-fallback",
+      schemaVersion: 3,
+      getString: (key, fallback = "") => {
+        const value = localStorage.getItem(key);
+        return value == null ? fallback : value;
+      },
+      setString: (key, value) => localStorage.setItem(key, String(value)),
+      setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
+      removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
+      buildEnvelope: (type, data, metadata = {}) => ({
+        schemaVersion: 3,
+        storageKind: "local-json-fallback",
+        type,
+        exportedAt: new Date().toISOString(),
+        exportVersion: metadata.exportVersion || `${type}-v3`,
+        ...metadata,
+        data
+      }),
+      sqliteMigrationPlan: () => ({
+        target: "sqlite",
+        schemaVersion: 3,
+        schema: [],
+        strategy: ["加载 storage-adapter.js 后导出迁移计划"]
+      })
+    };
   }
 
   function mockValue(field, fallback) {
@@ -262,7 +298,7 @@
 
     $("roleModeSelect").addEventListener("change", (event) => {
       state.roleMode = event.target.value === "student" ? "student" : "teacher";
-      localStorage.setItem(roleModeKey, state.roleMode);
+      storage.setString(roleModeKey, state.roleMode);
       applyRoleMode();
       renderAll();
       setModelStatus(state.roleMode === "teacher" ? "已切换到教师模式，可进行生成、审核和数据管理。" : "已切换到学生模式，只保留学习、答题、解析、错题和测验。", "ok");
@@ -301,6 +337,7 @@
     $("simulateOcrBtn").addEventListener("click", simulateOcr);
     $("gradeBtn").addEventListener("click", gradeAnswers);
     $("answerImage").addEventListener("change", previewAnswerImage);
+    $("answerInput").addEventListener("input", () => updateAnswerReviewFromText("manual"));
     $("mistakePaperBtn").addEventListener("click", buildMistakePaper);
     $("clearMasteredBtn").addEventListener("click", clearMastered);
     $("saveScheduleBtn").addEventListener("click", saveSchedule);
@@ -456,7 +493,7 @@
           }
         );
         const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
-        state.coursewareReviews[coursewareKey(unit)] = slides;
+        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "llm" });
         writeJson(coursewareReviewKey, state.coursewareReviews);
         setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
       } finally {
@@ -621,9 +658,10 @@
     if (ruleEngine.validatePaper) {
       const prepared = ruleEngine.validatePaper(questions, unit, { limit: requestedCount });
       const sourceRefs = getSourceRefs(unit);
+      const checkedAt = new Date().toISOString();
       return {
         ...prepared,
-        questions: prepared.questions.map((questionItem, index) => ({
+        questions: prepared.questions.map((questionItem, index) => withQuestionReviewMetadata({
           ...questionItem,
           id: questionItem.id || `${unit.id}-checked-${Date.now()}-${index}`,
           sourceIds: questionItem.sourceIds || unit.sourceIds || content.defaultSourceIds || [],
@@ -633,11 +671,23 @@
             : buildDetailSteps(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint }),
           commonMistake: questionItem.commonMistake || buildCommonMistake(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint }),
           checkMethod: questionItem.checkMethod || buildCheckMethod(questionItem, { unit, tag: questionItem.knowledgePoint, mode: questionItem.questionType, knowledgePoint: questionItem.knowledgePoint })
-        }))
+        }, checkedAt))
       };
     }
     const scoped = normalizePaperPoints(rebalanceQuestionTypes(dedupeByStem(enforceUnitQuestionBoundary(questions, unit)), requestedCount).slice(0, requestedCount));
-    return { questions: scoped, rejected: [], issues: [], summary: { accepted: scoped.length, totalScore: paperTotal(scoped) } };
+    return { questions: scoped.map((questionItem) => withQuestionReviewMetadata(questionItem)), rejected: [], issues: [], summary: { accepted: scoped.length, totalScore: paperTotal(scoped) } };
+  }
+
+  function withQuestionReviewMetadata(questionItem, checkedAt = new Date().toISOString()) {
+    const reviewStatus = questionItem.reviewStatus || "rule_checked";
+    return {
+      ...questionItem,
+      schemaVersion: questionItem.schemaVersion || exportSchemaVersion,
+      exportVersion: questionItem.exportVersion || practiceExportVersion,
+      reviewStatus,
+      reviewStatusLabel: questionItem.reviewStatusLabel || reviewStatusLabel(reviewStatus),
+      validatedAt: questionItem.validatedAt || checkedAt
+    };
   }
 
   function rebalanceQuestionTypes(questions, count) {
@@ -678,6 +728,7 @@
     const unit = unitData();
     const sourceRefs = getSourceRefs(unit);
     const slides = buildCoursewareSlides(unit);
+    const reviewRecord = coursewareReviewRecord(unit);
     const hasSlides = slides.length > 0;
     if (!hasSlides) state.coursewareEditMode = false;
     $("knowledgePoints").innerHTML = unit.points
@@ -709,7 +760,7 @@
     }
 
     $("coursewareSlides").className = "slide-grid";
-    $("coursewareSlides").innerHTML = slides
+    $("coursewareSlides").innerHTML = renderCoursewareReviewStatus(reviewRecord) + slides
       .map(
         (slide, index) => `
           <article class="slide-card ${state.coursewareEditMode ? "editing" : ""}" data-slide-index="${index}">
@@ -726,6 +777,18 @@
       .join("");
   }
 
+  function renderCoursewareReviewStatus(record) {
+    if (!record) return "";
+    return `
+      <article class="review-status-card">
+        <div>
+          <strong>\u5ba1\u6838\u72b6\u6001\uff1a${escapeHtml(record.reviewStatusLabel || reviewStatusLabel(record.reviewStatus))}</strong>
+          <p>\u7248\u672c ${escapeHtml(record.exportVersion || reviewExportVersion)} \u00b7 \u66f4\u65b0\u65f6\u95f4 ${formatDateTime(record.updatedAt || record.createdAt)}</p>
+        </div>
+        <span class="pill green">${escapeHtml(record.source || "local")}</span>
+      </article>
+    `;
+  }
   function updateCoursewareButtons(hasSlides) {
     $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
@@ -737,9 +800,9 @@
   }
 
   function buildCoursewareSlides(unit) {
-    const review = state.coursewareReviews[coursewareKey(unit)];
-    if (!Array.isArray(review) || !review.length) return [];
-    return applyCoursewareReview(buildBaseCoursewareSlides(unit), review);
+    const record = coursewareReviewRecord(unit);
+    if (!record?.slides?.length) return [];
+    return applyCoursewareReview(buildBaseCoursewareSlides(unit), record.slides);
   }
 
   function buildBaseCoursewareSlides(unit) {
@@ -801,6 +864,39 @@
     return `${state.grade}-${state.volume}-${unit.id}`;
   }
 
+  function coursewareReviewRecord(unit) {
+    const raw = state.coursewareReviews[coursewareKey(unit)];
+    if (Array.isArray(raw)) return buildCoursewareReviewRecord(raw, "reviewed", { migratedFrom: "legacy-array" });
+    if (raw && Array.isArray(raw.slides)) return raw;
+    return null;
+  }
+
+  function buildCoursewareReviewRecord(slides, reviewStatus = "draft", extra = {}) {
+    const now = new Date().toISOString();
+    return {
+      schemaVersion: exportSchemaVersion,
+      exportVersion: reviewExportVersion,
+      reviewStatus,
+      reviewStatusLabel: reviewStatusLabel(reviewStatus),
+      createdAt: extra.createdAt || now,
+      updatedAt: now,
+      reviewedAt: reviewStatus === "reviewed" ? now : extra.reviewedAt || "",
+      source: extra.source || "local",
+      slides
+    };
+  }
+
+  function reviewStatusLabel(status) {
+    const labels = {
+      draft: "待审核",
+      reviewed: "已审核",
+      imported: "已导入",
+      rule_checked: "规则已验",
+      legacy: "历史记录"
+    };
+    return labels[status] || "待审核";
+  }
+
   function applyCoursewareReview(slides, review) {
     return slides.map((slide, index) => ({
       ...slide,
@@ -842,7 +938,7 @@
         sources: existingSlide.sources || getSourceRefs(unit)
       };
     });
-    state.coursewareReviews[coursewareKey(unit)] = slides;
+    state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "reviewed", { source: "teacher-review" });
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
     renderCourseware();
@@ -1442,7 +1538,7 @@
       writeJson(scoreHistoryKey, state.scoreHistory);
       writeJson(coursewareReviewKey, state.coursewareReviews);
       writeJson(scheduleKey, state.schedule);
-      localStorage.setItem(roleModeKey, state.roleMode);
+      storage.setString(roleModeKey, state.roleMode);
       restoreScheduleControls();
       restoreRoleModeControls();
       clearPracticeState();
@@ -1459,7 +1555,7 @@
     if (!requireTeacherMode("清空学习数据")) return;
     const confirmed = window.confirm("确认清空本机错题、成绩、课件审核稿和测验设置？此操作不会删除知识点包。建议先导出备份。");
     if (!confirmed) return;
-    Object.values(localDataKeys).forEach((key) => localStorage.removeItem(key));
+    storage.removeMany(Object.values(localDataKeys));
     state.mistakes = [];
     state.scoreHistory = [];
     state.coursewareReviews = {};
@@ -1473,20 +1569,18 @@
   }
 
   function buildLocalDataPayload() {
-    return {
-      schemaVersion: exportSchemaVersion,
-      exportedAt: new Date().toISOString(),
-      type: "local-data-backup",
+    return storage.buildEnvelope("local-data-backup", {
+      mistakes: state.mistakes,
+      scoreHistory: state.scoreHistory,
+      coursewareReviews: state.coursewareReviews,
+      schedule: state.schedule,
+      roleMode: state.roleMode
+    }, {
+      exportVersion: `local-data-v${exportSchemaVersion}`,
       version: content.version,
       subject: content.subject,
-      data: {
-        mistakes: state.mistakes,
-        scoreHistory: state.scoreHistory,
-        coursewareReviews: state.coursewareReviews,
-        schedule: state.schedule,
-        roleMode: state.roleMode
-      }
-    };
+      sqliteMigrationPlan: storage.sqliteMigrationPlan()
+    });
   }
 
   function downloadJson(payload, filename) {
@@ -1526,6 +1620,11 @@
       schemaVersion: exportSchemaVersion,
       exportedAt: new Date().toISOString(),
       type: "courseware",
+      exportVersion: coursewareReviewRecord(unit)?.exportVersion || reviewExportVersion,
+      reviewStatus: coursewareReviewRecord(unit)?.reviewStatus || "draft",
+      reviewStatusLabel: coursewareReviewRecord(unit)?.reviewStatusLabel || reviewStatusLabel("draft"),
+      reviewedAt: coursewareReviewRecord(unit)?.reviewedAt || "",
+      storageKind: storage.kind,
       version: content.version,
       subject: content.subject,
       gradeId: state.grade,
@@ -1557,7 +1656,7 @@
       applyScopeFromPayload(payload);
       const unit = unitData();
       const slides = normalizeAiCoursewareSlides(rawSlides, buildBaseCoursewareSlides(unit), unit);
-      state.coursewareReviews[coursewareKey(unit)] = slides;
+      state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, payload.reviewStatus || "imported", { source: "import", createdAt: payload.exportedAt });
       writeJson(coursewareReviewKey, state.coursewareReviews);
       state.coursewareEditMode = false;
       hideGenerationProgress("courseware");
@@ -1582,6 +1681,10 @@
       schemaVersion: exportSchemaVersion,
       exportedAt: new Date().toISOString(),
       type: "practice",
+      exportVersion: practiceExportVersion,
+      reviewStatus: "rule_checked",
+      reviewStatusLabel: reviewStatusLabel("rule_checked"),
+      storageKind: storage.kind,
       version: content.version,
       subject: content.subject,
       gradeId: state.grade,
@@ -1594,6 +1697,7 @@
       questionCount: state.currentQuestions.length,
       totalScore: paperTotal(state.currentQuestions),
       answersText: $("practiceAnswerInput").value || $("answerInput").value || "",
+      answerReview: state.answerReview,
       gradingResults: state.gradingResults,
       questions: state.currentQuestions
     };
@@ -1689,6 +1793,8 @@
     const template = buildAnswerTemplate();
     $("practiceAnswerInput").value = template;
     $("answerInput").value = template;
+    state.answerReview = buildEmptyAnswerReview();
+    renderAnswerReviewPanel();
     $("practiceGradingSummary").classList.remove("active");
     $("practiceGradingSummary").innerHTML = "";
     $("practiceResults").innerHTML = "";
@@ -1700,6 +1806,7 @@
       return;
     }
     $("answerInput").value = $("practiceAnswerInput").value;
+    updateAnswerReviewFromText("practice-sync");
     switchTab("grading");
     setModelStatus("同步出题页答案已同步到拍照批改页。", "ok");
   }
@@ -1728,6 +1835,7 @@
     });
     $("answerInput").value = lines.join("\n");
     $("practiceAnswerInput").value = lines.join("\n");
+    updateAnswerReviewFromText("mock-ocr");
   }
 
   function makeNearbyWrongAnswer(answer, index) {
@@ -1753,14 +1861,19 @@
       return;
     }
     state.currentQuestions = prepareQuestionsForPaper(state.currentQuestions, unitData(), state.currentQuestions.length).questions;
-    const answers = parseAnswers(answerText || "");
+    const answerReview = parseAnswerReview(answerText || "", options.origin === "grading" ? "manual-correction" : "practice-input");
+    state.answerReview = answerReview;
+    const answers = answerReview.answers;
     const results = state.currentQuestions.map((question, index) => {
+      const reviewEntry = answerReview.entries[index] || {};
       const submitted = answers[index + 1] || "";
       const correct = isCorrectAnswer(submitted, question.answer);
       return {
         question,
         index,
         submitted,
+        answerConfidence: reviewEntry.confidence || 0,
+        answerReviewStatus: reviewEntry.status || "missing",
         correct,
         score: correct ? question.point : 0
       };
@@ -1771,6 +1884,7 @@
     $("practiceAnswerInput").value = answerText || "";
     saveScoreHistory(summary, results);
     saveMistakesFromResults(results);
+    renderAnswerReviewPanel(answerReview);
     renderGradingResults(results, summary);
     renderPracticeGradingResults(results, summary);
     renderMistakes();
@@ -1780,23 +1894,106 @@
   }
 
   function parseAnswers(text) {
+    return parseAnswerReview(text, "manual").answers;
+  }
+
+  function buildEmptyAnswerReview() {
+    return { entries: [], answers: {}, summary: { averageConfidence: 0, lowConfidenceCount: 0, missingCount: 0 } };
+  }
+
+  function updateAnswerReviewFromText(source) {
+    state.answerReview = parseAnswerReview($("answerInput").value || "", source);
+    renderAnswerReviewPanel();
+  }
+
+  function parseAnswerReview(text, source = "manual") {
     const answers = {};
     const fallback = [];
-    text
+    const lineMeta = {};
+    String(text || "")
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean)
       .forEach((line) => {
         const match = line.match(/^(\d+)\s*[\.、:：=]?\s*(.+)$/);
-        if (match) answers[Number(match[1])] = match[2].trim();
-        else fallback.push(line);
+        if (match) {
+          const questionNo = Number(match[1]);
+          answers[questionNo] = match[2].trim();
+          lineMeta[questionNo] = { rawLine: line, source: source === "mock-ocr" ? "mock-ocr" : source, explicitNo: true };
+        } else {
+          fallback.push(line);
+        }
       });
     fallback.forEach((value, index) => {
-      if (!answers[index + 1]) answers[index + 1] = value;
+      if (!answers[index + 1]) {
+        answers[index + 1] = value;
+        lineMeta[index + 1] = { rawLine: value, source, explicitNo: false };
+      }
     });
-    return answers;
+    const entries = state.currentQuestions.map((question, index) => {
+      const questionNo = index + 1;
+      const answer = cleanText(answers[questionNo] || "");
+      const meta = lineMeta[questionNo] || { rawLine: "", source, explicitNo: false };
+      const confidence = estimateAnswerConfidence(answer, meta, question);
+      return {
+        questionNo,
+        knowledgePoint: question.knowledgePoint,
+        answer,
+        rawLine: meta.rawLine,
+        source: meta.source,
+        confidence,
+        status: !answer ? "missing" : confidence < 0.7 ? "needs_review" : "ready"
+      };
+    });
+    const answered = entries.filter((entry) => entry.answer);
+    const averageConfidence = answered.length ? Math.round(answered.reduce((sum, entry) => sum + entry.confidence, 0) / answered.length * 100) : 0;
+    return {
+      answers,
+      entries,
+      summary: {
+        averageConfidence,
+        lowConfidenceCount: entries.filter((entry) => entry.answer && entry.confidence < 0.7).length,
+        missingCount: entries.filter((entry) => !entry.answer).length
+      }
+    };
   }
 
+  function estimateAnswerConfidence(answer, meta, question) {
+    if (!answer) return 0;
+    let confidence = meta.explicitNo ? 0.92 : 0.72;
+    if (meta.source === "mock-ocr") confidence -= 0.08;
+    if (/疑似|不清|\?|？|漏写/.test(answer)) confidence -= 0.22;
+    if (question?.questionType?.includes("选择") && /^[A-Da-d]$/.test(answer.trim())) confidence += 0.05;
+    if (Number.isFinite(parseNumberLike(answer))) confidence += 0.04;
+    return Math.max(0.35, Math.min(0.99, Number(confidence.toFixed(2))));
+  }
+
+  function renderAnswerReviewPanel(review = state.answerReview) {
+    const panel = $("ocrReviewPanel");
+    if (!panel) return;
+    const entries = review?.entries || [];
+    if (!entries.length) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+    panel.hidden = false;
+    const summary = review.summary || {};
+    panel.innerHTML =
+      "<div class=\"ocr-review-head\"><strong>结构化题号与答案校正</strong><span>平均置信度 " +
+      (summary.averageConfidence || 0) + "% · 低置信 " + (summary.lowConfidenceCount || 0) + " · 未作答 " + (summary.missingCount || 0) +
+      "</span></div><div class=\"ocr-review-table\">" +
+      entries.map((entry) =>
+        "<div class=\"ocr-review-row " + entry.status + "\"><span>" + entry.questionNo + "</span><strong>" +
+        escapeHtml(entry.answer || "未作答") + "</strong><em>" + Math.round((entry.confidence || 0) * 100) + "%</em><small>" +
+        escapeHtml(answerReviewStatusLabel(entry.status)) + "</small></div>"
+      ).join("") + "</div>";
+  }
+
+  function answerReviewStatusLabel(status) {
+    const labels = { ready: "可判分", needs_review: "需人工确认", missing: "未作答" };
+    return labels[status] || "需人工确认";
+  }
   function isCorrectAnswer(submitted, expected) {
     if (ruleEngine.isCorrectAnswer) return ruleEngine.isCorrectAnswer(submitted, expected);
     const cleanSubmitted = normalizeAnswer(submitted);
@@ -1871,6 +2068,7 @@
             </div>
             <p class="source-note">知识点来源：${renderSourceLinks(question.sourceRefs || getSourceRefs(unitData()))}</p>
             <p><strong>学生答案：</strong>${escapeHtml(item.submitted || "未作答")}</p>
+            <p><strong>校正状态：</strong>${Math.round((item.answerConfidence || 0) * 100)}% · ${escapeHtml(answerReviewStatusLabel(item.answerReviewStatus || "missing"))}</p>
             <p><strong>正确答案：</strong>${escapeHtml(question.answer)}</p>
             <p><strong>解析思路：</strong>${escapeHtml(question.explanation)}</p>
             ${renderExplanationDetail(question)}
@@ -2003,10 +2201,10 @@
       "看清条件，分数会慢慢追上来",
       "这次找到问题，下次就更有方向"
     ];
-    const last = localStorage.getItem(feedbackPhraseKey);
+    const last = storage.getString(feedbackPhraseKey, "");
     const candidates = phrases.filter((phrase) => phrase !== last);
     const picked = candidates[Math.floor(Math.random() * candidates.length)] || phrases[0];
-    localStorage.setItem(feedbackPhraseKey, picked);
+    storage.setString(feedbackPhraseKey, picked);
     return picked;
   }
 
