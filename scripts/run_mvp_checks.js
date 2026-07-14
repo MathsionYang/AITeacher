@@ -32,6 +32,8 @@ assert.ok(agentSource.includes("generateQuestionsStream"));
 const questionCardSource = appSource.slice(appSource.indexOf("function renderQuestionCard"), appSource.indexOf("function renderExplanationDetail"));
 assert.ok(questionCardSource.includes("function renderQuestionCard"));
 assert.equal(questionCardSource.includes("知识点来源"), false);
+assert.ok(appSource.includes("function renderStemContent"));
+assert.ok(appSource.includes("class=\"stem-table\""));
 assert.equal(appSource.includes("当前还没有练习题，请先生成或导入练习，再进行 OCR 识别。"), false);
 assert.ok(ocrProxySource.includes("class PaddleOcrRuntime"));
 assert.ok(ocrProxySource.includes("PP-OCRv6_small"));

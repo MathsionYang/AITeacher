@@ -1170,7 +1170,7 @@
   function renderQuestionCard(question, index) {
     return `
       <article class="question-card">
-        <h4>${index + 1}. ${escapeHtml(question.stem)}</h4>
+        <h4>${index + 1}. ${renderStemContent(question.stem)}</h4>
         <div class="question-meta">
           <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
           <span class="pill green">${escapeHtml(question.questionType || "同步练习")}</span>
@@ -1478,6 +1478,55 @@
     return "检查方法：重新读题，看答案是否回答了题目真正问的量。";
   }
 
+  function renderStemContent(stem) {
+    const raw = String(stem || "");
+    if (!raw.includes("|") || !raw.includes("---")) return escapeHtml(raw);
+    const table = parseMarkdownTable(raw);
+    if (!table) return escapeHtml(raw);
+    return escapeHtml(table.prefix) + renderStemTable(table);
+  }
+
+  function parseMarkdownTable(raw) {
+    const normalized = String(raw || "").replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
+    const tableStart = lines.findIndex((line, index) => line.includes("|") && lines[index + 1] && /^\s*\|?\s*:?-{3,}:?/.test(lines[index + 1]));
+    if (tableStart < 0) return null;
+
+    const prefix = lines.slice(0, tableStart).join("\n").trim();
+    const tableLines = [];
+    for (let index = tableStart; index < lines.length; index += 1) {
+      const line = lines[index].trim();
+      if (!line.includes("|")) break;
+      tableLines.push(line);
+    }
+    if (tableLines.length < 3) return null;
+
+    const headers = splitMarkdownTableRow(tableLines[0]);
+    const rows = tableLines.slice(2).map(splitMarkdownTableRow).filter((row) => row.length);
+    if (!headers.length || !rows.length) return null;
+    return { prefix: prefix ? prefix + "\n" : "", headers, rows };
+  }
+
+  function splitMarkdownTableRow(line) {
+    return String(line || "")
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim());
+  }
+
+  function renderStemTable(table) {
+    const head = table.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+    const body = table.rows.map((row) => `<tr>${table.headers.map((_, index) => `<td>${renderStemTableCell(row[index] || "")}</td>`).join("")}</tr>`).join("");
+    return `<div class="stem-table-wrap"><table class="stem-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  function renderStemTableCell(value) {
+    const text = String(value || "").trim();
+    if (/^_+$/.test(text) || text === "____") return "<span class=\"blank-cell\">____</span>";
+    return escapeHtml(text);
+  }
   function renderExplanationDetail(question) {
     const steps = question.detailSteps || [];
     return `
@@ -2274,7 +2323,7 @@
         const { question } = item;
         return `
           <article class="result-card ${item.correct ? "" : "wrong"}">
-            <h4>${item.index + 1}. ${escapeHtml(question.stem)}</h4>
+            <h4>${item.index + 1}. ${renderStemContent(question.stem)}</h4>
             <div class="question-meta">
               <span class="pill ${item.correct ? "green" : "red"}">${item.correct ? "正确" : "需复习"}</span>
               <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
@@ -2648,7 +2697,7 @@
       .map(
         (item) => `
           <article class="mistake-card">
-            <h4>${escapeHtml(item.stem)}</h4>
+            <h4>${renderStemContent(item.stem)}</h4>
             <div class="question-meta">
               <span class="pill blue">${escapeHtml(item.grade)} ${escapeHtml(item.volume)}</span>
               <span class="pill orange">${escapeHtml(item.knowledgePoint)}</span>

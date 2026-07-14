@@ -522,6 +522,39 @@ body[data-role-mode="student"] .teacher-only {
   line-height: 1.65;
 }
 
+.stem-table-wrap {
+  margin: 12px 0 4px;
+  overflow-x: auto;
+}
+
+.stem-table {
+  width: 100%;
+  min-width: 360px;
+  border-collapse: collapse;
+  border: 2px solid #0f766e;
+  background: #fff;
+  font-size: 15px;
+}
+
+.stem-table th,
+.stem-table td {
+  border: 1px solid #94a3b8;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.stem-table th {
+  background: #ecfdf5;
+  color: #0f766e;
+  font-weight: 900;
+}
+
+.stem-table .blank-cell {
+  display: inline-block;
+  min-width: 64px;
+  border-bottom: 2px solid #1d4ed8;
+  color: transparent;
+}
 .slide-card ul {
   margin: 10px 0 0;
   padding-left: 18px;
