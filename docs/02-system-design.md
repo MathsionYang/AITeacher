@@ -108,8 +108,9 @@ index.html
 - `capQuestionCount()` 将每次题量限制在 20 题以内。
 - `normalizePaperPoints()` 将当前试卷分值归一为 100 分。
 - `enforceUnitQuestionBoundary()` 对进入当前试卷的题目做 `unitId`、`unitTitle`、`knowledgePoint` 校验，确保同步练习只出现所选单元知识点。
+- `validateKnowledgePointRelevance()` 进一步检查题干证据，避免普通加法、乘法等无关题目只贴上当前单元知识点标签后进入试卷。
 - 同步练习、错题卷和周期测验都限制在当前单元知识点边界内。
-- `agent-orchestrator.js` 可选调用出题 Agent 生成候选客观题，进入试卷前仍会经过单元边界、客观题型、开放题过滤、题型重复和分值规则处理。
+- `agent-orchestrator.js` 可选调用出题 Agent 生成候选客观题，进入试卷前仍会经过单元边界、题干与知识点匹配、客观题型、开放题过滤、题型重复和分值规则处理。
 - 同步出题页面默认空白；点击 AI 生成练习时先显示进度动画，题目全部生成并通过单元边界、客观题型、开放题过滤、题型重复和 100 分制校验后再展示。
 - `state.currentQuestions` 保存当前试卷，当前练习可导出为 JSON，也可导入历史练习 JSON；导出内容包含题目、答案草稿和最近判分结果。
 - 同步出题页提供 `practiceAnswerInput`，可直接填写答案并调用共享判分逻辑，结果同步写入拍照批改页的 `answerInput`、成绩面板和逐题解析。

@@ -1257,22 +1257,175 @@
   }
 
   function makeQuestion(context) {
-    const { tag } = context;
+    const { tag, knowledgePoint } = context;
+    const concept = [knowledgePoint, tag].filter(Boolean).join(" ");
     let built;
-    if (includesAny(tag, ["分数"])) built = fractionQuestion(context);
-    else if (includesAny(tag, ["小数"])) built = decimalQuestion(context);
-    else if (includesAny(tag, ["百分数"])) built = percentQuestion(context);
-    else if (includesAny(tag, ["比例", "比"])) built = ratioQuestion(context);
-    else if (includesAny(tag, ["方程"])) built = equationQuestion(context);
-    else if (includesAny(tag, ["体积"])) built = volumeQuestion(context);
-    else if (includesAny(tag, ["面积"])) built = areaQuestion(context);
-    else if (includesAny(tag, ["长度", "单位", "人民币"])) built = conversionQuestion(context);
-    else if (includesAny(tag, ["时间"])) built = timeQuestion(context);
-    else if (includesAny(tag, ["统计"])) built = statisticsQuestion(context);
-    else if (includesAny(tag, ["图形", "角", "方向", "观察"])) built = geometryQuestion(context);
-    else if (includesAny(tag, ["乘除", "倍数", "口诀", "余数"])) built = multiplicationQuestion(context);
+    if (includesAny(concept, ["线段图", "表格"]) && includesAny(concept, ["数量关系", "单位 1", "单位1"])) built = quantityRelationQuestion(context);
+    else if (includesAny(concept, ["分步算式", "合并成综合算式"])) built = stepExpressionQuestion(context);
+    else if (includesAny(concept, ["单价数量总价"])) built = priceQuantityQuestion(context);
+    else if (includesAny(concept, ["速度时间路程"])) built = speedDistanceQuestion(context);
+    else if (includesAny(concept, ["克、千克、吨", "质量"])) built = massQuestion(context);
+    else if (includesAny(concept, ["数对"])) built = coordinateQuestion(context);
+    else if (includesAny(concept, ["负数", "正数"])) built = negativeNumberQuestion(context);
+    else if (includesAny(concept, ["圆"])) built = circleQuestion(context);
+    else if (includesAny(concept, ["可能性"])) built = probabilityQuestion(context);
+    else if (includesAny(concept, ["分数"])) built = fractionQuestion(context);
+    else if (includesAny(concept, ["小数"])) built = decimalQuestion(context);
+    else if (includesAny(concept, ["百分数"])) built = percentQuestion(context);
+    else if (includesAny(concept, ["运算律", "交换律", "结合律", "分配律", "简便"])) built = operationLawQuestion(context);
+    else if (includesAny(concept, ["混合运算", "小括号"])) built = mixedOperationQuestion(context);
+    else if (includesAny(concept, ["比例", "比"])) built = ratioQuestion(context);
+    else if (includesAny(concept, ["方程"])) built = equationQuestion(context);
+    else if (includesAny(concept, ["体积"])) built = volumeQuestion(context);
+    else if (includesAny(concept, ["面积"])) built = areaQuestion(context);
+    else if (includesAny(concept, ["长度", "单位", "人民币"])) built = conversionQuestion(context);
+    else if (includesAny(concept, ["时间"])) built = timeQuestion(context);
+    else if (includesAny(concept, ["统计", "可能性"])) built = statisticsQuestion(context);
+    else if (includesAny(concept, ["图形", "角", "方向", "观察", "视图"])) built = geometryQuestion(context);
+    else if (includesAny(concept, ["乘除", "倍数", "口诀", "余数", "乘法", "除法"])) built = multiplicationQuestion(context);
     else built = arithmeticQuestion(context);
     return enrichQuestion(built, context);
+  }
+
+  function mixedOperationQuestion({ unit, grade, difficulty, tag, knowledgePoint, index }) {
+    const base = Math.max(6, Math.floor(difficultyBase(grade, difficulty) / 8));
+    const a = base + index + 3;
+    const b = 2 + (index % 5);
+    const c = 3 + (index % 4);
+    const point = knowledgePoint || tag;
+
+    if (String(point).includes("含小括号")) {
+      const answer = String((a + b) * c);
+      const stem = `填空：(${a} + ${b}) × ${c} = ____。`;
+      return question(unit, point, difficulty, stem, answer, `先算小括号里的 ${a}+${b}=${a + b}，再乘 ${c}，结果是 ${answer}。`, index);
+    }
+
+    const answer = String(a + b * c);
+    const stem = `填空：${a} + ${b} × ${c} = ____。`;
+    return question(unit, point, difficulty, stem, answer, `没有小括号时先算乘除：${b}×${c}=${b * c}，再算 ${a}+${b * c}=${answer}。`, index);
+  }
+
+  function stepExpressionQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const groups = 4 + (index % 5);
+    const each = 3 + (index % 4);
+    const extra = 6 + index;
+    const product = groups * each;
+    const total = product + extra;
+    const point = knowledgePoint || tag;
+    const stem = [
+      `选择题：分步计算为：先算 ${groups} × ${each} = ${product}，再算 ${product} + ${extra} = ${total}。`,
+      `下面哪个算式表示同一过程？ A. ${groups} + ${each} × ${extra} B. ${groups} × ${each} + ${extra} C. (${groups} + ${each}) × ${extra} D. ${product} - ${extra}`
+    ].join(" ");
+    return question(unit, point, difficulty, stem, "B", `分步结果是先求 ${groups} 个 ${each}，再加 ${extra}，对应算式是 ${groups} × ${each} + ${extra}，所以选 B。`, index);
+  }
+
+  function quantityRelationQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const perDay = 5 + (index % 4);
+    const days = 3 + (index % 3);
+    const rest = difficulty === "挑战" ? 20 + index : 12 + index;
+    const readPages = perDay * days;
+    const totalPages = readPages + rest;
+    const point = knowledgePoint || tag;
+    const stem = [
+      `填空：小明每天看 ${perDay} 页书，看了 ${days} 天，还剩 ${rest} 页。先用表格整理数量关系，再填写空格。`,
+      "| 已看页数 | 剩余页数 | 总页数 |",
+      "| --- | --- | --- |",
+      `| ____ | ${rest} | ____ |`
+    ].join("\n");
+    return question(unit, point, difficulty, stem, `${readPages}和${totalPages}`, `已看页数 = ${perDay}×${days}=${readPages} 页；总页数 = 已看页数 + 剩余页数 = ${readPages}+${rest}=${totalPages} 页。`, index);
+  }
+
+  function operationLawQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const point = knowledgePoint || tag;
+    if (String(point).includes("分配律")) {
+      const a = 25;
+      const b = 12 + index;
+      const c = 4 + (index % 4);
+      const answer = String(a * (b + c));
+      const stem = `填空：${a} × ${b} + ${a} × ${c} = ${a} × (${b} + ${c}) = ____。`;
+      return question(unit, point, difficulty, stem, answer, `两个乘法算式有相同因数 ${a}，可用乘法分配律合并为 ${a}×(${b}+${c})，结果是 ${answer}。`, index);
+    }
+    const a = 125;
+    const b = 8;
+    const c = 4 + (index % 5);
+    const answer = String(a * b * c);
+    const stem = `填空：${a} × ${c} × ${b} = (${a} × ${b}) × ${c} = ____。`;
+    return question(unit, point, difficulty, stem, answer, `利用交换律和结合律先算 ${a}×${b}=1000，再乘 ${c}，结果是 ${answer}。`, index);
+  }
+
+  function priceQuantityQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const price = difficulty === "挑战" ? 18 + index : 12 + (index % 6);
+    const quantity = 3 + (index % 5);
+    const total = price * quantity;
+    const point = knowledgePoint || tag;
+    const stem = [
+      `填空：练习本每本 ${price} 元，买 ${quantity} 本。根据“单价 × 数量 = 总价”填写表格。`,
+      "| 单价 | 数量 | 总价 |",
+      "| --- | --- | --- |",
+      `| ${price} 元/本 | ${quantity} 本 | ____ 元 |`
+    ].join("\n");
+    return question(unit, point, difficulty, stem, String(total), `单价是 ${price} 元/本，数量是 ${quantity} 本，总价 = ${price}×${quantity}=${total} 元。`, index);
+  }
+
+  function speedDistanceQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const speed = difficulty === "挑战" ? 75 + index : 45 + index;
+    const time = 2 + (index % 4);
+    const distance = speed * time;
+    const point = knowledgePoint || tag;
+    const stem = [
+      `填空：汽车每小时行 ${speed} 千米，行驶 ${time} 小时。根据“速度 × 时间 = 路程”填写表格。`,
+      "| 速度 | 时间 | 路程 |",
+      "| --- | --- | --- |",
+      `| ${speed} 千米/时 | ${time} 小时 | ____ 千米 |`
+    ].join("\n");
+    return question(unit, point, difficulty, stem, String(distance), `路程 = 速度×时间 = ${speed}×${time}=${distance} 千米。`, index);
+  }
+
+  function massQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const kg = 2 + (index % 6);
+    const grams = kg * 1000;
+    const point = knowledgePoint || tag;
+    const stem = `填空：一袋大米的质量是 ${kg} 千克，合 ____ 克。`;
+    return question(unit, point, difficulty, stem, String(grams), `质量单位换算中 1 千克 = 1000 克，所以 ${kg} 千克 = ${grams} 克。`, index);
+  }
+
+  function coordinateQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const col = 2 + (index % 6);
+    const row = 3 + (index % 5);
+    const point = knowledgePoint || tag;
+    const stem = `填空：方格图中，小红的位置用数对表示为 (${col}, ${row})，其中列数是 ____。`;
+    return question(unit, point, difficulty, stem, String(col), `数对通常先写列、再写行，(${col}, ${row}) 中第一个数 ${col} 表示列数。`, index);
+  }
+
+  function negativeNumberQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const below = 3 + (index % 7);
+    const above = 2 + (index % 6);
+    const point = knowledgePoint || tag;
+    const stem = `填空：温度从 -${below}℃ 上升到 ${above}℃，在数轴上跨过 0，温度升高了 ____℃。`;
+    return question(unit, point, difficulty, stem, String(below + above), `负数到 0 相差 ${below}℃，0 到 ${above}℃ 相差 ${above}℃，共升高 ${below + above}℃。`, index);
+  }
+
+  function circleQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const radius = 3 + (index % 5);
+    const point = knowledgePoint || tag;
+    if (String(point).includes("直径") || String(point).includes("半径")) {
+      const stem = `填空：一个圆的半径是 ${radius} cm，直径是 ____ cm。`;
+      return question(unit, point, difficulty, stem, String(radius * 2), `同一个圆中直径 = 半径 × 2，所以直径是 ${radius}×2=${radius * 2} cm。`, index);
+    }
+    const circumference = trimNumber(2 * 3.14 * radius);
+    const stem = `填空：圆的半径是 ${radius} cm，取 π=3.14，圆的周长是 ____ cm。`;
+    return question(unit, point, difficulty, stem, circumference, `圆的周长公式是 C=2πr，所以 2×3.14×${radius}=${circumference} cm。`, index);
+  }
+
+  function probabilityQuestion({ unit, difficulty, tag, knowledgePoint, index }) {
+    const red = 3 + (index % 4);
+    const blue = 1 + (index % 3);
+    const point = knowledgePoint || tag;
+    const stem = [
+      `选择题：袋子里有 ${red} 个红球和 ${blue} 个蓝球，任意摸 1 个球，哪种说法正确？`,
+      "A. 一定摸到红球 B. 不可能摸到蓝球 C. 摸到红球的可能性更大 D. 两种颜色可能性相同"
+    ].join(" ");
+    return question(unit, point, difficulty, stem, "C", `红球数量 ${red} 个多于蓝球 ${blue} 个，所以摸到红球的可能性更大，选 C。`, index);
   }
 
   function arithmeticQuestion({ unit, grade, difficulty, tag, index }) {
@@ -1389,9 +1542,16 @@
 
   function statisticsQuestion({ unit, difficulty, tag, index }) {
     const values = difficulty === "基础" ? [6 + index, 8 + index, 10 + index] : [12 + index, 15 + index, 18 + index];
-    const answer = String(values.reduce((sum, value) => sum + value, 0) / values.length);
-    const stem = `填空：三次数学练习得分分别是 ${values.join("、")} 分，平均分是 ____ 分。`;
-    return question(unit, tag, difficulty, stem, answer, `平均数 = 总数 ÷ 份数，先求和再除以 ${values.length}，平均分是 ${answer}。`, index);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const answer = String(max - min);
+    const stem = [
+      "填空：下面是三组同学完成口算题数量的统计表，最多组比最少组多 ____ 题。",
+      "| 小组 | 一组 | 二组 | 三组 |",
+      "| --- | --- | --- | --- |",
+      `| 题数 | ${values[0]} | ${values[1]} | ${values[2]} |`
+    ].join("\n");
+    return question(unit, tag, difficulty, stem, answer, `统计表中最大值是 ${max}，最小值是 ${min}，差值是 ${max}-${min}=${answer} 题。`, index);
   }
 
   function geometryQuestion({ unit, difficulty, tag, index }) {
@@ -1421,7 +1581,9 @@
   }
 
   function enrichQuestion(questionItem, context) {
-    const questionType = pickQuestionType(context.mode, context.tag);
+    const concept = [context.knowledgePoint, context.tag].filter(Boolean).join(" ");
+    const enrichedContext = { ...context, tag: concept };
+    const questionType = pickQuestionType(context.mode, concept);
     const sourceRefs = getSourceRefs(context.unit);
     const enriched = {
       ...questionItem,
@@ -1432,16 +1594,16 @@
     };
     return {
       ...enriched,
-      detailSteps: buildDetailSteps(enriched, context),
-      commonMistake: buildCommonMistake(enriched, context),
-      checkMethod: buildCheckMethod(enriched, context)
+      detailSteps: buildDetailSteps(enriched, enrichedContext),
+      commonMistake: buildCommonMistake(enriched, enrichedContext),
+      checkMethod: buildCheckMethod(enriched, enrichedContext)
     };
   }
 
   function pickQuestionType(mode, tag) {
     if (includesAny(tag, ["图形", "角", "方向", "观察"]) || String(mode).includes("选择")) return "选择题";
     if (includesAny(tag, ["单位", "长度", "人民币", "时间"])) return "单位换算填空题";
-    if (includesAny(tag, ["统计"])) return "数据填空题";
+    if (includesAny(tag, ["统计", "表格", "线段图", "数量关系", "可能性"])) return "数据填空题";
     if (String(mode).includes("计算")) return "计算填空题";
     return "填空题";
   }

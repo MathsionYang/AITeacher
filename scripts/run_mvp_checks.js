@@ -46,7 +46,7 @@ assert.ok(ocrProxySource.includes("enable_mkldnn"));
 const unit = {
   id: "g3a-u2",
   title: "混合运算",
-  points: ["不含括号的两级混合运算", "含小括号的混合运算", "分步算式合并成综合算式"]
+  points: ["不含括号的两级混合运算", "含小括号的混合运算", "分步算式合并成综合算式", "用线段图或表格分析数量关系"]
 };
 
 const questions = [
@@ -216,6 +216,80 @@ const validFillBlank = ruleEngine.validateQuestion({
 }, unit);
 assert.equal(validFillBlank.ok, true);
 assert.equal(validFillBlank.question.questionType, "计算填空题");
+
+const plainAddAsMixed = ruleEngine.validateQuestion({
+  id: "plain-add-as-mixed",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: "不含括号的两级混合运算",
+  questionType: "计算填空题",
+  difficulty: "基础",
+  stem: "填空：107 + 54 = ____。",
+  answer: "161",
+  explanation: "普通加法不能冒充两级混合运算。"
+}, unit);
+assert.equal(plainAddAsMixed.ok, false);
+assert.ok(plainAddAsMixed.issues.some((issue) => issue.includes("不匹配")));
+
+const plainAddAsStepExpression = ruleEngine.validateQuestion({
+  id: "plain-add-as-step",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: "分步算式合并成综合算式",
+  questionType: "填空题",
+  difficulty: "基础",
+  stem: "填空：113 + 56 = ____。",
+  answer: "169",
+  explanation: "普通加法不能冒充分步算式知识点。"
+}, unit);
+assert.equal(plainAddAsStepExpression.ok, false);
+assert.ok(plainAddAsStepExpression.issues.some((issue) => issue.includes("不匹配")));
+
+const plainMultiplyAsTableRelation = ruleEngine.validateQuestion({
+  id: "plain-multiply-as-table",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: "用线段图或表格分析数量关系",
+  questionType: "填空题",
+  difficulty: "基础",
+  stem: "填空：12 × 9 = ____。",
+  answer: "108",
+  explanation: "普通乘法不能冒充表格数量关系。"
+}, unit);
+assert.equal(plainMultiplyAsTableRelation.ok, false);
+assert.ok(plainMultiplyAsTableRelation.issues.some((issue) => issue.includes("不匹配")));
+
+const validTableRelation = ruleEngine.validateQuestion({
+  id: "table-relation-ok",
+  unitId: unit.id,
+  unitTitle: unit.title,
+  knowledgePoint: "用线段图或表格分析数量关系",
+  questionType: "数据填空题",
+  difficulty: "基础",
+  stem: "填空：小明每天看 6 页书，看了 4 天，还剩 18 页。先用表格整理数量关系，再填写空格。\n| 已看页数 | 剩余页数 | 总页数 |\n| --- | --- | --- |\n| ____ | 18 | ____ |",
+  answer: "24和42",
+  explanation: "已看页数 6×4=24 页，总页数 24+18=42 页。"
+}, unit);
+assert.equal(validTableRelation.ok, true);
+
+const multiplicationUnit = {
+  id: "g4a-u3",
+  title: "多位数乘两位数",
+  points: ["三位数乘两位数笔算", "部分积对位", "乘法估算", "积的变化规律", "单价数量总价", "速度时间路程"]
+};
+
+const validPriceRelation = ruleEngine.validateQuestion({
+  id: "price-relation-ok",
+  unitId: multiplicationUnit.id,
+  unitTitle: multiplicationUnit.title,
+  knowledgePoint: "单价数量总价",
+  questionType: "数据填空题",
+  difficulty: "基础",
+  stem: "填空：练习本每本 12 元，买 4 本。根据“单价 × 数量 = 总价”填写表格。\n| 单价 | 数量 | 总价 |\n| --- | --- | --- |\n| 12 元/本 | 4 本 | ____ 元 |",
+  answer: "48",
+  explanation: "总价 = 单价×数量 = 12×4=48 元。"
+}, multiplicationUnit);
+assert.equal(validPriceRelation.ok, true);
 
 assert.equal(ruleEngine.isCorrectAnswer("24 平方厘米", "24"), true);
 assert.equal(ruleEngine.isCorrectAnswer("x = 8", "8"), true);

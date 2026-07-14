@@ -181,6 +181,10 @@
     if (!answer) issues.push("答案为空");
     if (!explanation) warnings.push("解析为空或过短");
     if (!knowledgePoint) issues.push("知识点不在当前单元边界内");
+    if (knowledgePoint) {
+      const relevanceIssue = validateKnowledgePointRelevance(questionItem, unit, knowledgePoint, stem);
+      if (relevanceIssue) issues.push(relevanceIssue);
+    }
     if (!isObjectiveQuestionType(questionType)) issues.push("题型不是选择题、填空题或计算填空题");
     if (isOpenEndedStem(stem)) issues.push("题干包含说明、改正、综合算式等开放作答要求");
     if (questionType.includes("选择") && !hasChoiceOptions(stem)) issues.push("选择题缺少 A/B/C/D 或 ①②③④ 选项");
@@ -257,6 +261,125 @@
   function isOpenEndedStem(stem) {
     const text = normalizeLooseText(stem);
     return OPEN_ENDED_STEM_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+  }
+
+  function validateKnowledgePointRelevance(questionItem, unit, knowledgePoint, stem) {
+    const point = normalizeText(knowledgePoint);
+    const rawStem = normalizeText(stem);
+    const text = normalizeLooseText(stem);
+    if (!point || !rawStem) return "";
+
+    const hasArithmetic = /\d/.test(rawStem) && /[+\-－—–×xX*÷\/]/.test(rawStem);
+    const hasAddSub = /[+\-－—–]/.test(rawStem);
+    const hasMulDiv = /[×xX*÷\/]/.test(rawStem);
+    const hasParentheses = /[()（）]/.test(rawStem);
+    const hasChoice = hasChoiceOptions(rawStem);
+    const issue = "题干内容与当前知识点不匹配";
+
+    if (point.includes("不含括号") && point.includes("混合运算")) {
+      if (!hasArithmetic || !hasAddSub || !hasMulDiv) return issue;
+      if (!hasChoice && hasParentheses) return issue;
+    }
+
+    if (point.includes("含小括号") && point.includes("混合运算")) {
+      if (!hasArithmetic || !hasParentheses) return issue;
+    }
+
+    if (point.includes("分步算式") || point.includes("合并成综合算式")) {
+      if (!hasArithmetic || !includesAnyText(text, ["分步", "第一步", "第二步", "先算", "再算", "同一过程", "对应算式"])) return issue;
+    }
+
+    if ((point.includes("线段图") || point.includes("表格")) && point.includes("数量关系")) {
+      if (!hasRepresentationEvidence(rawStem, text)) return issue;
+    }
+
+    if (point.includes("单价数量总价")) {
+      if (!includesAnyText(text, ["单价", "数量", "总价", "每", "元", "买"])) return issue;
+    }
+
+    if (point.includes("速度时间路程")) {
+      if (!includesAnyText(text, ["速度", "时间", "路程", "每小时", "每分钟", "千米", "米"])) return issue;
+    }
+
+    if (point.includes("运算律") || point.includes("交换律") || point.includes("结合律") || point.includes("分配律") || point.includes("简便计算")) {
+      if (!includesAnyText(text, ["交换律", "结合律", "分配律", "简便", "凑整"]) && !/[+\-－—–×xX*÷\/]/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("角")) {
+      if (!includesAnyText(text, ["角", "度", "°", "量角器", "锐角", "直角", "钝角", "平角", "周角", "顶点", "边"])) return issue;
+    }
+
+    if (point.includes("统计") || point.includes("统计图") || point.includes("统计表") || point.includes("平均数") || point.includes("可能性")) {
+      if (!includesAnyText(text, ["统计", "数据", "表", "图", "每格", "平均", "最多", "最少", "差值", "可能", "一定", "不可能"]) && !/\|.+\|/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("长度") || point.includes("毫米") || point.includes("厘米") || point.includes("分米") || point.includes("千米")) {
+      if (!includesAnyText(text, ["长度", "毫米", "厘米", "分米", "千米", "米", "线段"])) return issue;
+    }
+
+    if (point.includes("质量") || point.includes("克、千克、吨") || point.includes("等量关系推算未知质量")) {
+      if (!includesAnyText(text, ["质量", "克", "千克", "吨", "称", "重"])) return issue;
+    }
+
+    if (point.includes("人民币")) {
+      if (!includesAnyText(text, ["元", "角", "分", "人民币", "钱"])) return issue;
+    }
+
+    if (point.includes("时间")) {
+      if (!includesAnyText(text, ["时间", "小时", "分钟", "秒", "时", "分"])) return issue;
+    }
+
+    if (point.includes("面积")) {
+      if (!includesAnyText(text, ["面积", "平方", "底", "高", "长", "宽", "三角形", "梯形", "平行四边形", "圆"]) && !/[cCmM][mM]2|cm²|m²/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("体积")) {
+      if (!includesAnyText(text, ["体积", "立方", "长方体", "正方体", "长", "宽", "高"]) && !/[cCmM][mM]3|cm³|m³/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("小数")) {
+      if (!text.includes("小数") && !/\d+\.\d+/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("分数") || point.includes("单位 1")) {
+      if (!includesAnyText(text, ["分数", "几分", "单位1", "单位 1", "约分", "倒数"]) && !/\d+\s*\/\s*\d+/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("百分数") || point.includes("百分率") || point.includes("增长率") || point.includes("折扣") || point.includes("利率")) {
+      if (!includesAnyText(text, ["百分", "百分率", "增长率", "折扣", "利率", "成数"]) && !/%/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("方程") || point.includes("字母") || point.includes("未知数")) {
+      if (!includesAnyText(text, ["方程", "字母", "未知数", "等量", "式子"]) && !/[a-zA-Z]/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("数对")) {
+      if (!includesAnyText(text, ["数对", "列", "行", "坐标"]) && !/\(\s*-?\d+\s*,\s*-?\d+\s*\)/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("负数") || point.includes("正数")) {
+      if (!includesAnyText(text, ["负数", "正数", "数轴", "温度", "海拔", "收支", "0"]) && !/-\d/.test(rawStem)) return issue;
+    }
+
+    if (point.includes("圆")) {
+      if (!includesAnyText(text, ["圆", "半径", "直径", "圆周率", "周长", "面积", "π"])) return issue;
+    }
+
+    if (point.includes("观察") || point.includes("视图") || point.includes("组合体")) {
+      if (!includesAnyText(text, ["观察", "视图", "正面", "侧面", "上面", "前面", "组合体", "小正方体"])) return issue;
+    }
+
+    return "";
+  }
+
+  function hasRepresentationEvidence(rawStem, looseText) {
+    return includesAnyText(looseText, ["线段图", "表格", "表中", "数量关系", "已看", "剩余", "总数", "单位1", "单位 1"])
+      || /\|.+\|/.test(rawStem)
+      || /<table/i.test(rawStem);
+  }
+
+  function includesAnyText(text, needles) {
+    return needles.some((needle) => text.includes(normalizeLooseText(needle)));
   }
 
 
@@ -421,6 +544,7 @@
     resolveKnowledgePoint,
     isOpenEndedStem,
     isObjectiveQuestionType,
+    validateKnowledgePointRelevance,
     validatePaper,
     validateQuestion
   };
