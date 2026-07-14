@@ -13,6 +13,7 @@ structure. Scoring still happens in the browser rule engine after manual review.
 import argparse
 import base64
 import json
+import os
 import re
 import tempfile
 import threading
@@ -20,6 +21,14 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+
+# PaddleOCR on Windows can hit PaddlePaddle oneDNN/PIR runtime errors on some
+# CPU builds. Keep MKLDNN/oneDNN disabled by default for stability; users can
+# opt in with --enable-mkldnn after local verification.
+os.environ.setdefault("FLAGS_use_mkldnn", "0")
+os.environ.setdefault("FLAGS_use_onednn", "0")
+os.environ.setdefault("FLAGS_tracer_onednn_ops_on", "")
+os.environ.setdefault("OMP_NUM_THREADS", "2")
 
 MAX_BODY_BYTES = 18 * 1024 * 1024
 FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９", "0123456789")
@@ -65,6 +74,8 @@ class PaddleOcrRuntime:
             "use_doc_unwarping": False,
             "use_textline_orientation": False,
             "lang": self.args.lang,
+            "enable_mkldnn": self.args.enable_mkldnn,
+            "mkldnn_cache_capacity": 0 if not self.args.enable_mkldnn else 10,
         }
         if self.args.device:
             common_v3["device"] = self.args.device
@@ -83,6 +94,7 @@ class PaddleOcrRuntime:
             "lang": self.args.lang,
             "use_angle_cls": False,
             "show_log": False,
+            "use_mkldnn": self.args.enable_mkldnn,
         }
         yield "paddleocr-legacy", legacy
 
@@ -379,13 +391,19 @@ def main():
     parser.add_argument("--rec-model", default="PP-OCRv6_small_rec")
     parser.add_argument("--default-models", action="store_true", help="Skip explicit small/mobile model names and use PaddleOCR defaults.")
     parser.add_argument("--keep-images", action="store_true", help="Keep temporary uploaded images for debugging.")
+    parser.add_argument("--enable-mkldnn", action="store_true", help="Opt in to Paddle MKLDNN/oneDNN acceleration. Disabled by default for Windows CPU stability.")
     args = parser.parse_args()
+
+    if args.enable_mkldnn:
+        os.environ["FLAGS_use_mkldnn"] = "1"
+        os.environ["FLAGS_use_onednn"] = "1"
 
     runtime = PaddleOcrRuntime(args)
     OcrHandler.runtime = runtime
     server = ThreadingHTTPServer((args.host, args.port), OcrHandler)
 
     print(f"AITeacher PaddleOCR proxy listening at http://{args.host}:{args.port}/ocr")
+    print("Paddle MKLDNN/oneDNN acceleration: " + ("enabled" if args.enable_mkldnn else "disabled"))
     print("First OCR request may take longer while PaddleOCR loads/downloads models.")
     print("Press Ctrl+C to stop.")
     try:

@@ -3,6 +3,10 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "PY_EXE="
+set "FLAGS_use_mkldnn=0"
+set "FLAGS_use_onednn=0"
+set "FLAGS_tracer_onednn_ops_on="
+set "OMP_NUM_THREADS=2"
 
 where python.exe >nul 2>nul
 if errorlevel 1 (
@@ -16,6 +20,7 @@ for /f "delims=" %%I in ('where python.exe 2^>nul') do if not defined PY_EXE set
 
 echo [AITeacher OCR] Starting PaddleOCR local proxy...
 echo [AITeacher OCR] First recognition may download/load OCR models.
+echo [AITeacher OCR] Paddle MKLDNN/oneDNN acceleration is disabled for Windows CPU stability.
 echo [AITeacher OCR] Keep this window open. Press Ctrl+C to stop.
 echo.
 "%PY_EXE%" "scripts\local_ocr_paddle.py" --port 8790

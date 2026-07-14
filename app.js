@@ -590,6 +590,9 @@
     if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
       return "没有连接到本机 OCR 服务。请先运行 start_aiteacher_ocr.bat，看到 127.0.0.1:8790/ocr 启动后再点击 OCR 识别。";
     }
+    if (/ConvertPirAttribute2RuntimeAttribute|onednn_instruction|oneDNN|MKLDNN/i.test(raw)) {
+      return "PaddleOCR 触发了 Windows CPU 的 oneDNN/MKLDNN 兼容问题。请更新后重新运行 start_aiteacher_ocr.bat；该脚本会默认关闭 MKLDNN/oneDNN 加速。";
+    }
     if (/PaddleOCR is not installed|No module named|paddleocr/i.test(raw)) {
       return "本机 OCR 依赖未安装。请运行：python -m pip install paddlepaddle paddleocr，然后重新启动 start_aiteacher_ocr.bat。";
     }

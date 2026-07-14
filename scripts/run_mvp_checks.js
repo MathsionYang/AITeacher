@@ -35,6 +35,9 @@ assert.equal(questionCardSource.includes("知识点来源"), false);
 assert.equal(appSource.includes("当前还没有练习题，请先生成或导入练习，再进行 OCR 识别。"), false);
 assert.ok(ocrProxySource.includes("class PaddleOcrRuntime"));
 assert.ok(ocrProxySource.includes("PP-OCRv6_small"));
+assert.ok(ocrProxySource.includes("FLAGS_use_mkldnn"));
+assert.ok(ocrProxySource.includes("--enable-mkldnn"));
+assert.ok(ocrProxySource.includes("enable_mkldnn"));
 
 const unit = {
   id: "g3a-u2",
