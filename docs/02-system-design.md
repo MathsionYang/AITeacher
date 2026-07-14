@@ -132,7 +132,9 @@ index.html
 当前实现：
 
 - 文件上传和图片预览已完成。
+- `scripts/local_ocr_paddle.py` 提供本机 PaddleOCR 代理，默认监听 `http://127.0.0.1:8790/ocr`，前端点击“OCR 识别”后上传图片 Data URL。
 - `answerInput` 作为 OCR 识别文本/人工校正区，也接收同步出题页答案同步；`parseAnswerReview()` 会结构化题号、答案、置信度和低置信状态。
+- OCR 返回的 `answerItems`、`lines` 和置信度会进入 `parseAnswerReview()`，如果用户改动识别文本，则按手动校正重新评估。
 - `gradeCurrentAnswers()` 是共享判分入口，`gradeAnswers()` 和同步出题页判分按钮都复用它。
 - `scoreHistoryKey` 将每次成绩保存到浏览器本地存储。
 - `renderPerformanceFeedback()` 根据分数段展示鼓励图、奖状、撒花或领奖台动画。
@@ -242,7 +244,7 @@ score_records
 - 安全策略：API Key 不提交、不写入代码、不写入 `localStorage`；推荐本地代理模式，页面 API Key 留空，Key 只存在客户电脑本地配置文件中。
 - 课件：大模型只基于结构化客观知识点生成课件 JSON，固定模板和低随机性参数保证稳定性。
 - 视觉：Agent 负责把知识点映射为分数格、几何图、统计柱、数轴、流程图等参数化图形。
-- OCR：可用本地 PaddleOCR/TrOCR，也可接入用户配置的云 OCR；手写数学建议保留人工确认。
+- OCR：当前接入本地 PaddleOCR 代理；后续可替换 TrOCR、云 OCR 或客户自有 OCR 接口。手写数学建议保留人工确认。
 - 题目生成：大模型负责生成候选客观题，规则引擎负责校验答案、客观题型和题型重复度。
 - 判分：选择题、填空题、计算填空题等结构化题走确定性判分；说明理由、综合算式、判断改错、作图等开放题不进入当前 MVP 自动试卷。
 - 解析：大模型生成讲解，但必须引用题目、答案和知识点，避免自由发挥。

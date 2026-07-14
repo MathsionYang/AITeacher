@@ -216,7 +216,7 @@
             <div class="upload-panel">
               <label class="file-drop" for="answerImage">
                 <span>上传答题照片</span>
-                <small>支持本地图片预览；OCR 服务后续接入</small>
+                <small>支持本地图片预览；可调用本机 PaddleOCR</small>
               </label>
               <input id="answerImage" type="file" accept="image/*" />
               <img id="answerPreview" alt="答题照片预览" />
@@ -225,10 +225,13 @@
             <div class="answer-panel">
               <div class="textarea-head">
                 <label for="answerInput">OCR 识别/手动校正答案</label>
-                <button id="simulateOcrBtn" class="secondary-btn small">模拟识别</button>
+                <div class="textarea-actions">
+                  <button id="runOcrBtn" class="secondary-btn small">OCR 识别</button>
+                  <button id="simulateOcrBtn" class="secondary-btn small">模拟识别</button>
+                </div>
               </div>
               <textarea id="answerInput" rows="10" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
-              <p class="hint">MVP 阶段先保留人工校正入口，避免 OCR 误识别直接影响判分。</p>
+              <p class="hint">OCR 结果会先进入人工校正与置信度面板，确认后再判分。</p>
             </div>
           </div>
 

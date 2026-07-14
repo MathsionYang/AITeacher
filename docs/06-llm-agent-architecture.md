@@ -48,7 +48,7 @@ LOCAL_LLM_PROXY_BASE_URL=http://127.0.0.1:8787
 - `agent-orchestrator.js` 已接入课件 Agent 和出题 Agent。
 - AI 课件入口放在“知识点课件”页面内，生成时显示进度动画，不提前展示半成品内容，完成后生成审核稿，用户保存前仍可人工修改，并可导入/导出 JSON。
 - AI 出题入口放在“同步出题”页面内，页面默认空白；生成候选客观题后进入当前单元边界、客观题型、开放题过滤、题型重复和 100 分制规则处理，全部完成后再展示整卷，并支持历史练习 JSON 导入/导出。
-- 批改 Agent、错题复习 Agent 和周期测验 Agent 当前仍按架构预留，后续接入 OCR、步骤评分和复习计划。
+- 批改流程已接入本地 PaddleOCR 适配器，先完成题号答案结构化、置信度提示和规则判分；批改 Agent、错题复习 Agent 和周期测验 Agent 仍按架构预留步骤评分和复习计划。
 
 ## 3. 大模型适用环节
 
@@ -281,7 +281,7 @@ content-store
   知识点包、课件审核稿、题目、错题库、成绩记录、测验记录
 
 ocr-adapter
-  本地 OCR 或客户自有 OCR 接口
+  当前实现为 `scripts/local_ocr_paddle.py` 本地 PaddleOCR 代理；后续可替换客户自有 OCR 接口
 
 exporter
   JSON、Markdown、PDF、后续 PPTX

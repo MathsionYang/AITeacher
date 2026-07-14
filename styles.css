@@ -1367,7 +1367,15 @@ body[data-role-mode="student"] .teacher-only {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.textarea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .hint {

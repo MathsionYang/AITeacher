@@ -6,6 +6,7 @@
   const scoreHistoryKey = "ai-teacher-rj-math-score-history-v1";
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
   const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
+  const ocrProxyBaseUrl = "http://127.0.0.1:8790";
   const ruleEngine = window.AITeacherRuleEngine || {};
   const storage = window.AITeacherStorage?.createLocalJsonStorage?.({
     namespace: "ai-teacher-rj-math",
@@ -36,6 +37,9 @@
     questionCount: initialScope.questionCount || 6,
     currentQuestions: [],
     answerReview: { entries: [], summary: { averageConfidence: 0, lowConfidenceCount: 0, missingCount: 0 } },
+    lastOcrResult: null,
+    lastOcrText: "",
+    ocrRecognizing: false,
     answersVisible: false,
     activeTab: "courseware",
     coursewareEditMode: false,
@@ -334,6 +338,7 @@
     $("copyAnswersBtn").addEventListener("click", copyAnswerTemplate);
     $("gradePracticeBtn").addEventListener("click", gradePracticeAnswers);
     $("syncPracticeToGradingBtn").addEventListener("click", syncPracticeAnswersToGrading);
+    $("runOcrBtn").addEventListener("click", runPaddleOcr);
     $("simulateOcrBtn").addEventListener("click", simulateOcr);
     $("gradeBtn").addEventListener("click", gradeAnswers);
     $("answerImage").addEventListener("change", previewAnswerImage);
@@ -717,6 +722,14 @@
 
   function cleanText(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function cleanMultilineText(value) {
+    return String(value || "")
+      .split(/\r?\n/)
+      .map(cleanText)
+      .filter(Boolean)
+      .join("\n");
   }
 
   function cleanTextList(value) {
@@ -1823,6 +1836,120 @@
     preview.style.display = "block";
   }
 
+  async function runPaddleOcr() {
+    if (!state.currentQuestions.length) {
+      setModelStatus("当前还没有练习题，请先生成或导入练习，再进行 OCR 识别。", "warn");
+      return;
+    }
+    const file = $("answerImage").files && $("answerImage").files[0];
+    if (!file) {
+      setModelStatus("请先上传答题照片，再点击 OCR 识别。", "warn");
+      return;
+    }
+
+    const button = $("runOcrBtn");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "识别中...";
+    state.ocrRecognizing = true;
+    setModelStatus("正在调用本机 PaddleOCR 服务，识别结果会先进入人工校正面板。", "busy");
+
+    try {
+      const result = await requestLocalOcr(file);
+      applyOcrResult(result);
+    } catch (error) {
+      setModelStatus(error.message || "OCR 识别失败，请确认本地 PaddleOCR 服务已启动。", "error");
+    } finally {
+      state.ocrRecognizing = false;
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+
+  async function requestLocalOcr(file) {
+    const image = await readFileAsDataUrl(file);
+    const endpoint = `${ocrProxyBaseUrl.replace(/\/+$/, "")}/ocr`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image,
+        expectedQuestionCount: state.currentQuestions.length,
+        mode: "answer-sheet"
+      })
+    });
+    const payload = await safeReadJson(response);
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || `OCR 服务返回 ${response.status}`);
+    }
+    return payload;
+  }
+
+  async function safeReadJson(response) {
+    try {
+      return await response.json();
+    } catch (error) {
+      return { error: "OCR 服务返回内容不是 JSON。" };
+    }
+  }
+
+  function applyOcrResult(result) {
+    const normalized = normalizeOcrResult(result);
+    state.lastOcrResult = normalized;
+    const answerText = normalized.answersText || normalized.rawText || "";
+    state.lastOcrText = answerText;
+    $("answerInput").value = answerText;
+    $("practiceAnswerInput").value = answerText;
+    state.answerReview = parseAnswerReview(answerText, "paddleocr", normalized);
+    renderAnswerReviewPanel(state.answerReview);
+
+    const summary = normalized.summary || {};
+    const answeredCount = summary.answerCount || state.answerReview.entries.filter((entry) => entry.answer).length;
+    const lowConfidence = summary.lowConfidenceCount || state.answerReview.summary.lowConfidenceCount || 0;
+    setModelStatus(
+      `OCR 识别完成：${answeredCount} 个答案，低置信度 ${lowConfidence} 个，请确认后判分。`,
+      lowConfidence ? "warn" : "ok"
+    );
+  }
+
+  function normalizeOcrResult(result) {
+    const answerItems = Array.isArray(result?.answerItems) ? result.answerItems.map((item) => ({
+      questionNo: Number(item.questionNo),
+      answer: cleanText(item.answer),
+      confidence: Number(item.confidence),
+      rawLine: cleanText(item.rawLine),
+      source: item.source || "paddleocr"
+    })).filter((item) => Number.isFinite(item.questionNo) && item.answer) : [];
+    const lines = Array.isArray(result?.lines) ? result.lines.map((line) => ({
+      text: cleanText(line.text),
+      confidence: Number(line.confidence),
+      box: line.box || null
+    })).filter((line) => line.text) : [];
+    return {
+      provider: result?.provider || "paddleocr",
+      modelProfile: result?.modelProfile || "local",
+      elapsedMs: result?.elapsedMs || 0,
+      rawText: cleanMultilineText(result?.rawText || lines.map((line) => line.text).join("\n")),
+      answersText: cleanMultilineText(result?.answersText || answerItems.map((item) => `${item.questionNo}. ${item.answer}`).join("\n")),
+      lines,
+      answerItems,
+      summary: result?.summary || {
+        lineCount: lines.length,
+        answerCount: answerItems.length,
+        lowConfidenceCount: answerItems.filter((item) => item.confidence < 0.7).length
+      }
+    };
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("读取答题照片失败。"));
+      reader.readAsDataURL(file);
+    });
+  }
+
   function simulateOcr() {
     if (!state.currentQuestions.length) {
       setModelStatus("当前还没有练习题，请先导入历史练习或点击 AI 生成练习。", "warn");
@@ -1861,7 +1988,8 @@
       return;
     }
     state.currentQuestions = prepareQuestionsForPaper(state.currentQuestions, unitData(), state.currentQuestions.length).questions;
-    const answerReview = parseAnswerReview(answerText || "", options.origin === "grading" ? "manual-correction" : "practice-input");
+    const ocrResult = (answerText || "") === state.lastOcrText ? state.lastOcrResult : null;
+    const answerReview = parseAnswerReview(answerText || "", options.origin === "grading" ? "manual-correction" : "practice-input", ocrResult);
     state.answerReview = answerReview;
     const answers = answerReview.answers;
     const results = state.currentQuestions.map((question, index) => {
@@ -1902,14 +2030,19 @@
   }
 
   function updateAnswerReviewFromText(source) {
+    if (source !== "paddleocr") {
+      state.lastOcrResult = null;
+      state.lastOcrText = "";
+    }
     state.answerReview = parseAnswerReview($("answerInput").value || "", source);
     renderAnswerReviewPanel();
   }
 
-  function parseAnswerReview(text, source = "manual") {
+  function parseAnswerReview(text, source = "manual", ocrResult = null) {
     const answers = {};
     const fallback = [];
     const lineMeta = {};
+    const ocrHints = buildOcrHints(ocrResult);
     String(text || "")
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -1918,16 +2051,28 @@
         const match = line.match(/^(\d+)\s*[\.、:：=]?\s*(.+)$/);
         if (match) {
           const questionNo = Number(match[1]);
+          const hint = ocrHints.byQuestionNo[questionNo] || ocrHints.byRawLine[line] || {};
           answers[questionNo] = match[2].trim();
-          lineMeta[questionNo] = { rawLine: line, source: source === "mock-ocr" ? "mock-ocr" : source, explicitNo: true };
+          lineMeta[questionNo] = {
+            rawLine: line,
+            source: hint.source || (source === "mock-ocr" ? "mock-ocr" : source),
+            explicitNo: true,
+            ocrConfidence: hint.confidence
+          };
         } else {
           fallback.push(line);
         }
       });
     fallback.forEach((value, index) => {
       if (!answers[index + 1]) {
+        const hint = ocrHints.byQuestionNo[index + 1] || ocrHints.byRawLine[value] || {};
         answers[index + 1] = value;
-        lineMeta[index + 1] = { rawLine: value, source, explicitNo: false };
+        lineMeta[index + 1] = {
+          rawLine: value,
+          source: hint.source || source,
+          explicitNo: false,
+          ocrConfidence: hint.confidence
+        };
       }
     });
     const entries = state.currentQuestions.map((question, index) => {
@@ -1958,10 +2103,38 @@
     };
   }
 
+  function buildOcrHints(ocrResult) {
+    const byQuestionNo = {};
+    const byRawLine = {};
+    if (!ocrResult) return { byQuestionNo, byRawLine };
+    (ocrResult.answerItems || []).forEach((item) => {
+      const questionNo = Number(item.questionNo);
+      const confidence = Number(item.confidence);
+      const hint = {
+        confidence: Number.isFinite(confidence) ? confidence : undefined,
+        source: item.source || "paddleocr"
+      };
+      if (Number.isFinite(questionNo)) byQuestionNo[questionNo] = hint;
+      if (item.rawLine) byRawLine[item.rawLine] = hint;
+      if (item.answer && Number.isFinite(questionNo)) byRawLine[questionNo + ". " + item.answer] = hint;
+    });
+    (ocrResult.lines || []).forEach((line) => {
+      const confidence = Number(line.confidence);
+      if (line.text) byRawLine[line.text] = {
+        confidence: Number.isFinite(confidence) ? confidence : undefined,
+        source: "paddleocr"
+      };
+    });
+    return { byQuestionNo, byRawLine };
+  }
   function estimateAnswerConfidence(answer, meta, question) {
     if (!answer) return 0;
-    let confidence = meta.explicitNo ? 0.92 : 0.72;
+    const ocrConfidence = Number(meta.ocrConfidence);
+    let confidence = Number.isFinite(ocrConfidence) && ocrConfidence > 0
+      ? (ocrConfidence * 0.75) + ((meta.explicitNo ? 0.92 : 0.72) * 0.25)
+      : meta.explicitNo ? 0.92 : 0.72;
     if (meta.source === "mock-ocr") confidence -= 0.08;
+    if (meta.source === "paddleocr" && !meta.explicitNo) confidence -= 0.08;
     if (/疑似|不清|\?|？|漏写/.test(answer)) confidence -= 0.22;
     if (question?.questionType?.includes("选择") && /^[A-Da-d]$/.test(answer.trim())) confidence += 0.05;
     if (Number.isFinite(parseNumberLike(answer))) confidence += 0.04;

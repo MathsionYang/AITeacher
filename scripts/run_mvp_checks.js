@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const ruleEngine = require("../rule-engine.js");
 const storageApi = require("../storage-adapter.js");
 
@@ -13,6 +15,16 @@ assert.equal(envelope.schemaVersion, 3);
 assert.equal(envelope.namespace, "test-ai-teacher");
 assert.equal(envelope.type, "local-data-backup");
 assert.ok(storage.sqliteMigrationPlan().schema.some((sql) => sql.includes("score_history")));
+
+const rootDir = path.resolve(__dirname, "..");
+const appSource = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
+const indexSource = fs.readFileSync(path.join(rootDir, "index.html"), "utf8");
+const ocrProxySource = fs.readFileSync(path.join(rootDir, "scripts", "local_ocr_paddle.py"), "utf8");
+assert.ok(indexSource.includes("id=\"runOcrBtn\""));
+assert.ok(appSource.includes("http://127.0.0.1:8790"));
+assert.ok(appSource.includes("parseAnswerReview(answerText, \"paddleocr\""));
+assert.ok(ocrProxySource.includes("class PaddleOcrRuntime"));
+assert.ok(ocrProxySource.includes("PP-OCRv6_small"));
 
 const unit = {
   id: "g3a-u2",
@@ -167,4 +179,4 @@ assert.equal(ruleEngine.isCorrectAnswer("10%", "0.1"), true);
 assert.equal(ruleEngine.isCorrectAnswer("25 和 35", "25和35"), true);
 assert.equal(ruleEngine.isCorrectAnswer("25 和 36", "25和35"), false);
 
-console.log("MVP rule checks passed.");
+console.log("MVP rule/storage/OCR checks passed.");
