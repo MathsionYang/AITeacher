@@ -6,6 +6,7 @@
   const scoreHistoryKey = "ai-teacher-rj-math-score-history-v1";
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
   const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
+  const generationCacheKey = "ai-teacher-rj-math-generation-cache-v1";
   const ocrProxyBaseUrl = "http://127.0.0.1:8790";
   const ruleEngine = window.AITeacherRuleEngine || {};
   const storage = window.AITeacherStorage?.createLocalJsonStorage?.({
@@ -20,7 +21,8 @@
     schedule: scheduleKey,
     coursewareReviews: coursewareReviewKey,
     scoreHistory: scoreHistoryKey,
-    roleMode: roleModeKey
+    roleMode: roleModeKey,
+    generationCache: generationCacheKey
   };
   const mockData = window.AI_TEACHER_MOCK_DATA || {};
   const mockEnabled = Boolean(mockData.enabled);
@@ -50,6 +52,7 @@
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
     scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
+    generationCache: readJson(generationCacheKey, {}, "generationCache"),
     schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule"),
     roleMode: readRoleMode()
   };
@@ -80,7 +83,7 @@
   function createFallbackStorage() {
     return {
       kind: "local-json-fallback",
-      schemaVersion: 3,
+      schemaVersion: 4,
       getString: (key, fallback = "") => {
         const value = localStorage.getItem(key);
         return value == null ? fallback : value;
@@ -89,17 +92,17 @@
       setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
       removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
       buildEnvelope: (type, data, metadata = {}) => ({
-        schemaVersion: 3,
+        schemaVersion: 4,
         storageKind: "local-json-fallback",
         type,
         exportedAt: new Date().toISOString(),
-        exportVersion: metadata.exportVersion || `${type}-v3`,
+        exportVersion: metadata.exportVersion || `${type}-v4`,
         ...metadata,
         data
       }),
       sqliteMigrationPlan: () => ({
         target: "sqlite",
-        schemaVersion: 3,
+        schemaVersion: 4,
         schema: [],
         strategy: ["加载 storage-adapter.js 后导出迁移计划"]
       })
@@ -113,6 +116,75 @@
 
   function cloneJson(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function buildGenerationCacheId(kind, unit, runtimeConfig, extra = {}) {
+    const fingerprint = stableStringify({
+      kind,
+      schemaVersion: exportSchemaVersion,
+      contentVersion: content.version,
+      subject: content.subject,
+      gradeId: state.grade,
+      volumeId: state.volume,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      unitPoints: unit.points || [],
+      difficulty: state.difficulty,
+      questionCount: capQuestionCount(state.questionCount),
+      provider: cleanText(runtimeConfig?.provider),
+      model: cleanText(runtimeConfig?.model),
+      baseUrl: cleanText(runtimeConfig?.baseUrl),
+      ...extra
+    });
+    return `${kind}:${hashString(fingerprint)}`;
+  }
+
+  function readGenerationCache(cacheId) {
+    const entry = state.generationCache && state.generationCache[cacheId];
+    if (!entry || !entry.payload) return null;
+    return entry;
+  }
+
+  function writeGenerationCache(cacheId, payload, metadata = {}) {
+    const now = new Date().toISOString();
+    const previous = state.generationCache[cacheId] || {};
+    state.generationCache[cacheId] = {
+      schemaVersion: exportSchemaVersion,
+      cacheVersion: "generation-cache-v1",
+      cacheId,
+      createdAt: previous.createdAt || now,
+      updatedAt: now,
+      ...metadata,
+      payload
+    };
+    pruneGenerationCache(30);
+    writeJson(generationCacheKey, state.generationCache);
+  }
+
+  function pruneGenerationCache(limit) {
+    const entries = Object.entries(state.generationCache || {});
+    if (entries.length <= limit) return;
+    entries
+      .sort(([, a], [, b]) => String(a.updatedAt || a.createdAt || "").localeCompare(String(b.updatedAt || b.createdAt || "")))
+      .slice(0, entries.length - limit)
+      .forEach(([key]) => delete state.generationCache[key]);
+  }
+
+  function stableStringify(value) {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+    if (value && typeof value === "object") {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value);
+  }
+
+  function hashString(value) {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
   }
 
   function gradeData() {
@@ -486,9 +558,11 @@
   async function generateAiCourseware() {
     if (!requireTeacherMode("AI 生成课件")) return;
     await runWithModelStatus("aiCoursewareBtn", "生成中...", async () => {
-      ensureAgentReady();
       const unit = unitData();
       const fallbackSlides = buildBaseCoursewareSlides(unit);
+      const runtimeConfig = collectModelRuntimeConfig();
+      const cacheId = buildGenerationCacheId("courseware", unit, runtimeConfig, { slideCount: fallbackSlides.length });
+      const shouldReuseCache = !coursewareReviewRecord(unit)?.slides?.length;
       let receivedChars = 0;
       switchTab("courseware");
       state.coursewareGenerating = true;
@@ -496,9 +570,19 @@
       setGenerationProgress("courseware", "AI 正在根据当前单元知识点组织课件内容，完成后统一展示。");
       renderCourseware();
       try {
+        const cached = shouldReuseCache ? readGenerationCache(cacheId) : null;
+        if (cached?.payload?.slides?.length) {
+          const slides = normalizeAiCoursewareSlides(cached.payload.slides, fallbackSlides, unit);
+          state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "cache", createdAt: cached.createdAt });
+          writeJson(coursewareReviewKey, state.coursewareReviews);
+          setModelStatus(`已复用本地缓存课件：${slides.length} 页，可继续审核编辑；点击“重新生成课件”会重新调用模型。`, "ok");
+          return;
+        }
+
+        ensureAgentReady();
         const generator = agentOrchestrator.generateCoursewareStream || agentOrchestrator.generateCourseware;
         const result = await generator(
-          collectModelRuntimeConfig(),
+          runtimeConfig,
           buildAgentScope(unit),
           fallbackSlides,
           (token) => {
@@ -509,6 +593,7 @@
         const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
         state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "llm" });
         writeJson(coursewareReviewKey, state.coursewareReviews);
+        writeGenerationCache(cacheId, { slides }, { kind: "courseware", scopeKey: coursewareKey(unit), source: "llm" });
         setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
       } finally {
         state.coursewareGenerating = false;
@@ -522,9 +607,11 @@
   async function generateAiQuestions() {
     if (!requireTeacherMode("AI 生成练习")) return;
     await runWithModelStatus("aiQuestionsBtn", "出题中...", async () => {
-      ensureAgentReady();
       const unit = unitData();
       const requestedCount = capQuestionCount(state.questionCount);
+      const runtimeConfig = collectModelRuntimeConfig();
+      const cacheId = buildGenerationCacheId("practice", unit, runtimeConfig, { requestedCount });
+      const shouldReuseCache = !state.currentQuestions.length;
       let receivedChars = 0;
       switchTab("practice");
       clearPracticeState();
@@ -532,9 +619,22 @@
       setGenerationProgress("practice", "AI 正在按当前单元边界生成题目，全部校验完成后统一展示。");
       renderPractice();
       try {
+        const cached = shouldReuseCache ? readGenerationCache(cacheId) : null;
+        if (cached?.payload?.questions?.length) {
+          const prepared = prepareQuestionsForPaper(cached.payload.questions, unit, requestedCount);
+          if (isPreparedPaperComplete(prepared, unit, requestedCount)) {
+            state.currentQuestions = prepared.questions;
+            state.answersVisible = false;
+            seedAnswerInputsWithTemplate();
+            setModelStatus(`已复用本地缓存练习：${state.currentQuestions.length} 题，范围仍锁定为“${unit.title}”。`, "ok");
+            return;
+          }
+        }
+
+        ensureAgentReady();
         const generator = agentOrchestrator.generateQuestionsStream || agentOrchestrator.generateQuestions;
         const result = await generator(
-          collectModelRuntimeConfig(),
+          runtimeConfig,
           buildAgentScope(unit),
           (token) => {
             receivedChars += String(token || "").length;
@@ -549,13 +649,11 @@
         const fallbackQuestions = generateScopedQuestions(unit, Number(state.grade), state.difficulty, requestedCount);
         const prepared = prepareQuestionsForPaper([...aiQuestions, ...fallbackQuestions], unit, requestedCount);
 
-        if (!prepared.questions.length) throw new Error("模型返回题目未通过单元边界校验，请重新生成。");
-        if (prepared.questions.length !== requestedCount || !hasKnowledgeCoverage(prepared.questions, unit)) {
-          throw new Error("模型返回题目未满足 10 题且覆盖全部知识点的规则，请重新生成。");
-        }
+        if (!isPreparedPaperComplete(prepared, unit, requestedCount)) throw new Error(formatPaperValidationError(prepared, unit, requestedCount));
         state.currentQuestions = prepared.questions;
         state.answersVisible = false;
         seedAnswerInputsWithTemplate();
+        writeGenerationCache(cacheId, { questions: state.currentQuestions }, { kind: "practice", scopeKey: coursewareKey(unit), source: "llm" });
         const rejectedHint = prepared.rejected.length ? `，已剔除 ${prepared.rejected.length} 题不合格题` : "";
         setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”${rejectedHint}。`, "ok");
       } finally {
@@ -572,7 +670,7 @@
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = busyText;
-    setModelStatus("正在调用模型，结果完成校验后才会展示。", "busy");
+    setModelStatus("正在检查本地缓存并准备模型，结果完成校验后才会展示。", "busy");
     try {
       await action();
     } catch (error) {
@@ -630,11 +728,13 @@
     return fallbackSlides.map((fallbackSlide, index) => {
       const candidate = Array.isArray(slides) ? slides[index] || {} : {};
       const visualType = allowedVisuals.has(candidate.visualType) ? candidate.visualType : fallbackSlide.visualType;
+      const visualData = normalizeSlideVisualData(candidate.visualData, fallbackSlide.visualData, unit);
       return {
         title: cleanText(candidate.title) || fallbackSlide.title,
         body: cleanText(candidate.body) || fallbackSlide.body,
         bullets: cleanTextList(candidate.bullets).length ? cleanTextList(candidate.bullets).slice(0, 5) : fallbackSlide.bullets,
         visualType,
+        ...(visualData ? { visualData } : {}),
         sources: sourceRefs
       };
     });
@@ -725,6 +825,30 @@
     return { questions: scoped.map((questionItem) => withQuestionReviewMetadata(questionItem)), rejected: [], issues: [], summary: { accepted: scoped.length, totalScore: paperTotal(scoped) } };
   }
 
+  function isPreparedPaperComplete(prepared, unit, requestedCount) {
+    return Boolean(
+      prepared?.questions?.length === requestedCount
+      && hasKnowledgeCoverage(prepared.questions, unit)
+      && paperTotal(prepared.questions) === 100
+    );
+  }
+
+  function formatPaperValidationError(prepared, unit, requestedCount) {
+    const questions = prepared?.questions || [];
+    const missing = prepared?.summary?.missingKnowledgePoints || (ruleEngine.findMissingKnowledgePoints ? ruleEngine.findMissingKnowledgePoints(questions, unit) : []);
+    const parts = [];
+    if ((unit.points || []).length > requestedCount) {
+      parts.push(`当前单元有 ${unit.points.length} 个知识点，${requestedCount} 题无法全部覆盖，请先拆分单元或合并知识点`);
+    }
+    if (!questions.length) parts.push("没有题目通过单元边界和客观题规则校验");
+    if (questions.length && questions.length !== requestedCount) parts.push(`当前只通过 ${questions.length} 题，要求固定 ${requestedCount} 题`);
+    if (missing.length) parts.push(`未覆盖知识点：${missing.slice(0, 8).join("、")}${missing.length > 8 ? "等" : ""}`);
+    if (prepared?.rejected?.length) parts.push(`已剔除 ${prepared.rejected.length} 题不合格题`);
+    if (prepared?.issues?.length) parts.push(`规则提示：${prepared.issues.slice(0, 2).join("；")}`);
+    if (!parts.length) parts.push("题目未满足 10 题、100 分、全知识点覆盖的规则");
+    return `${parts.join("；")}。请检查知识点模板，或重新生成。`;
+  }
+
   function withQuestionReviewMetadata(questionItem, checkedAt = new Date().toISOString()) {
     const reviewStatus = questionItem.reviewStatus || "rule_checked";
     return {
@@ -777,6 +901,172 @@
   function cleanTextList(value) {
     if (!Array.isArray(value)) return [];
     return value.map(cleanText).filter(Boolean);
+  }
+
+  function normalizeSlideVisualData(value, fallback, unit) {
+    const normalized = normalizeSlideVisualDataCandidate(value, unit);
+    if (normalized) return normalized;
+    return normalizeSlideVisualDataCandidate(fallback, unit);
+  }
+
+  function normalizeSlideVisualDataCandidate(value, unit) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const kind = normalizeVisualKind(value.kind || value.type || value.visualKind);
+    if (kind === "stationery") return normalizeStationeryVisualData(value);
+    if (kind === "share") return normalizeShareVisualData(value);
+    if (kind === "quantity") return normalizeQuantityVisualData(value);
+    if (kind === "auto") return buildDefaultSlideVisualData(unit, value.title || "");
+    return null;
+  }
+
+  function normalizeVisualKind(value) {
+    const text = cleanText(value).toLowerCase();
+    if (["stationery", "objects", "object", "object-equation", "object_equation"].includes(text)) return "stationery";
+    if (["share", "craft", "part-whole", "part_whole", "average-share"].includes(text)) return "share";
+    if (["quantity", "bar", "bars", "line", "line-segment", "table"].includes(text)) return "quantity";
+    if (text === "auto") return "auto";
+    return "";
+  }
+
+  function normalizeStationeryVisualData(data) {
+    const rawItems = Array.isArray(data.items) ? data.items : [];
+    const items = rawItems
+      .map(normalizeStationeryItem)
+      .filter(Boolean)
+      .slice(0, 4);
+    if (!items.length) return null;
+    return {
+      kind: "stationery",
+      title: cleanText(data.title) || `图解：${items.map((item) => `${item.count} 个${item.label}`).join(" + ")}`,
+      items,
+      expression: cleanText(data.expression || data.formula).slice(0, 32),
+      caption: cleanText(data.caption || data.note).slice(0, 60)
+    };
+  }
+
+  function normalizeStationeryItem(item, index) {
+    if (!item || typeof item !== "object") return null;
+    const type = normalizeObjectType(item.type || item.icon || item.kind, index);
+    const count = clampInt(item.count ?? item.quantity ?? 1, 1, 6);
+    const label = cleanText(item.label || item.name || defaultObjectLabel(type)).slice(0, 8);
+    const priceLabel = cleanText(item.priceLabel || formatPriceLabel(item.unitPrice ?? item.price ?? item.totalPrice ?? item.value)).slice(0, 12);
+    return { type, count, label, priceLabel };
+  }
+
+  function normalizeObjectType(value, index) {
+    const text = cleanText(value).toLowerCase();
+    if (["pen", "钢笔", "笔"].includes(text)) return "pen";
+    if (["pencil", "铅笔"].includes(text)) return "pencil";
+    if (["book", "notebook", "练习本", "笔记本", "本子"].includes(text)) return "notebook";
+    if (["ruler", "尺子"].includes(text)) return "ruler";
+    if (["eraser", "橡皮"].includes(text)) return "eraser";
+    return index % 2 ? "pen" : "notebook";
+  }
+
+  function defaultObjectLabel(type) {
+    const labels = {
+      pen: "钢笔",
+      pencil: "铅笔",
+      notebook: "笔记本",
+      ruler: "尺子",
+      eraser: "橡皮"
+    };
+    return labels[type] || "物品";
+  }
+
+  function formatPriceLabel(value) {
+    const text = cleanText(value);
+    if (!text) return "";
+    if (/[元角分页朵个本支]/.test(text)) return text;
+    return `${text}元`;
+  }
+
+  function normalizeShareVisualData(data) {
+    const total = clampInt(data.total ?? data.whole ?? 24, 1, 999);
+    const done = clampInt(data.done ?? data.used ?? data.completed ?? 8, 0, total);
+    const remain = clampInt(data.remain ?? data.left ?? (total - done), 0, total);
+    const groups = clampInt(data.groups ?? data.people ?? data.parts ?? 4, 1, 6);
+    const each = cleanText(data.each ?? data.perGroup ?? (groups ? trimNumber(remain / groups) : remain)).slice(0, 12);
+    return {
+      kind: "share",
+      title: cleanText(data.title) || "图解：总量 - 已知部分，再平均分",
+      total,
+      done,
+      remain,
+      groups,
+      each,
+      unitLabel: cleanText(data.unitLabel || data.unit || "份").slice(0, 4),
+      expression: cleanText(data.expression || data.formula || `(${total}-${done})÷${groups}`).slice(0, 32),
+      caption: cleanText(data.caption || data.note || `先求剩余 ${total}-${done}=${remain}，再平均分成 ${groups} 份。`).slice(0, 70)
+    };
+  }
+
+  function normalizeQuantityVisualData(data) {
+    const rawBars = Array.isArray(data.bars) ? data.bars : [];
+    const bars = rawBars
+      .map((bar, index) => ({
+        label: cleanText(bar?.label || bar?.name || `部分${index + 1}`).slice(0, 12),
+        valueLabel: cleanText(bar?.valueLabel || bar?.value || bar?.result || (index ? "总量" : "?")).slice(0, 12),
+        width: clampInt(bar?.width ?? bar?.percent ?? (index ? 38 : 62), 18, 100)
+      }))
+      .filter((bar) => bar.label)
+      .slice(0, 4);
+    const safeBars = bars.length ? bars : [
+      { label: "已知部分", valueLabel: "?", width: 62 },
+      { label: "剩余部分", valueLabel: "总量", width: 38 }
+    ];
+    return {
+      kind: "quantity",
+      title: cleanText(data.title) || "图解：用线段表示数量关系",
+      bars: safeBars,
+      caption: cleanText(data.caption || data.note || "把文字条件先变成“部分 + 部分 = 总量”。").slice(0, 70)
+    };
+  }
+
+  function buildDefaultSlideVisualData(unit, slideTitle = "") {
+    const text = [
+      slideTitle,
+      unit.title,
+      unit.summary,
+      ...(unit.tags || []),
+      ...(unit.points || [])
+    ].join(" ");
+    if (includesAny(text, ["平均分", "剩余", "剩下", "几分之一", "几分之几"])) {
+      return {
+        kind: "share",
+        total: 24,
+        done: 8,
+        remain: 16,
+        groups: 4,
+        each: "4",
+        unitLabel: "份",
+        expression: "(24-8)÷4",
+        caption: "先求剩余 24-8=16，再把 16 平均分成 4 份。"
+      };
+    }
+    if (includesAny(text, ["混合运算", "单价", "总价", "价格", "文具", "买了", "花了"])) {
+      return {
+        kind: "stationery",
+        title: "图解：3 个笔记本 + 1 支钢笔",
+        items: [
+          { type: "notebook", label: "笔记本", count: 3, priceLabel: "6元" },
+          { type: "pen", label: "钢笔", count: 1, priceLabel: "15元" }
+        ],
+        expression: "3×6+15",
+        caption: "先看 3 个同价笔记本，再把钢笔价格合进去。"
+      };
+    }
+    if (includesAny(text, ["线段图", "表格", "数量关系", "单位 1"])) {
+      return {
+        kind: "quantity",
+        bars: [
+          { label: "已知部分", valueLabel: "?", width: 62 },
+          { label: "剩余部分", valueLabel: "总量", width: 38 }
+        ],
+        caption: "把文字条件先变成“部分 + 部分 = 总量”。"
+      };
+    }
+    return null;
   }
 
   function renderCourseware() {
@@ -882,6 +1172,7 @@
         body: "从生活问题进入数学表达，让学生先观察、再表达、再列式。",
         bullets: [`用熟悉情境引出 ${unit.tags[0] || "核心概念"}`, "让学生说出已知条件和问题", "鼓励用图、表、式三种方式表达"],
         visualType: "scenario",
+        visualData: buildDefaultSlideVisualData(unit, "情境导入"),
         sources
       },
       {
@@ -896,6 +1187,7 @@
         body: "用一道典型题示范审题、建模、计算和检查。",
         bullets: ["先圈关键词", "再确定数量关系", "最后用估算或逆运算检查"],
         visualType: "scenario",
+        visualData: buildDefaultSlideVisualData(unit, "例题精讲"),
         sources
       },
       {
@@ -965,6 +1257,7 @@
       body: review[index]?.body || slide.body,
       bullets: Array.isArray(review[index]?.bullets) && review[index].bullets.length ? review[index].bullets : slide.bullets,
       visualType: review[index]?.visualType || slide.visualType,
+      visualData: review[index]?.visualData || slide.visualData,
       sources: Array.isArray(review[index]?.sources) && review[index].sources.length ? review[index].sources : slide.sources
     }));
   }
@@ -996,6 +1289,7 @@
           .map((item) => cleanEditableText(item.innerText))
           .filter(Boolean),
         visualType: existingSlide.visualType || "concept",
+        visualData: existingSlide.visualData,
         sources: existingSlide.sources || getSourceRefs(unit)
       };
     });
@@ -1145,6 +1439,11 @@
   }
 
   function renderScenarioVisual(slide, unit, size) {
+    const visualData = normalizeSlideVisualData(slide.visualData, null, unit);
+    if (visualData?.kind === "stationery") return renderStationeryScenario(size, visualData);
+    if (visualData?.kind === "share") return renderCraftShareScenario(size, visualData);
+    if (visualData?.kind === "quantity") return renderQuantityBarScenario(size, visualData);
+
     const scenarioText = [
       slide.title,
       slide.body,
@@ -1156,65 +1455,77 @@
     ].join(" ");
 
     if (includesAny(scenarioText, ["文具", "笔记本", "钢笔", "单价", "总价", "买了", "花了", "元"])) {
-      return renderStationeryScenario(size);
+      return renderStationeryScenario(size, buildDefaultSlideVisualData(unit, "混合运算"));
     }
 
     if (includesAny(scenarioText, ["纸花", "做花", "已经做", "剩下", "剩余", "平均分", "每人"])) {
-      return renderCraftShareScenario(size);
+      return renderCraftShareScenario(size, { kind: "share" });
     }
 
     if (includesAny(scenarioText, ["线段图", "表格", "数量关系", "单位 1"])) {
-      return renderQuantityBarScenario(size);
+      return renderQuantityBarScenario(size, { kind: "quantity" });
     }
 
     return renderTopicVisual(unit, size);
   }
 
-  function renderStationeryScenario(size) {
+  function renderStationeryScenario(size, visualData) {
+    const data = normalizeStationeryVisualData(visualData) || normalizeStationeryVisualData(buildDefaultSlideVisualData(unitData(), "混合运算"));
+    const expression = data.expression || data.items.map((item) => item.priceLabel || item.label).join("+");
     return `
       <div class="scenario-visual stationery-scenario ${size}">
-        <strong class="visual-title">图解：3 个笔记本 + 1 支钢笔</strong>
-        <div class="object-equation" aria-label="3 个笔记本，每个 6 元，加 1 支钢笔 15 元">
-          <div class="object-group">
-            ${Array.from({ length: 3 }, (_, index) => `<span class="notebook" style="--i:${index}"><i></i><b>6元</b></span>`).join("")}
-          </div>
-          <span class="math-mark">+</span>
-          <span class="pen-object"><i></i><b>15元</b></span>
+        <strong class="visual-title">${escapeHtml(data.title)}</strong>
+        <div class="object-equation" aria-label="${escapeAttribute(data.title)}">
+          ${data.items.map((item, itemIndex) => `
+            <div class="object-group" aria-label="${escapeAttribute(`${item.count} 个${item.label}`)}">
+              ${Array.from({ length: item.count }, (_, objectIndex) => renderScenarioObject(item, itemIndex + objectIndex)).join("")}
+            </div>
+          `).join('<span class="math-mark">+</span>')}
           <span class="math-mark">=</span>
-          <span class="total-badge">3×6+15</span>
+          <span class="total-badge">${escapeHtml(expression)}</span>
         </div>
-        <small class="visual-caption">先看“3 个同价笔记本”，再把钢笔价格合进去。</small>
+        <small class="visual-caption">${escapeHtml(data.caption || "先看相同物品的数量关系，再合并其他条件。")}</small>
       </div>
     `;
   }
 
-  function renderCraftShareScenario(size) {
+  function renderScenarioObject(item, index) {
+    if (item.type === "pen" || item.type === "pencil") {
+      return `<span class="pen-object" style="--i:${index}"><i></i><b>${escapeHtml(item.priceLabel || item.label)}</b></span>`;
+    }
+    return `<span class="notebook object-${escapeAttribute(item.type)}" style="--i:${index}"><i></i><b>${escapeHtml(item.priceLabel || item.label)}</b></span>`;
+  }
+
+  function renderCraftShareScenario(size, visualData) {
+    const data = normalizeShareVisualData(visualData || {});
+    const doneWidth = data.total ? clampInt((data.done / data.total) * 100, 8, 92) : 33;
+    const remainWidth = clampInt(100 - doneWidth, 8, 92);
     return `
       <div class="scenario-visual craft-scenario ${size}">
-        <strong class="visual-title">图解：总量 - 已做，再平均分</strong>
-        <div class="craft-bars" aria-label="24 朵纸花，已做 8 朵，剩下 16 朵平均分给 4 人">
+        <strong class="visual-title">${escapeHtml(data.title)}</strong>
+        <div class="craft-bars" aria-label="${escapeAttribute(data.title)}">
           <div class="total-strip">
-            <span class="done" style="--w:33%">已做 8</span>
-            <span class="remain" style="--w:67%">剩余 16</span>
+            <span class="done" style="--w:${doneWidth}%">已知 ${escapeHtml(data.done)}</span>
+            <span class="remain" style="--w:${remainWidth}%">剩余 ${escapeHtml(data.remain)}</span>
           </div>
-          <div class="share-row">
-            ${Array.from({ length: 4 }, (_, index) => `<span style="--i:${index}"><i></i><b>4朵</b></span>`).join("")}
+          <div class="share-row" style="grid-template-columns: repeat(${data.groups}, minmax(0, 1fr));">
+            ${Array.from({ length: data.groups }, (_, index) => `<span style="--i:${index}"><i></i><b>${escapeHtml(data.each)}${escapeHtml(data.unitLabel)}</b></span>`).join("")}
           </div>
         </div>
-        <small class="visual-caption">先求剩余 24-8=16，再把 16 平均分成 4 份。</small>
+        <small class="visual-caption">${escapeHtml(data.caption)}</small>
       </div>
     `;
   }
 
-  function renderQuantityBarScenario(size) {
+  function renderQuantityBarScenario(size, visualData) {
+    const data = normalizeQuantityVisualData(visualData || {});
     return `
       <div class="scenario-visual quantity-scenario ${size}">
-        <strong class="visual-title">图解：用线段表示数量关系</strong>
+        <strong class="visual-title">${escapeHtml(data.title)}</strong>
         <div class="quantity-bars">
-          <div><span style="--w:62%">已知部分</span><em>?</em></div>
-          <div><span style="--w:38%">剩余部分</span><em>总量</em></div>
+          ${data.bars.map((bar) => `<div><span style="--w:${bar.width}%">${escapeHtml(bar.label)}</span><em>${escapeHtml(bar.valueLabel)}</em></div>`).join("")}
         </div>
-        <small class="visual-caption">把文字条件先变成“部分 + 部分 = 总量”。</small>
+        <small class="visual-caption">${escapeHtml(data.caption)}</small>
       </div>
     `;
   }
@@ -1928,6 +2239,12 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function clampInt(value, min, max) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return min;
+    return Math.round(clamp(number, min, max));
+  }
+
   function exportLocalData() {
     if (!requireTeacherMode("导出本地数据备份")) return;
     downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
@@ -1944,11 +2261,13 @@
       state.mistakes = Array.isArray(data.mistakes) ? data.mistakes : [];
       state.scoreHistory = Array.isArray(data.scoreHistory) ? data.scoreHistory : [];
       state.coursewareReviews = data.coursewareReviews && typeof data.coursewareReviews === "object" ? data.coursewareReviews : {};
+      state.generationCache = data.generationCache && typeof data.generationCache === "object" ? data.generationCache : {};
       state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10, mistakeRatio: 40 };
       state.roleMode = data.roleMode === "student" ? "student" : "teacher";
       writeJson(mistakeKey, state.mistakes);
       writeJson(scoreHistoryKey, state.scoreHistory);
       writeJson(coursewareReviewKey, state.coursewareReviews);
+      writeJson(generationCacheKey, state.generationCache);
       writeJson(scheduleKey, state.schedule);
       storage.setString(roleModeKey, state.roleMode);
       restoreScheduleControls();
@@ -1971,6 +2290,7 @@
     state.mistakes = [];
     state.scoreHistory = [];
     state.coursewareReviews = {};
+    state.generationCache = {};
     state.schedule = { frequency: "每周", count: 10, mistakeRatio: 40 };
     state.roleMode = "teacher";
     restoreScheduleControls();
@@ -1985,6 +2305,7 @@
       mistakes: state.mistakes,
       scoreHistory: state.scoreHistory,
       coursewareReviews: state.coursewareReviews,
+      generationCache: state.generationCache,
       schedule: state.schedule,
       roleMode: state.roleMode
     }, {
@@ -2135,7 +2456,9 @@
       const unit = unitData();
       const questions = normalizeImportedQuestions(rawQuestions, unit);
       const prepared = prepareQuestionsForPaper(questions, unit, capQuestionCount(questions.length));
-      if (!prepared.questions.length) throw new Error("导入题目未通过当前单元知识点边界校验。");
+      if (!isPreparedPaperComplete(prepared, unit, capQuestionCount(questions.length))) {
+        throw new Error(formatPaperValidationError(prepared, unit, capQuestionCount(questions.length)));
+      }
       state.currentQuestions = prepared.questions;
       state.answersVisible = false;
       seedAnswerInputsWithTemplate();

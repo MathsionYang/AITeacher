@@ -1333,6 +1333,8 @@ body[data-role-mode="student"] .teacher-only {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  row-gap: 22px;
+  flex-wrap: wrap;
 }
 
 .object-group {
@@ -1384,7 +1386,7 @@ body[data-role-mode="student"] .teacher-only {
   transform: rotate(18deg);
   box-shadow: 0 6px 12px rgba(249, 115, 22, 0.18);
   animation: lift-in 560ms ease both;
-  animation-delay: 240ms;
+  animation-delay: calc(var(--i, 0) * 80ms);
 }
 
 .pen-object i {

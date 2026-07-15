@@ -92,7 +92,9 @@
       "情境导入和例题精讲页优先使用可图解的生活情境，例如物品数量、单价总价、已完成/剩余/平均分，并用少量文字说明图中关系。",
       "保持页数、标题顺序和 visualType 稳定，优先沿用 fallbackSlides 的结构。",
       "visualType 可用 goals、scenario、concept、practice、summary；情境导入和例题精讲优先用 scenario。",
-      "返回 JSON 对象：{ \"slides\": [{ \"title\": string, \"body\": string, \"bullets\": string[], \"visualType\": string }] }。"
+      "scenario 页可返回 visualData，但只能使用结构化数据，不能返回 HTML、SVG、图片链接或教材原图。",
+      "visualData.kind 可用 stationery、share、quantity：stationery.items 写 type/label/count/priceLabel/expression；share 写 total/done/remain/groups/each/unitLabel/expression；quantity.bars 写 label/valueLabel/width。",
+      "返回 JSON 对象：{ \"slides\": [{ \"title\": string, \"body\": string, \"bullets\": string[], \"visualType\": string, \"visualData\": object|null }] }。"
     ].join("\n");
   }
 
