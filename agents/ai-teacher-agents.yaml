@@ -23,6 +23,18 @@ agents:
       - "检查疑似教材原文、课本图片、教材原题或未经授权题库痕迹"
     output: "editable_courseware_json"
 
+  tutor_courseware_agent:
+    role: "AI 导学课件 Agent"
+    model_tasks:
+      - "把当前知识点课件重制为短讲解、互动追问、即时检测和反馈复盘"
+      - "根据已有 visualData 组织一对一导学提示，不重新创造教材事实来源"
+    rule_tasks:
+      - "输入只能是已生成、已导入或已审核的知识点课件"
+      - "保留页数、visualType、visualData、来源和审核流"
+      - "禁止绕过当前课件读取网络教材、复制教材原文、教材插图或商业题库"
+      - "输出 tutorMoves 供页面展示、授课全屏和 Markdown/JSON 导出"
+    output: "editable_tutor_courseware_json"
+
   question_agent:
     role: "出题 Agent"
     model_tasks:

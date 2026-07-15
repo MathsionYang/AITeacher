@@ -31,6 +31,7 @@ assert.ok(indexSource.includes("id=\"questionCount\" type=\"number\" min=\"10\" 
 assert.ok(indexSource.includes("id=\"scheduledCount\" type=\"number\" min=\"10\" max=\"10\" value=\"10\" disabled"));
 assert.ok(indexSource.includes("id=\"coursewareMoreMenu\""));
 assert.ok(indexSource.includes("id=\"presentCoursewareBtn\""));
+assert.ok(indexSource.includes("id=\"remakeTutorCoursewareBtn\""));
 assert.ok(indexSource.includes("id=\"aiPptPlanBtn\""));
 assert.ok(indexSource.includes("id=\"exportPptxBtn\""));
 assert.ok(indexSource.includes("pptx-exporter.js"));
@@ -48,12 +49,17 @@ assert.ok(stylesSource.includes(".courseware-presentation"));
 assert.ok(stylesSource.includes(".presentation-slide"));
 assert.ok(appSource.includes("function exportCoursewarePptx"));
 assert.ok(appSource.includes("function generateAiPptPlan"));
+assert.ok(appSource.includes("function remakeTutorCourseware"));
+assert.ok(appSource.includes("function buildTutorCoursewareSlides"));
+assert.ok(appSource.includes("function renderTutorMoves"));
 assert.ok(appSource.includes("function startCoursewarePresentation"));
 assert.ok(appSource.includes("handleCoursewarePresentationKeydown"));
 assert.ok(appSource.includes("requestFullscreen"));
 assert.ok(appSource.includes("pptPlans"));
 assert.ok(agentSource.includes("generatePptPlanStream"));
 assert.ok(agentSource.includes("PPT 制作 Agent"));
+assert.ok(agentSource.includes("AI 导学课件 Agent"));
+assert.ok(agentSource.includes("tutor_courseware_agent"));
 assert.equal(agentSource.includes("直接生成 PPTX"), true);
 assert.ok(pptxExporter.createPptxPackage);
 const samplePlan = pptxExporter.buildPptPlan({

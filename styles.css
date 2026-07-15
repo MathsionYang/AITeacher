@@ -651,6 +651,34 @@ body[data-role-mode="student"] .teacher-only {
   text-decoration: underline;
 }
 
+.tutor-moves {
+  border: 1px solid #d8e4ef;
+  background: #f8fbff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+
+.tutor-moves strong {
+  display: block;
+  color: #17406b;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.tutor-moves ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.presentation-tutor-moves {
+  background: rgba(248, 251, 255, 0.92);
+  margin-top: 18px;
+}
+
 .slide-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

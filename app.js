@@ -398,6 +398,7 @@
     $("aiCoursewareBtn").addEventListener("click", generateAiCourseware);
     $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
     $("presentCoursewareBtn").addEventListener("click", startCoursewarePresentation);
+    $("remakeTutorCoursewareBtn").addEventListener("click", remakeTutorCourseware);
     $("aiPptPlanBtn").addEventListener("click", generateAiPptPlan);
     $("exportPptxBtn").addEventListener("click", exportCoursewarePptx);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
@@ -619,6 +620,64 @@
     renderCourseware();
   }
 
+  async function remakeTutorCourseware() {
+    if (!requireTeacherMode("AI 导学重制")) return;
+    await runWithModelStatus("remakeTutorCoursewareBtn", "重制中...", async () => {
+      const unit = unitData();
+      const sourceSlides = buildCoursewareSlides(unit);
+      if (!sourceSlides.length) throw new Error("当前还没有知识点课件，请先 AI 生成或导入历史课件。");
+
+      const fallbackSlides = buildTutorCoursewareSlides(sourceSlides, unit);
+      const runtimeConfig = collectModelRuntimeConfig();
+      const generator = agentOrchestrator?.generateTutorCoursewareStream || agentOrchestrator?.generateTutorCourseware;
+      let slides = fallbackSlides;
+      let statusMessage = `已用本地导学模板重制 ${slides.length} 页课件，可继续审核编辑。`;
+      let statusTone = "warn";
+      let receivedChars = 0;
+
+      switchTab("courseware");
+      state.coursewareGenerating = true;
+      state.coursewareEditMode = false;
+      setGenerationProgress("courseware", "正在把当前知识点课件重制成互动导学稿，完成后统一展示。");
+      renderCourseware();
+
+      try {
+        if (generator && runtimeConfig.model) {
+          try {
+            const result = await generator(
+              runtimeConfig,
+              buildAgentScope(unit),
+              sourceSlides,
+              fallbackSlides,
+              (token) => {
+                receivedChars += String(token || "").length;
+                setGenerationProgress("courseware", `导学课件 Agent 已接收 ${receivedChars} 字内容，正在整理互动提问与反馈。`);
+              }
+            );
+            slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
+            statusMessage = `AI 导学课件已重制 ${slides.length} 页，并进入可审核稿。`;
+            statusTone = "ok";
+          } catch (error) {
+            statusMessage = `模型重制失败，已使用本地导学模板完成 ${slides.length} 页：${error.message || "未知错误"}`;
+            statusTone = "warn";
+          }
+        } else {
+          statusMessage = `未检测到可用模型配置，已使用本地导学模板重制 ${slides.length} 页课件。`;
+        }
+
+        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: statusTone === "ok" ? "tutor-agent" : "tutor-template" });
+        clearPptPlanForUnit(unit);
+        writeJson(coursewareReviewKey, state.coursewareReviews);
+        setModelStatus(statusMessage, statusTone);
+      } finally {
+        state.coursewareGenerating = false;
+        hideGenerationProgress("courseware");
+        renderCourseware();
+      }
+    });
+    renderCourseware();
+  }
+
   async function generateAiQuestions() {
     if (!requireTeacherMode("AI 生成练习")) return;
     await runWithModelStatus("aiQuestionsBtn", "出题中...", async () => {
@@ -819,12 +878,16 @@
       const candidate = Array.isArray(slides) ? slides[index] || {} : {};
       const visualType = allowedVisuals.has(candidate.visualType) ? candidate.visualType : fallbackSlide.visualType;
       const visualData = normalizeSlideVisualData(candidate.visualData, fallbackSlide.visualData, unit);
+      const tutorMoves = uniqueTextList(candidate.tutorMoves || candidate.interactions || candidate.interactionPrompts || fallbackSlide.tutorMoves || [], 4);
+      const lessonMode = cleanText(candidate.lessonMode || fallbackSlide.lessonMode);
       return {
         title: cleanText(candidate.title) || fallbackSlide.title,
         body: cleanText(candidate.body) || fallbackSlide.body,
         bullets: cleanTextList(candidate.bullets).length ? cleanTextList(candidate.bullets).slice(0, 5) : fallbackSlide.bullets,
         visualType,
         ...(visualData ? { visualData } : {}),
+        ...(lessonMode ? { lessonMode } : {}),
+        ...(tutorMoves.length ? { tutorMoves } : {}),
         sources: sourceRefs
       };
     });
@@ -991,6 +1054,18 @@
   function cleanTextList(value) {
     if (!Array.isArray(value)) return [];
     return value.map(cleanText).filter(Boolean);
+  }
+
+  function uniqueTextList(value, limit = 5) {
+    const seen = new Set();
+    return cleanTextList(value)
+      .filter((item) => {
+        const key = item.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, limit);
   }
 
   function normalizeSlideVisualData(value, fallback, unit) {
@@ -1205,6 +1280,7 @@
             <h4 data-edit="title" contenteditable="${state.coursewareEditMode}">${index + 1}. ${escapeHtml(slide.title)}</h4>
             <p data-edit="body" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.body)}</p>
             <ul>${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}</ul>
+            ${renderTutorMoves(slide)}
             <div class="source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</div>
           </article>
         `
@@ -1331,6 +1407,7 @@
             <h2>${index + 1}. ${escapeHtml(slide.title)}</h2>
             <p>${escapeHtml(slide.body)}</p>
             <ul>${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+            ${renderTutorMoves(slide, "presentation")}
           </section>
         </main>
         <footer class="presentation-footer">
@@ -1355,9 +1432,10 @@
 
   function updateCoursewareButtons(hasSlides) {
     $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
+    $("remakeTutorCoursewareBtn").textContent = state.coursewareGenerating ? "重制中..." : "AI 导学重制";
     $("aiPptPlanBtn").textContent = state.pptPlanGenerating ? "制作中..." : "AI 制作 PPT";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
-    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn", "presentCoursewareBtn"].forEach((id) => {
+    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "remakeTutorCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn", "presentCoursewareBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.coursewareGenerating || state.pptPlanGenerating || !hasSlides;
     });
@@ -1425,6 +1503,64 @@
         sources
       }
     ];
+  }
+
+  function buildTutorCoursewareSlides(sourceSlides, unit) {
+    const sourceRefs = getSourceRefs(unit);
+    const safeSlides = sourceSlides.length ? sourceSlides : buildBaseCoursewareSlides(unit);
+    const frames = [
+      {
+        title: "导学目标",
+        body: "把本节知识点先变成学生能回答的问题，再进入讲解。",
+        moves: (point) => [`先问：看到“${point}”，你觉得今天要解决什么问题？`, "追问：这个知识点通常会用图、表还是算式表达？", "反馈：能说出目标即可，不急着计算。"]
+      },
+      {
+        title: "情境观察",
+        body: "先观察图形中的数量和关系，让学生用自己的话复述条件。",
+        moves: () => ["先问：图中哪些数量已经知道？", "追问：要求的问题和哪些数量直接相关？", "反馈：条件说不完整时，回到图形逐个指认。"]
+      },
+      {
+        title: "概念拆解",
+        body: "把概念拆成可观察、可操作、可验证的三个小步骤。",
+        moves: (point) => [`先问：${point} 的第一步应该先看什么？`, "追问：如果顺序换了，结果会不会变？", "反馈：让学生把步骤和图形上的位置对应起来。"]
+      },
+      {
+        title: "例题对话",
+        body: "用一题示范审题、建模、计算和检查，让学生参与每一步判断。",
+        moves: () => ["先问：这一步为什么先算它？", "追问：能不能用另一种图或表检查？", "反馈：只给结果时，提醒补上数量关系。"]
+      },
+      {
+        title: "即时小测",
+        body: "用少量标准答案题确认是否会迁移，不增加跨单元内容。",
+        moves: (point) => [`先问：换一个数，你还能用 ${point} 解决吗？`, "追问：答案格式应该写成什么样？", "反馈：错在审题、顺序或计算时分别提示。"]
+      },
+      {
+        title: "复盘反馈",
+        body: "把本节学习收束为方法、易错点和下一次练习方向。",
+        moves: () => ["先问：今天最容易错的是哪一步？", "追问：下次遇到同类题先画什么？", "反馈：把错因写入错题库，下一次先复习薄弱点。"]
+      }
+    ];
+
+    return safeSlides.map((slide, index) => {
+      const frame = frames[index] || frames[frames.length - 1];
+      const point = unit.points[index % Math.max(unit.points.length, 1)] || unit.title;
+      const visualData = slide.visualData || (["scenario", "example", "context"].includes(slide.visualType) ? buildDefaultSlideVisualData(unit, slide.title) : null);
+      return {
+        title: frame.title,
+        body: `${frame.body} 输入依据：原课件“${cleanText(slide.title)}”。`,
+        bullets: uniqueTextList([
+          `围绕知识点：${point}`,
+          slide.body,
+          ...(slide.bullets || []).slice(0, 2),
+          "教师可审核修改后再发布。"
+        ], 5),
+        visualType: slide.visualType || "concept",
+        ...(visualData ? { visualData } : {}),
+        lessonMode: "tutor",
+        tutorMoves: uniqueTextList(frame.moves(point, slide), 4),
+        sources: Array.isArray(slide.sources) && slide.sources.length ? slide.sources : sourceRefs
+      };
+    });
   }
 
   function padPoints(points) {
@@ -1537,6 +1673,8 @@
       bullets: Array.isArray(review[index]?.bullets) && review[index].bullets.length ? review[index].bullets : slide.bullets,
       visualType: review[index]?.visualType || slide.visualType,
       visualData: review[index]?.visualData || slide.visualData,
+      lessonMode: review[index]?.lessonMode || slide.lessonMode,
+      tutorMoves: Array.isArray(review[index]?.tutorMoves) && review[index].tutorMoves.length ? review[index].tutorMoves : slide.tutorMoves,
       sources: Array.isArray(review[index]?.sources) && review[index].sources.length ? review[index].sources : slide.sources
     }));
   }
@@ -1569,6 +1707,8 @@
           .filter(Boolean),
         visualType: existingSlide.visualType || "concept",
         visualData: existingSlide.visualData,
+        lessonMode: existingSlide.lessonMode,
+        tutorMoves: existingSlide.tutorMoves,
         sources: existingSlide.sources || getSourceRefs(unit)
       };
     });
@@ -1663,6 +1803,17 @@
       <div class="summary-cycle">
         <strong class="visual-title">复习闭环</strong>
         <span>学</span><span>练</span><span>批</span><span>复</span>
+      </div>
+    `;
+  }
+
+  function renderTutorMoves(slide, variant = "card") {
+    const moves = uniqueTextList(slide.tutorMoves || [], 4);
+    if (!moves.length) return "";
+    return `
+      <div class="tutor-moves ${variant === "presentation" ? "presentation-tutor-moves" : ""}">
+        <strong>导学互动</strong>
+        <ol>${moves.map((move) => `<li>${escapeHtml(move)}</li>`).join("")}</ol>
       </div>
     `;
   }
@@ -2808,6 +2959,10 @@
     slides.forEach((slide, index) => {
       lines.push(`## ${index + 1}. ${slide.title}`, "", slide.body, "");
       slide.bullets.forEach((item) => lines.push(`- ${item}`));
+      if (slide.tutorMoves?.length) {
+        lines.push("", "导学互动：");
+        slide.tutorMoves.forEach((item) => lines.push(`- ${item}`));
+      }
       lines.push("", `来源：${sourceNames(slide.sources)}`);
       lines.push("");
     });

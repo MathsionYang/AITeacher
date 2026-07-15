@@ -38,6 +38,35 @@
       };
     }
 
+    async function generateTutorCourseware(runtimeConfig, scope, sourceSlides, fallbackSlides) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const payload = await modelClient.generateJson(runtimeConfig, [
+        { role: "system", content: buildTutorCoursewareSystemPrompt() },
+        { role: "user", content: JSON.stringify({ scope, sourceSlides, fallbackSlides }) }
+      ]);
+      return {
+        source: "llm",
+        agent: "tutor_courseware_agent",
+        slides: Array.isArray(payload?.slides) ? payload.slides : []
+      };
+    }
+
+    async function generateTutorCoursewareStream(runtimeConfig, scope, sourceSlides, fallbackSlides, onToken) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const generate = modelClient.generateJsonStream || modelClient.generateJson;
+      const payload = await generate(runtimeConfig, [
+        { role: "system", content: buildTutorCoursewareSystemPrompt() },
+        { role: "user", content: JSON.stringify({ scope, sourceSlides, fallbackSlides }) }
+      ], {}, onToken);
+      return {
+        source: "llm",
+        agent: "tutor_courseware_agent",
+        slides: Array.isArray(payload?.slides) ? payload.slides : []
+      };
+    }
+
     async function generateQuestions(runtimeConfig, scope) {
       ensureModelClient();
       ensureRuntime(runtimeConfig);
@@ -105,6 +134,8 @@
       generateCoursewareStream,
       generatePptPlan,
       generatePptPlanStream,
+      generateTutorCourseware,
+      generateTutorCoursewareStream,
       generateQuestions,
       generateQuestionsStream,
       testConnection
@@ -126,6 +157,19 @@
       "scenario 页可返回 visualData，但只能使用结构化数据，不能返回 HTML、SVG、图片链接或教材原图。",
       "visualData.kind 可用 stationery、share、quantity：stationery.items 写 type/label/count/priceLabel/expression；share 写 total/done/remain/groups/each/unitLabel/expression；quantity.bars 写 label/valueLabel/width。",
       "返回 JSON 对象：{ \"slides\": [{ \"title\": string, \"body\": string, \"bullets\": string[], \"visualType\": string, \"visualData\": object|null }] }。"
+    ].join("\n");
+  }
+
+  function buildTutorCoursewareSystemPrompt() {
+    return [
+      "你是 AI 导学课件 Agent，参考 AI-Shifu 的课程创作思路：把专业知识和教案转成个性化讲解、互动追问、即时测评和反馈闭环。",
+      "输入 sourceSlides 是已生成或已审核的知识点课件；你只能把它重制为导学课，不能直接编教材内容，不能复制教材原文、教材例题、教材插图或商业题库。",
+      "必须保留 fallbackSlides 的页数、顺序、visualType 和 visualData 结构，必要时只做轻微整理。",
+      "每页必须包含短讲解、学生可回答的问题、追问、答错提示或即时检测；把互动动作写入 tutorMoves。",
+      "每页 title 不超过 16 字，body 不超过 70 字，bullets 不超过 5 条且每条不超过 32 字，tutorMoves 不超过 4 条且每条不超过 42 字。",
+      "图形化必须服务理解知识点、数量关系、步骤顺序或错因；不要生成 HTML、SVG、图片链接或教材原图。",
+      "输出 schema 必须与课件一致，并额外支持 lessonMode 和 tutorMoves。",
+      "返回 JSON 对象：{ \"slides\": [{ \"title\": string, \"body\": string, \"bullets\": string[], \"visualType\": string, \"visualData\": object|null, \"lessonMode\": \"tutor\", \"tutorMoves\": string[] }] }。"
     ].join("\n");
   }
 
