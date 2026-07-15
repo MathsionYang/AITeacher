@@ -337,17 +337,13 @@
 
         <div class="intro-copy">
           <h2>先开放教师工作台</h2>
-          <p>教师可管理班级、切换年级册别、生成导学课件和同步练习。学生端入口先保留，待后端账号体系接入后开放。</p>
+          <p>教师可设置年级册别、生成导学课件、同步练习和周期测验。当前 MVP 只做教师端，后续如需在线作答再由 Go/Java 后端接入账号体系。</p>
         </div>
 
         <div class="role-preview">
           <article>
             <strong>教师端</strong>
             <span>已开放</span>
-          </article>
-          <article>
-            <strong>学生端</strong>
-            <span>预留中</span>
           </article>
         </div>
       </section>
@@ -357,23 +353,6 @@
           <div>
             <h2>登录</h2>
             <p class="hint">本地 MVP 默认教师账号为 <strong>teacher</strong>，密码为 <strong>teacher123</strong>。正式版本将由 Go/Java 后端接管账号、会话和权限。</p>
-          </div>
-
-          <div class="role-selector" aria-label="选择登录角色">
-            <label class="role-option">
-              <input type="radio" name="roleMode" value="teacher" checked />
-              <span class="role-button">
-                <strong>教师登录</strong>
-                <span>进入课件、出题、班级管理和审核工作台</span>
-              </span>
-            </label>
-            <label class="role-option">
-              <input type="radio" name="roleMode" value="student" />
-              <span class="role-button">
-                <strong>学生登录</strong>
-                <span>按钮保留，当前版本暂未开放</span>
-              </span>
-            </label>
           </div>
 
           <div class="field">
@@ -409,14 +388,9 @@
 
       loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const roleMode = document.querySelector("input[name='roleMode']:checked").value;
+        const roleMode = "teacher";
         const username = document.getElementById("username").value.trim();
         const password = document.getElementById("password").value;
-
-        if (roleMode === "student") {
-          setStatus("学生端暂未开放", "当前 MVP 先实现教师端。学生账号、练习记录和个人学情会在 Go/Java 后端接入后开放。", "warn");
-          return;
-        }
 
         const accounts = readJson(ACCOUNTS_KEY, []);
         const account = accounts.find((item) => item.role === "teacher" && item.username === username);
@@ -439,13 +413,6 @@
         window.setTimeout(() => {
           window.location.href = "index.html";
         }, 380);
-      });
-
-      document.querySelectorAll("input[name='roleMode']").forEach((radio) => {
-        radio.addEventListener("change", () => {
-          const isTeacher = document.querySelector("input[name='roleMode']:checked").value === "teacher";
-          document.querySelector(".submit-btn").textContent = isTeacher ? "进入教师工作台" : "学生端暂未开放";
-        });
       });
 
       function seedLocalAccounts() {

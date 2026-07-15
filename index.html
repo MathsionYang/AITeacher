@@ -12,76 +12,31 @@
         <div class="brand">
           <div class="brand-mark">AI</div>
           <div>
-            <h1>同步数学 MVP</h1>
-            <p>人教版 · 小学数学</p>
+            <h1>AI Teacher</h1>
+            <p>教师端 · 本机出题备课</p>
           </div>
         </div>
 
         <nav class="tabs sidebar-nav" aria-label="教师端导航">
-          <button class="tab-btn active" data-tab="courseware">导学课件</button>
+          <button class="tab-btn active" data-tab="courseware">课件生成</button>
           <button class="tab-btn" data-tab="practice">同步出题</button>
-          <button class="tab-btn" data-tab="mistakes">错题库</button>
-          <button class="tab-btn" data-tab="schedule">周期测验</button>
-          <button class="tab-btn" data-tab="classes">班级管理</button>
+          <button class="tab-btn" data-tab="schedule">周期测验出题</button>
           <button class="tab-btn" data-tab="settings">系统设置</button>
         </nav>
 
-        <div class="control-block">
-          <label for="subjectSelect">学科</label>
-          <select id="subjectSelect">
-            <option value="math">数学</option>
-          </select>
-        </div>
-
-        <div class="control-block">
-          <label for="gradeSelect">年级</label>
-          <select id="gradeSelect"></select>
-        </div>
-
-        <div class="control-block">
-          <label for="volumeSelect">册别</label>
-          <select id="volumeSelect"></select>
-        </div>
-
-        <div class="control-block">
-          <label for="unitSelect">单元</label>
-          <select id="unitSelect"></select>
-        </div>
-
-        <div class="control-block">
-          <label for="classSelect">当前班级</label>
-          <select id="classSelect"></select>
-        </div>
-
-        <div class="control-row">
-          <div class="control-block">
-            <label for="difficultySelect">难度</label>
-            <select id="difficultySelect">
-              <option value="基础">基础</option>
-              <option value="提高">提高</option>
-              <option value="挑战">挑战</option>
-            </select>
-          </div>
-          <div class="control-block">
-            <label for="questionCount">题量</label>
-            <input id="questionCount" type="number" min="10" max="10" value="10" disabled />
-          </div>
-        </div>
-
-        <button id="generatePaperBtn" class="primary-btn full">进入同步出题</button>
-
-        <div class="scope-card">
-          <span>当前范围</span>
+        <div class="scope-card compact-scope">
+          <span>当前设置</span>
           <strong id="scopeLabel"></strong>
           <p id="scopeSummary"></p>
+          <button class="secondary-btn small" type="button" data-tab="settings">修改设置</button>
         </div>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">MVP 原型</p>
-            <h2>学、练、批、讲、复测一体化</h2>
+            <p class="eyebrow">Teacher Workspace</p>
+            <h2>课件、同步练习和周期测验</h2>
           </div>
           <div class="topbar-side">
             <div class="teacher-session">
@@ -97,8 +52,8 @@
                 <p>当前题目</p>
               </div>
               <div>
-                <span id="mistakeMetric">0</span>
-                <p>错题记录</p>
+                <span id="coursewareMetric">0</span>
+                <p>历史课件</p>
               </div>
               <div>
                 <span id="scheduleMetric">未设置</span>
@@ -112,10 +67,10 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Courseware</p>
-              <h3>MarkdownFlow 导学课</h3>
+              <h3>课件生成</h3>
             </div>
             <div class="button-row courseware-actions">
-              <button id="aiCoursewareBtn" class="primary-btn teacher-only">AI 生成导学课件</button>
+              <button id="aiCoursewareBtn" class="primary-btn teacher-only">生成课件</button>
               <button id="toggleReviewBtn" class="secondary-btn teacher-only">审核编辑</button>
               <button id="presentCoursewareBtn" class="secondary-btn">授课全屏</button>
               <button id="exportPdfBtn" class="primary-btn teacher-only">导出 PDF</button>
@@ -129,12 +84,22 @@
                   <button id="downloadCoursewareBtn" class="menu-action">导出 Markdown</button>
                   <button id="exportCoursewareJsonBtn" class="menu-action">导出课件记录</button>
                   <button id="importCoursewareBtn" class="menu-action">导入历史课件</button>
-                  <button id="resetCoursewareBtn" class="menu-action danger">清空课件</button>
+                  <button id="resetCoursewareBtn" class="menu-action danger">清空当前课件</button>
                 </div>
               </details>
               <input id="importCoursewareFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>
+
+          <div class="module-toolbar">
+            <div class="control-block">
+              <label for="coursewareUnitSelect">选择单元</label>
+              <select id="coursewareUnitSelect"></select>
+            </div>
+            <p class="hint">先选择单元，再生成课件；已有历史课件会优先展示，可直接复用或重新生成新版本。</p>
+          </div>
+
+          <div id="coursewareHistory" class="history-list"></div>
           <div id="coursewareProgressPanel" class="generation-panel" hidden>
             <div class="progress-orbit" aria-hidden="true"></div>
             <div>
@@ -150,17 +115,39 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Practice</p>
-              <h3>同步练习</h3>
+              <h3>同步出题</h3>
             </div>
             <div class="button-row">
               <button id="aiQuestionsBtn" class="primary-btn teacher-only">AI 生成练习</button>
+              <button id="exportPracticeStudentPdfBtn" class="secondary-btn teacher-only">导出空白卷 PDF</button>
+              <button id="exportPracticeTeacherPdfBtn" class="secondary-btn teacher-only">导出含答案 PDF</button>
               <button id="exportPracticeJsonBtn" class="secondary-btn teacher-only">导出练习记录</button>
               <button id="importPracticeBtn" class="secondary-btn teacher-only">导入历史练习</button>
               <button id="showAnswerBtn" class="secondary-btn teacher-only">显示答案</button>
               <button id="copyAnswersBtn" class="secondary-btn">填入答题模板</button>
+              <button id="syncPracticeToGradingBtn" class="secondary-btn small hidden-action" type="button" hidden>内部判分校正</button>
               <input id="importPracticeFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>
+
+          <div class="module-toolbar two-col">
+            <div class="control-block">
+              <label for="practiceUnitSelect">选择单元</label>
+              <select id="practiceUnitSelect"></select>
+            </div>
+            <div class="control-block">
+              <label for="difficultySelect">出题难度</label>
+              <select id="difficultySelect">
+                <option value="基础">基础</option>
+                <option value="提高">提高</option>
+                <option value="挑战">挑战</option>
+              </select>
+            </div>
+            <input id="questionCount" class="hidden-input" type="number" min="10" max="10" value="10" disabled />
+            <p class="hint">历史出题记录按章节归档；重新出题会生成新记录，不覆盖旧记录。</p>
+          </div>
+
+          <div id="practiceHistory" class="history-list"></div>
           <div id="practiceProgressPanel" class="generation-panel" hidden>
             <div class="progress-orbit" aria-hidden="true"></div>
             <div>
@@ -173,85 +160,35 @@
           <div id="practiceAnswerPanel" class="answer-panel practice-answer-panel" hidden>
             <div class="textarea-head">
               <label for="practiceAnswerInput">直接填写答案</label>
-              <button id="syncPracticeToGradingBtn" class="secondary-btn small">进入拍照/OCR校正</button>
             </div>
             <textarea id="practiceAnswerInput" rows="8" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
             <div class="button-row answer-actions">
               <button id="gradePracticeBtn" class="primary-btn">判分并生成解析</button>
             </div>
-            <p class="hint">在这里填写答案后可直接判分，结果会同步到“拍照批改”页面。</p>
+            <p class="hint">教师可在这里快速验算答案，结果只保存在本机判分记录中。</p>
           </div>
           <div id="practiceGradingSummary" class="score-panel"></div>
           <div id="practiceResults" class="result-list"></div>
         </section>
 
-        <section id="grading" class="tab-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Grading</p>
-              <h3>拍照上传与自动判分</h3>
-            </div>
-            <button id="gradeBtn" class="primary-btn">判分并生成解析</button>
-          </div>
-
-          <div class="grading-grid">
-            <div class="upload-panel">
-              <label class="file-drop" for="answerImage">
-                <span>上传答题照片</span>
-                <small>支持本地图片预览；可调用本机 PaddleOCR</small>
-              </label>
-              <input id="answerImage" type="file" accept="image/*" />
-              <img id="answerPreview" alt="答题照片预览" />
-            </div>
-
-            <div class="answer-panel">
-              <div class="textarea-head">
-                <label for="answerInput">OCR 识别/手动校正答案</label>
-                <div class="textarea-actions">
-                  <button id="runOcrBtn" class="secondary-btn small">OCR 识别</button>
-                  <button id="simulateOcrBtn" class="secondary-btn small">模拟识别</button>
-                </div>
-              </div>
-              <textarea id="answerInput" rows="10" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
-              <p class="hint">OCR 结果会先进入人工校正与置信度面板，确认后再判分。</p>
-              <div id="ocrStatusPanel" class="ocr-status-panel" data-tone="info">
-                使用 OCR 前，请先启动本机 OCR 服务：运行 start_aiteacher_ocr.bat；未生成练习时也可先识别文本。
-              </div>
-            </div>
-          </div>
-
-          <div id="ocrReviewPanel" class="ocr-review-panel" hidden></div>
-          <div id="gradingSummary" class="score-panel"></div>
-          <div id="performanceFeedback" class="performance-feedback"></div>
-          <div id="trendPanel" class="trend-panel"></div>
-          <div id="gradingResults" class="result-list"></div>
-        </section>
-
-        <section id="mistakes" class="tab-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Mistake Book</p>
-              <h3>错题库</h3>
-            </div>
-            <div class="button-row">
-              <button id="mistakePaperBtn" class="primary-btn">随机生成错题卷</button>
-              <button id="clearMasteredBtn" class="secondary-btn">清理已掌握</button>
-            </div>
-          </div>
-          <div id="mistakeStats" class="mistake-stats"></div>
-          <div id="mistakeList" class="mistake-list empty-state"></div>
-        </section>
-
         <section id="schedule" class="tab-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">Schedule</p>
-              <h3>周期测验</h3>
+              <p class="eyebrow">Scheduled Paper</p>
+              <h3>周期测验出题</h3>
             </div>
-            <button id="scheduledPaperBtn" class="primary-btn">生成本期测验</button>
+            <div class="button-row">
+              <button id="scheduledPaperBtn" class="primary-btn">生成周期测验</button>
+              <button id="exportScheduledStudentPdfBtn" class="secondary-btn teacher-only">导出空白卷 PDF</button>
+              <button id="exportScheduledTeacherPdfBtn" class="secondary-btn teacher-only">导出含答案 PDF</button>
+            </div>
           </div>
 
-          <div class="schedule-grid">
+          <div class="module-toolbar schedule-toolbar">
+            <div class="control-block">
+              <label for="scheduleUnitSelect">选择单元</label>
+              <select id="scheduleUnitSelect"></select>
+            </div>
             <div class="control-block">
               <label for="frequencySelect">频率</label>
               <select id="frequencySelect">
@@ -264,98 +201,12 @@
               <label for="scheduledCount">测验题量</label>
               <input id="scheduledCount" type="number" min="10" max="10" value="10" disabled />
             </div>
-            <div class="control-block">
-              <label for="mistakeRatio">错题占比</label>
-              <input id="mistakeRatio" type="range" min="0" max="80" value="40" />
-              <span id="mistakeRatioLabel">40%</span>
-            </div>
             <button id="saveScheduleBtn" class="secondary-btn">保存设置</button>
           </div>
 
+          <div id="scheduleHistory" class="history-list"></div>
           <div id="scheduleStatus" class="schedule-status"></div>
           <div id="scheduledPaper" class="question-list"></div>
-        </section>
-
-        <section id="classes" class="tab-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Classroom</p>
-              <h3>班级与学生管理</h3>
-            </div>
-            <button id="applyClassScopeBtn" class="primary-btn" type="button">应用班级范围</button>
-          </div>
-
-          <div class="classroom-grid">
-            <article class="classroom-card current-class-card">
-              <p class="eyebrow">当前班级</p>
-              <h4 id="currentClassName">三年级一班</h4>
-              <div id="currentClassMeta" class="class-meta"></div>
-              <p id="currentClassSummary" class="class-summary"></p>
-            </article>
-
-            <form id="classForm" class="classroom-card class-form">
-              <div>
-                <p class="eyebrow">新增班级</p>
-                <h4>班级范围设置</h4>
-              </div>
-              <div class="form-grid">
-                <div class="control-block">
-                  <label for="classNameInput">班级名称</label>
-                  <input id="classNameInput" type="text" placeholder="例如：三年级一班" autocomplete="off" />
-                </div>
-                <div class="control-block">
-                  <label for="classGradeSelect">年级</label>
-                  <select id="classGradeSelect"></select>
-                </div>
-                <div class="control-block">
-                  <label for="classSubjectSelect">学科</label>
-                  <select id="classSubjectSelect">
-                    <option value="math">数学</option>
-                  </select>
-                </div>
-                <div class="control-block">
-                  <label for="classVolumeSelect">册别</label>
-                  <select id="classVolumeSelect"></select>
-                </div>
-              </div>
-              <button class="primary-btn" type="submit">添加班级</button>
-            </form>
-          </div>
-
-          <div class="classroom-grid management-grid">
-            <article class="classroom-card">
-              <div class="list-head">
-                <div>
-                  <p class="eyebrow">Classes</p>
-                  <h4>班级列表</h4>
-                </div>
-                <span id="classCountBadge" class="pill green">0 个班级</span>
-              </div>
-              <div id="classList" class="class-list"></div>
-            </article>
-
-            <article class="classroom-card">
-              <div class="list-head">
-                <div>
-                  <p class="eyebrow">Students</p>
-                  <h4>学生列表</h4>
-                </div>
-                <span id="studentCountBadge" class="pill blue">0 名学生</span>
-              </div>
-              <form id="studentForm" class="student-form">
-                <div class="control-block">
-                  <label for="studentNameInput">学生姓名</label>
-                  <input id="studentNameInput" type="text" placeholder="请输入学生姓名" autocomplete="off" />
-                </div>
-                <div class="control-block">
-                  <label for="studentNoInput">学号</label>
-                  <input id="studentNoInput" type="text" placeholder="可选" autocomplete="off" />
-                </div>
-                <button class="secondary-btn" type="submit">添加学生</button>
-              </form>
-              <div id="studentList" class="student-list"></div>
-            </article>
-          </div>
         </section>
 
         <section id="settings" class="tab-panel">
@@ -364,16 +215,45 @@
               <p class="eyebrow">Settings</p>
               <h3>系统设置</h3>
             </div>
+            <button id="saveSettingsBtn" class="primary-btn" type="button">保存设置</button>
           </div>
 
-          <div class="settings-grid">
+          <div class="settings-grid teacher-settings-grid">
+            <article class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <p class="eyebrow">Scope</p>
+                  <h4>教材范围</h4>
+                </div>
+                <span class="pill green">必填</span>
+              </div>
+              <div class="form-grid">
+                <div class="control-block">
+                  <label for="subjectSelect">学科</label>
+                  <select id="subjectSelect">
+                    <option value="math">数学</option>
+                  </select>
+                </div>
+                <div class="control-block">
+                  <label for="gradeSelect">年级</label>
+                  <select id="gradeSelect"></select>
+                </div>
+                <div class="control-block">
+                  <label for="volumeSelect">册别</label>
+                  <select id="volumeSelect"></select>
+                </div>
+              </div>
+              <select id="unitSelect" class="hidden-input"></select>
+              <p class="settings-note">单元不在系统设置中选择，请在课件生成、同步出题或周期测验出题页面单独选择。</p>
+            </article>
+
             <article class="settings-card teacher-only">
               <div class="settings-card-head">
                 <div>
                   <p class="eyebrow">Model</p>
-                  <h4>模型与 Agent</h4>
+                  <h4>模型设置</h4>
                 </div>
-                <span class="pill green">可选增强</span>
+                <span class="pill blue">可选增强</span>
               </div>
               <div class="form-grid">
                 <div class="control-block">
@@ -398,38 +278,29 @@
               </div>
               <p class="settings-note">推荐使用本地代理，Key 和上游 URL 保存在客户电脑，不进入页面。</p>
             </article>
-
-            <article class="settings-card teacher-only">
-              <div class="settings-card-head">
-                <div>
-                  <p class="eyebrow">Local Data</p>
-                  <h4>本地数据</h4>
-                </div>
-                <span class="pill blue">教师可见</span>
-              </div>
-              <div class="button-row">
-                <button id="exportLocalDataBtn" class="secondary-btn" type="button">导出备份</button>
-                <button id="importLocalDataBtn" class="secondary-btn" type="button">导入备份</button>
-                <button id="clearLocalDataBtn" class="secondary-btn danger" type="button">清空学习数据</button>
-                <input id="importLocalDataFile" class="hidden-input" type="file" accept="application/json,.json" />
-              </div>
-              <p class="settings-note">备份包含账号、班级、学生、课件、练习、提交、错题、成绩和 SQLite 迁移计划。</p>
-            </article>
-
-            <article class="settings-card">
-              <div class="settings-card-head">
-                <div>
-                  <p class="eyebrow">OCR</p>
-                  <h4>拍照/OCR 校正</h4>
-                </div>
-                <span class="pill orange">本机服务</span>
-              </div>
-              <p class="settings-note">真实拍照识别使用 PaddleOCR 本地代理，默认地址为 http://127.0.0.1:8790/ocr。同步出题页可进入拍照/OCR 校正页面完成识别、人工校正和判分。</p>
-              <div class="button-row">
-                <button class="secondary-btn" type="button" data-tab="grading">进入拍照/OCR校正</button>
-              </div>
-            </article>
           </div>
+        </section>
+
+        <section id="grading" class="tab-panel internal-panel" hidden>
+          <button id="gradeBtn" class="primary-btn" type="button">判分并生成解析</button>
+          <input id="answerImage" type="file" accept="image/*" />
+          <img id="answerPreview" alt="答题照片预览" />
+          <button id="runOcrBtn" class="secondary-btn small" type="button">OCR 识别</button>
+          <button id="simulateOcrBtn" class="secondary-btn small" type="button">模拟识别</button>
+          <textarea id="answerInput" rows="10"></textarea>
+          <div id="ocrStatusPanel" class="ocr-status-panel" data-tone="info"></div>
+          <div id="ocrReviewPanel" class="ocr-review-panel" hidden></div>
+          <div id="gradingSummary" class="score-panel"></div>
+          <div id="performanceFeedback" class="performance-feedback"></div>
+          <div id="trendPanel" class="trend-panel"></div>
+          <div id="gradingResults" class="result-list"></div>
+        </section>
+
+        <section id="mistakes" class="tab-panel internal-panel" hidden>
+          <button id="mistakePaperBtn" class="primary-btn" type="button">随机生成错题卷</button>
+          <button id="clearMasteredBtn" class="secondary-btn" type="button">清理已掌握</button>
+          <div id="mistakeStats" class="mistake-stats"></div>
+          <div id="mistakeList" class="mistake-list empty-state"></div>
         </section>
       </main>
     </div>

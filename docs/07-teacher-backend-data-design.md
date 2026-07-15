@@ -2,56 +2,59 @@
 
 ## 1. 当前 MVP 边界
 
-当前版本仍是本机前端原型：
+当前只做教师端：
 
-- `login.html` 提供教师/学生两个入口，但只开放教师端。
-- 教师端左侧导航固定为：导学课件、同步出题、错题库、周期测验、班级管理、系统设置。
-- 默认教师账号为 `teacher / teacher123`，会话保存在 `ai-teacher-auth-session-v1`。
-- 班级、学生、课件、练习、提交、错题和成绩先保存在 localStorage。
-- `storage-adapter.js` schema v6 已给 SQLite 和后续 Go/Java 后端预留表结构。
+- 登录页只开放教师登录。
+- 教师端只保留课件生成、同步出题、周期测验出题、系统设置。
+- 不做学生端、班级管理、学生管理。
+- 本地数据先保存在 localStorage。
+- 后续如需要服务端，优先用 Go 或 Java + SQLite/本地数据库承接。
 
-本机登录只用于 MVP 演示，不是正式安全认证。正式版本必须由后端负责密码强哈希、会话、权限、审计和未成年人数据保护。
+## 2. 本地集合
 
-## 2. 教师端功能
-
-- 登录教师工作台。
-- 设置学科、年级、册别、单元。
-- 切换当前班级，班级默认范围同步到侧栏。
-- 新增/删除班级；有学生的班级不允许直接删除。
-- 给当前班级添加/删除学生。
-- 在系统设置中配置模型与 Agent、本地数据备份/恢复/清理和拍照/OCR 校正入口。
-- 生成、审核、导入导出课件。
-- 生成、导入导出同步练习。
-- 保存课件生成记录、出题记录、判分提交记录、成绩记录和错题记录。
-
-学生端暂不开放。后续开放后，学生登录应只能访问自己的练习、提交、成绩和错题。
+```text
+accounts
+subjectScope
+modelSettings
+coursewareReviews
+pptPlans
+generationCache
+generationRecords
+schedule
+scoreHistory
+gradingSubmissions
+ocrRecords
+```
 
 ## 3. 推荐数据库表
 
 ```text
 accounts
-  id, role, username, password_hash, status, created_at, updated_at
+  id, role, username, password_hash, display_name, status, payload_json, created_at, updated_at
 
 teacher_profiles
-  id, account_id, name, subject_scope_json, created_at, updated_at
+  id, account_id, name, subject_scope_json, payload_json, created_at, updated_at
 
-classes
-  id, teacher_id, name, grade_id, subject_id, volume_id, status, created_at, updated_at
-
-students
-  id, class_id, account_id, name, student_no, status, created_at, updated_at
+model_settings
+  id, provider, model, base_url, payload_json, updated_at
 
 textbook_scopes
   id, publisher, subject_id, grade_id, volume_id, unit_id, payload_json, updated_at
 
 coursewares
-  id, class_id, scope_key, title, review_status, export_version, payload_json, created_at, updated_at
+  id, scope_key, title, review_status, export_version, payload_json, created_at, updated_at
 
 courseware_versions
   id, courseware_id, version_no, review_status, export_version, payload_json, created_at
 
+practice_sets
+  id, scope_key, review_status, export_version, payload_json, updated_at
+
+scheduled_papers
+  id, scope_key, frequency, total_score, review_status, export_version, payload_json, created_at, updated_at
+
 papers
-  id, class_id, creator_account_id, paper_type, scope_key, title, total_score, review_status, export_version, payload_json, created_at, updated_at
+  id, creator_account_id, paper_type, scope_key, title, total_score, review_status, export_version, payload_json, created_at, updated_at
 
 questions
   id, unit_id, knowledge_point, question_type, difficulty, answer, review_status, payload_json, created_at, updated_at
@@ -59,37 +62,38 @@ questions
 paper_questions
   id, paper_id, question_id, order_no, point, payload_json
 
-submissions
-  id, paper_id, class_id, student_id, origin, score, total_score, accuracy, payload_json, created_at
-
-submission_answers
-  id, submission_id, question_id, order_no, student_answer, correct_answer, is_correct, score, point, payload_json
+grading_submissions
+  id, scope_key, confidence, payload_json, created_at
 
 ocr_records
   id, submission_id, image_ref, recognized_text, average_confidence, payload_json, created_at
 
-mistakes
-  id, student_id, class_id, question_id, unit_id, knowledge_point_id, student_answer, error_reason, status, review_count, next_review_at
+score_history
+  id, scope_key, score, payload_json, created_at
 
-score_records
-  id, student_id, class_id, unit_id, score, total_score, accuracy, knowledge_stats, created_at
+generation_cache
+  id, scope_key, kind, payload_json, updated_at
 
 generation_records
-  id, class_id, creator_account_id, kind, scope_key, source, item_count, payload_json, created_at
+  id, kind, scope_key, source, item_count, payload_json, created_at
+
+ppt_plans
+  id, scope_key, review_status, export_version, payload_json, updated_at
 ```
+
+当前 schema 不包含 `classes`、`students`、`student_id`。
 
 ## 4. 迁移路线
 
-1. 教师在本机导出 local-json 备份。
-2. 后端读取 envelope 的 `schemaVersion`、`exportVersion` 和 `sqliteMigrationPlan`。
-3. 按 collection 写入对应表：`accounts`、`classes`、`students`、`coursewares`、`papers`、`submissions`、`mistakes`、`score_records`。
-4. 历史课件和试卷保留 `payload_json`，先不强行拆所有字段，避免早期 schema 频繁变动。
-5. 学生端开放后，提交记录必须绑定 `student_id`；已有班级级提交可作为班级历史记录保留。
+1. 本机导出 local-json envelope。
+2. 后端读取 `schemaVersion`、`exportVersion` 和 `sqliteMigrationPlan`。
+3. 按 collection 写入对应表。
+4. 早期版本以 `payload_json` 为主，避免频繁拆字段。
+5. 如未来重新引入在线作答端，再单独设计账号、作业、提交和权限表。
 
 ## 5. 权限原则
 
-- 教师只能管理自己创建或被授权的班级。
-- 学生只能读取自己的练习、提交、成绩和错题。
-- Agent 不能决定权限，所有权限由后端规则判断。
-- API Key 不进入浏览器，继续由本地代理或后端模型网关托管。
-- 答题照片和 OCR 记录应支持删除、导出和最小化保存。
+- 模型和 Agent 不决定权限。
+- 教师登录、数据读写、导出权限由本地规则或后端规则控制。
+- API Key 不进入代码仓库。
+- 本地代理或后端模型网关负责托管真实 Key。

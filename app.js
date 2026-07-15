@@ -10,10 +10,8 @@
   const pptPlanKey = "ai-teacher-rj-math-ppt-plans-v1";
   const authSessionKey = "ai-teacher-auth-session-v1";
   const accountsKey = "ai-teacher-accounts-v1";
-  const classesKey = "ai-teacher-classes-v1";
-  const studentsKey = "ai-teacher-students-v1";
-  const activeClassKey = "ai-teacher-active-class-v1";
   const subjectScopeKey = "ai-teacher-subject-scope-v1";
+  const modelSettingsKey = "ai-teacher-model-settings-v1";
   const generationRecordsKey = "ai-teacher-generation-records-v1";
   const submissionsKey = "ai-teacher-submissions-v1";
   const ocrProxyBaseUrl = "http://127.0.0.1:8790";
@@ -34,10 +32,8 @@
     generationCache: generationCacheKey,
     pptPlans: pptPlanKey,
     accounts: accountsKey,
-    classes: classesKey,
-    students: studentsKey,
-    activeClassId: activeClassKey,
     subjectScope: subjectScopeKey,
+    modelSettings: modelSettingsKey,
     generationRecords: generationRecordsKey,
     submissions: submissionsKey
   };
@@ -49,11 +45,12 @@
   const agentOrchestrator = window.AITeacherAgentOrchestrator?.createAgentOrchestrator?.({ modelClient });
   const pptxExporter = window.AITeacherPptxExporter;
   const requiredQuestionCount = ruleEngine.REQUIRED_QUESTION_COUNT || 10;
+  const savedScope = readSubjectScope();
 
   const state = {
-    grade: String(initialScope.grade || "3"),
-    volume: initialScope.volume || "A",
-    unitId: initialScope.unitId || "",
+    grade: String(initialScope.grade || savedScope.gradeId || "3"),
+    volume: initialScope.volume || savedScope.volumeId || "A",
+    unitId: initialScope.unitId || savedScope.unitId || "",
     difficulty: initialScope.difficulty || "基础",
     questionCount: requiredQuestionCount,
     currentQuestions: [],
@@ -69,19 +66,18 @@
     coursewarePresentationIndex: 0,
     pptPlanGenerating: false,
     practiceGenerating: false,
+    scheduledQuestions: [],
     gradingResults: [],
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
     scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
     generationCache: readJson(generationCacheKey, {}, "generationCache"),
     pptPlans: readJson(pptPlanKey, {}, "pptPlans"),
-    schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule"),
+    schedule: readJson(scheduleKey, { frequency: "每周", count: 10 }, "schedule"),
     authSession: readAuthSession(),
     accounts: readJson(accountsKey, defaultAccounts(), "accounts"),
-    classes: readJson(classesKey, [], "classes"),
-    students: readJson(studentsKey, [], "students"),
-    activeClassId: storage.getString(activeClassKey, ""),
-    subjectId: readSubjectScope().subjectId,
+    subjectId: savedScope.subjectId,
+    modelSettings: readJson(modelSettingsKey, {}, "modelSettings"),
     generationRecords: readJson(generationRecordsKey, [], "generationRecords"),
     submissions: readJson(submissionsKey, [], "submissions"),
     roleMode: "teacher"
@@ -106,11 +102,6 @@
     storage.setJson(key, value);
   }
 
-  function readRoleMode() {
-    const value = storage.getString(roleModeKey, "teacher");
-    return value === "student" ? "student" : "teacher";
-  }
-
   function readAuthSession() {
     try {
       const raw = storage.getString(authSessionKey, "");
@@ -122,11 +113,17 @@
   }
 
   function readSubjectScope() {
-    const fallback = { subjectId: "math" };
+    const fallback = { subjectId: "math", gradeId: "3", volumeId: "A", unitId: "" };
     try {
       const raw = storage.getString(subjectScopeKey, "");
       const scope = raw ? JSON.parse(raw) : fallback;
-      return scope && scope.subjectId === "math" ? scope : fallback;
+      if (!scope || scope.subjectId !== "math") return fallback;
+      return {
+        subjectId: "math",
+        gradeId: String(scope.gradeId || scope.grade || fallback.gradeId),
+        volumeId: scope.volumeId || scope.volume || fallback.volumeId,
+        unitId: scope.unitId || fallback.unitId
+      };
     } catch (error) {
       return fallback;
     }
@@ -144,24 +141,10 @@
     }];
   }
 
-  function defaultClassroom() {
-    const now = new Date().toISOString();
-    return {
-      id: "class-g3-1",
-      name: "三年级一班",
-      gradeId: "3",
-      subjectId: "math",
-      volumeId: "A",
-      status: "active",
-      createdAt: now,
-      updatedAt: now
-    };
-  }
-
   function createFallbackStorage() {
     return {
       kind: "local-json-fallback",
-      schemaVersion: 6,
+      schemaVersion: 7,
       getString: (key, fallback = "") => {
         const value = localStorage.getItem(key);
         return value == null ? fallback : value;
@@ -170,17 +153,17 @@
       setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
       removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
       buildEnvelope: (type, data, metadata = {}) => ({
-        schemaVersion: 6,
+        schemaVersion: 7,
         storageKind: "local-json-fallback",
         type,
         exportedAt: new Date().toISOString(),
-        exportVersion: metadata.exportVersion || `${type}-v6`,
+        exportVersion: metadata.exportVersion || `${type}-v7`,
         ...metadata,
         data
       }),
       sqliteMigrationPlan: () => ({
         target: "sqlite",
-        schemaVersion: 6,
+        schemaVersion: 7,
         schema: [],
         strategy: ["加载 storage-adapter.js 后导出迁移计划"]
       })
@@ -240,14 +223,11 @@
   }
 
   function recordGeneration(kind, unit, metadata = {}) {
-    const classroom = currentClass();
     const now = new Date().toISOString();
     state.generationRecords = [{
       id: `generation-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       kind,
       createdAt: now,
-      classId: classroom?.id || "",
-      className: classroom?.name || "",
       subjectId: state.subjectId || "math",
       gradeId: state.grade,
       gradeName: gradeData().name,
@@ -255,6 +235,7 @@
       volumeName: volumeData().name,
       unitId: unit.id,
       unitTitle: unit.title,
+      scopeKey: coursewareKey(unit),
       difficulty: state.difficulty,
       ...metadata
     }, ...(Array.isArray(state.generationRecords) ? state.generationRecords : [])].slice(0, 200);
@@ -262,16 +243,11 @@
   }
 
   function recordSubmission(summary, results, options = {}) {
-    const classroom = currentClass();
     const unit = unitData();
     state.submissions = [{
       id: `submission-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       createdAt: new Date().toISOString(),
       origin: options.origin || "manual",
-      classId: classroom?.id || "",
-      className: classroom?.name || "",
-      studentId: options.studentId || "",
-      studentName: options.studentName || "",
       subjectId: state.subjectId || "math",
       gradeId: state.grade,
       gradeName: gradeData().name,
@@ -342,7 +318,7 @@
     if (!ensureTeacherSession()) return;
     seedTeacherWorkspace();
     buildSelectors();
-    buildClassScopeSelectors();
+    persistSubjectScope();
     buildModelProviderOptions();
     restoreScheduleControls();
     restoreTeacherControls();
@@ -361,30 +337,14 @@
       state.accounts = defaultAccounts();
       writeJson(accountsKey, state.accounts);
     }
-    if (!Array.isArray(state.classes) || !state.classes.length) {
-      const classroom = defaultClassroom();
-      state.classes = [classroom];
-      state.activeClassId = classroom.id;
-      writeJson(classesKey, state.classes);
-      storage.setString(activeClassKey, state.activeClassId);
-    }
-    if (!Array.isArray(state.students)) {
-      state.students = [];
-      writeJson(studentsKey, state.students);
-    }
-    if (!currentClass()) {
-      state.activeClassId = state.classes[0]?.id || "";
-      storage.setString(activeClassKey, state.activeClassId);
-    }
-    applyScopeFromClass(currentClass(), { silent: true });
     state.roleMode = "teacher";
     storage.setString(roleModeKey, "teacher");
+    persistSubjectScope();
   }
 
   function restoreTeacherControls() {
     $("subjectSelect").value = state.subjectId || "math";
     $("subjectSelect").disabled = true;
-    refreshClassSelect();
     applyRoleMode();
   }
 
@@ -399,7 +359,7 @@
 
   function requireTeacherMode(actionLabel) {
     if (isTeacherMode()) return true;
-    setModelStatus(`${actionLabel} 仅在教师端开放。学生端入口已保留，当前版本暂未开放。`, "warn");
+    setModelStatus(`${actionLabel} 仅在教师端开放。`, "warn");
     return false;
   }
 
@@ -441,72 +401,50 @@
 
   function refreshUnitOptions() {
     const volume = volumeData();
-    $("unitSelect").innerHTML = volume.units
+    const options = volume.units
       .map((unit) => `<option value="${unit.id}">${unit.title}</option>`)
       .join("");
     if (!volume.units.some((unit) => unit.id === state.unitId)) {
       state.unitId = volume.units[0].id;
     }
-    $("unitSelect").value = state.unitId;
+    ["unitSelect", "coursewareUnitSelect", "practiceUnitSelect", "scheduleUnitSelect"].forEach((id) => {
+      const select = $(id);
+      if (!select) return;
+      select.innerHTML = options;
+      select.value = state.unitId;
+    });
   }
 
-  function buildClassScopeSelectors() {
-    $("classGradeSelect").innerHTML = supportedGradeEntries()
-      .map(([id, grade]) => `<option value="${id}">${grade.name}</option>`)
-      .join("");
-    $("classGradeSelect").value = state.grade;
-    refreshClassVolumeOptions();
-    $("classSubjectSelect").value = "math";
+  function persistSubjectScope() {
+    storage.setString(subjectScopeKey, JSON.stringify({
+      subjectId: state.subjectId || "math",
+      gradeId: state.grade,
+      volumeId: state.volume,
+      unitId: state.unitId,
+      updatedAt: new Date().toISOString()
+    }));
   }
 
-  function refreshClassVolumeOptions() {
-    const gradeId = $("classGradeSelect").value || state.grade;
-    const grade = content.grades[gradeId] || gradeData();
-    const volumes = Object.entries(grade.volumes || {});
-    $("classVolumeSelect").innerHTML = volumes
-      .map(([id, volume]) => `<option value="${id}">${volume.name}</option>`)
-      .join("");
-    const currentVolume = volumes.some(([id]) => id === state.volume) ? state.volume : volumes[0]?.[0];
-    $("classVolumeSelect").value = currentVolume || "";
+  function syncUnitSelectors() {
+    ["unitSelect", "coursewareUnitSelect", "practiceUnitSelect", "scheduleUnitSelect"].forEach((id) => {
+      const select = $(id);
+      if (select && select.value !== state.unitId) select.value = state.unitId;
+    });
   }
 
-  function refreshClassSelect() {
-    const classSelect = $("classSelect");
-    if (!classSelect) return;
-    classSelect.innerHTML = state.classes
-      .map((classroom) => `<option value="${escapeAttribute(classroom.id)}">${escapeHtml(classroom.name)}</option>`)
-      .join("");
-    classSelect.value = currentClass()?.id || "";
-  }
-
-  function currentClass() {
-    return state.classes.find((classroom) => classroom.id === state.activeClassId) || state.classes[0] || null;
-  }
-
-  function studentsForClass(classId = state.activeClassId) {
-    return state.students.filter((student) => student.classId === classId && student.status !== "deleted");
-  }
-
-  function applyScopeFromClass(classroom, options = {}) {
-    if (!classroom) return false;
-    const gradeId = String(classroom.gradeId || state.grade);
-    const grade = content.grades[gradeId] ? gradeId : state.grade;
-    const volumeId = content.grades[grade]?.volumes?.[classroom.volumeId] ? classroom.volumeId : firstVolumeId(content.grades[grade]);
-    state.subjectId = classroom.subjectId || "math";
-    state.grade = grade;
-    state.volume = volumeId;
-    const volume = content.grades[state.grade].volumes[state.volume];
-    if (!volume.units.some((unit) => unit.id === state.unitId)) state.unitId = volume.units[0].id;
-    storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
-    if (options.silent) return true;
-    $("subjectSelect").value = state.subjectId;
-    $("gradeSelect").value = state.grade;
-    refreshVolumeOptions();
-    refreshUnitOptions();
-    $("classGradeSelect").value = state.grade;
-    refreshClassVolumeOptions();
-    clearPracticeState();
-    renderAll();
+  function setActiveUnit(unitId, options = {}) {
+    const volume = volumeData();
+    const nextUnit = volume.units.find((unit) => unit.id === unitId) || volume.units[0];
+    if (!nextUnit) return false;
+    const changed = state.unitId !== nextUnit.id;
+    state.unitId = nextUnit.id;
+    syncUnitSelectors();
+    persistSubjectScope();
+    if (changed && !options.keepCurrentQuestions) {
+      clearPracticeState();
+      clearScheduledPaperState();
+    }
+    if (!options.silent) renderAll();
     return true;
   }
 
@@ -532,6 +470,8 @@
     $("difficultySelect").value = state.difficulty;
     $("questionCount").value = state.questionCount;
     clearPracticeState();
+    clearScheduledPaperState();
+    persistSubjectScope();
     return true;
   }
   function buildModelProviderOptions() {
@@ -543,15 +483,18 @@
     $("modelProvider").innerHTML = entries
       .map(([id, provider]) => `<option value="${id}">${escapeHtml(provider.label || id)}</option>`)
       .join("");
-    $("modelProvider").value = entries[0][0];
-    applyModelProviderDefaults();
+    const savedProvider = state.modelSettings?.provider;
+    $("modelProvider").value = savedProvider && providerDefaults[savedProvider] ? savedProvider : entries[0][0];
+    applyModelProviderDefaults({ silent: true });
+    applySavedModelSettings();
   }
 
-  function applyModelProviderDefaults() {
+  function applyModelProviderDefaults(options = {}) {
     const provider = providerDefaults[$("modelProvider").value] || {};
     $("modelName").value = provider.model || "";
     $("modelBaseUrl").value = provider.baseUrl || "";
     updateModelApiKeyField(provider);
+    if (options.silent) return;
     setModelStatus(
       provider.requiresApiKey === false
         ? "本地代理模式：Key 和上游 URL 放在本机 1.md 或 .env，页面 API Key 可留空。"
@@ -568,6 +511,40 @@
     keyInput.placeholder = localProxyMode ? "本地代理已托管 Key，可留空" : "仅本次页面使用";
   }
 
+  function applySavedModelSettings() {
+    const saved = state.modelSettings || {};
+    if (saved.provider && providerDefaults[saved.provider]) {
+      $("modelProvider").value = saved.provider;
+      updateModelApiKeyField(providerDefaults[saved.provider] || {});
+    }
+    if (saved.model) $("modelName").value = saved.model;
+    if (saved.baseUrl) $("modelBaseUrl").value = saved.baseUrl;
+  }
+
+  function saveModelSettings() {
+    state.modelSettings = {
+      provider: $("modelProvider").value,
+      model: $("modelName").value.trim(),
+      baseUrl: $("modelBaseUrl").value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    writeJson(modelSettingsKey, state.modelSettings);
+  }
+
+  function saveSettings() {
+    if (!requireTeacherMode("保存系统设置")) return;
+    state.subjectId = "math";
+    state.grade = $("gradeSelect").value || state.grade;
+    if (!gradeData().volumes[state.volume]) state.volume = firstVolumeId(gradeData());
+    state.volume = $("volumeSelect").value || state.volume;
+    refreshVolumeOptions();
+    refreshUnitOptions();
+    persistSubjectScope();
+    saveModelSettings();
+    renderAll();
+    setModelStatus(`系统设置已保存：${gradeData().name}${volumeData().name} · 数学。单元选择会在课件、同步出题和周期测验之间同步。`, "ok");
+  }
+
   function bindEvents() {
     $("subjectSelect").addEventListener("change", () => {
       $("subjectSelect").value = "math";
@@ -580,6 +557,7 @@
       refreshVolumeOptions();
       refreshUnitOptions();
       clearPracticeState();
+      clearScheduledPaperState();
       renderAll();
     });
 
@@ -587,13 +565,21 @@
       state.volume = event.target.value;
       refreshUnitOptions();
       clearPracticeState();
+      clearScheduledPaperState();
       renderAll();
     });
 
     $("unitSelect").addEventListener("change", (event) => {
-      state.unitId = event.target.value;
-      clearPracticeState();
-      renderAll();
+      setActiveUnit(event.target.value);
+    });
+
+    ["coursewareUnitSelect", "practiceUnitSelect", "scheduleUnitSelect"].forEach((id) => {
+      $(id).addEventListener("change", (event) => {
+        setActiveUnit(event.target.value);
+        const unit = unitData();
+        const from = id === "coursewareUnitSelect" ? "课件生成" : id === "practiceUnitSelect" ? "同步出题" : "周期测验出题";
+        setModelStatus(`${from}已切换到“${unit.title}”，其他模块会同步使用该单元。`, "ok");
+      });
     });
 
     $("difficultySelect").addEventListener("change", (event) => {
@@ -609,29 +595,8 @@
       renderAll();
     });
 
-    $("classSelect").addEventListener("change", (event) => {
-      state.activeClassId = event.target.value;
-      storage.setString(activeClassKey, state.activeClassId);
-      const classroom = currentClass();
-      applyScopeFromClass(classroom);
-      setModelStatus(`已切换到 ${classroom?.name || "当前班级"}，年级和册别已同步。`, "ok");
-    });
-
     $("logoutBtn").addEventListener("click", logoutTeacher);
-    $("classGradeSelect").addEventListener("change", refreshClassVolumeOptions);
-    $("classForm").addEventListener("submit", addClassroom);
-    $("studentForm").addEventListener("submit", addStudent);
-    $("applyClassScopeBtn").addEventListener("click", () => {
-      const classroom = currentClass();
-      applyScopeFromClass(classroom);
-      setModelStatus(`已应用 ${classroom?.name || "当前班级"} 的年级、学科和册别。`, "ok");
-    });
-    $("classList").addEventListener("click", handleClassListAction);
-    $("studentList").addEventListener("click", handleStudentListAction);
-
-    $("generatePaperBtn").addEventListener("click", () => {
-      switchTab("practice");
-    });
+    $("saveSettingsBtn").addEventListener("click", saveSettings);
 
     $("modelProvider").addEventListener("change", applyModelProviderDefaults);
     $("testModelBtn").addEventListener("click", testModelConnection);
@@ -652,6 +617,8 @@
       if (requireTeacherMode("导入历史练习")) $("importPracticeFile").click();
     });
     $("importPracticeFile").addEventListener("change", importPracticeJson);
+    $("exportPracticeStudentPdfBtn").addEventListener("click", () => exportPracticePdf(false));
+    $("exportPracticeTeacherPdfBtn").addEventListener("click", () => exportPracticePdf(true));
     $("exportPdfBtn").addEventListener("click", exportCoursewarePdf);
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
     $("saveCoursewareBtn").addEventListener("click", saveCoursewareReview);
@@ -678,15 +645,12 @@
     $("clearMasteredBtn").addEventListener("click", clearMastered);
     $("saveScheduleBtn").addEventListener("click", saveSchedule);
     $("scheduledPaperBtn").addEventListener("click", buildScheduledPaper);
-    $("exportLocalDataBtn").addEventListener("click", exportLocalData);
-    $("importLocalDataBtn").addEventListener("click", () => {
-      if (requireTeacherMode("导入本地数据备份")) $("importLocalDataFile").click();
-    });
-    $("importLocalDataFile").addEventListener("change", importLocalData);
-    $("clearLocalDataBtn").addEventListener("click", clearLocalData);
-    $("mistakeRatio").addEventListener("input", (event) => {
-      $("mistakeRatioLabel").textContent = `${event.target.value}%`;
-    });
+    $("exportScheduledStudentPdfBtn").addEventListener("click", () => exportScheduledPdf(false));
+    $("exportScheduledTeacherPdfBtn").addEventListener("click", () => exportScheduledPdf(true));
+
+    $("coursewareHistory").addEventListener("click", handleCoursewareHistoryAction);
+    $("practiceHistory").addEventListener("click", handlePracticeHistoryAction);
+    $("scheduleHistory").addEventListener("click", handleScheduleHistoryAction);
 
     document.querySelectorAll("button[data-tab]").forEach((button) => {
       button.addEventListener("click", () => switchTab(button.dataset.tab));
@@ -718,119 +682,6 @@
     window.location.href = "login.html";
   }
 
-  function addClassroom(event) {
-    event.preventDefault();
-    const name = cleanText($("classNameInput").value);
-    const gradeId = $("classGradeSelect").value || state.grade;
-    const volumeId = $("classVolumeSelect").value || firstVolumeId(content.grades[gradeId]);
-    if (!name) {
-      setModelStatus("请先填写班级名称。", "warn");
-      return;
-    }
-    if (state.classes.some((classroom) => classroom.name === name && classroom.status !== "deleted")) {
-      setModelStatus("同名班级已存在，请换一个班级名称。", "warn");
-      return;
-    }
-    const now = new Date().toISOString();
-    const classroom = {
-      id: `class-${Date.now()}`,
-      name,
-      gradeId,
-      subjectId: "math",
-      volumeId,
-      status: "active",
-      createdAt: now,
-      updatedAt: now
-    };
-    state.classes = [...state.classes, classroom];
-    state.activeClassId = classroom.id;
-    writeJson(classesKey, state.classes);
-    storage.setString(activeClassKey, state.activeClassId);
-    $("classForm").reset();
-    buildClassScopeSelectors();
-    refreshClassSelect();
-    applyScopeFromClass(classroom);
-    setModelStatus(`已添加班级：${classroom.name}。`, "ok");
-  }
-
-  function addStudent(event) {
-    event.preventDefault();
-    const classroom = currentClass();
-    if (!classroom) {
-      setModelStatus("请先创建或选择班级。", "warn");
-      return;
-    }
-    const name = cleanText($("studentNameInput").value);
-    const studentNo = cleanText($("studentNoInput").value);
-    if (!name) {
-      setModelStatus("请填写学生姓名。", "warn");
-      return;
-    }
-    const now = new Date().toISOString();
-    state.students = [...state.students, {
-      id: `student-${Date.now()}`,
-      classId: classroom.id,
-      name,
-      studentNo,
-      status: "active",
-      createdAt: now,
-      updatedAt: now
-    }];
-    writeJson(studentsKey, state.students);
-    $("studentForm").reset();
-    renderClassroom();
-    setModelStatus(`已添加学生：${name}。`, "ok");
-  }
-
-  function handleClassListAction(event) {
-    const button = event.target.closest("button[data-action]");
-    if (!button) return;
-    const id = button.dataset.id;
-    if (button.dataset.action === "switch") {
-      state.activeClassId = id;
-      storage.setString(activeClassKey, state.activeClassId);
-      refreshClassSelect();
-      applyScopeFromClass(currentClass());
-      return;
-    }
-    if (button.dataset.action === "delete") deleteClassroom(id);
-  }
-
-  function handleStudentListAction(event) {
-    const button = event.target.closest("button[data-action='delete-student']");
-    if (!button) return;
-    deleteStudent(button.dataset.id);
-  }
-
-  function deleteClassroom(id) {
-    const classroom = state.classes.find((item) => item.id === id);
-    if (!classroom) return;
-    if (studentsForClass(id).length) {
-      setModelStatus("该班级下还有学生，请先删除或转移学生后再删除班级。", "warn");
-      return;
-    }
-    if (state.classes.length <= 1) {
-      setModelStatus("至少需要保留一个班级。", "warn");
-      return;
-    }
-    state.classes = state.classes.filter((item) => item.id !== id);
-    if (state.activeClassId === id) state.activeClassId = state.classes[0]?.id || "";
-    writeJson(classesKey, state.classes);
-    storage.setString(activeClassKey, state.activeClassId);
-    refreshClassSelect();
-    applyScopeFromClass(currentClass());
-    setModelStatus(`已删除班级：${classroom.name}。`, "ok");
-  }
-
-  function deleteStudent(id) {
-    const student = state.students.find((item) => item.id === id);
-    if (!student) return;
-    state.students = state.students.filter((item) => item.id !== id);
-    writeJson(studentsKey, state.students);
-    renderClassroom();
-    setModelStatus(`已移除学生：${student.name}。`, "ok");
-  }
-
   function clearPracticeState() {
     state.currentQuestions = [];
     state.answersVisible = false;
@@ -847,6 +698,15 @@
     $("practiceResults").innerHTML = "";
   }
 
+  function clearScheduledPaperState() {
+    state.scheduledQuestions = [];
+    const paper = $("scheduledPaper");
+    if (paper) {
+      paper.className = "question-list";
+      paper.innerHTML = "";
+    }
+  }
+
   function renderAll() {
     applyRoleMode();
     renderTeacherWorkspace();
@@ -855,7 +715,6 @@
     renderPractice();
     renderMistakes();
     renderSchedule();
-    renderClassroom();
     renderScoreTrends();
     renderMetrics();
   }
@@ -863,76 +722,18 @@
   function renderTeacherWorkspace() {
     const label = $("teacherNameLabel");
     if (label) label.textContent = state.authSession?.displayName || state.authSession?.username || "本机教师";
-    refreshClassSelect();
   }
 
   function renderScope() {
     const unit = unitData();
-    const classroom = currentClass();
-    $("scopeLabel").textContent = `${classroom?.name ? `${classroom.name} · ` : ""}${gradeData().name}${volumeData().name} · ${unit.title}`;
+    $("scopeLabel").textContent = `${gradeData().name}${volumeData().name} · ${unit.title}`;
     $("scopeSummary").textContent = `${unit.summary} 当前学科：数学。`;
   }
 
   function renderMetrics() {
     $("questionMetric").textContent = state.currentQuestions.length;
-    $("mistakeMetric").textContent = state.mistakes.filter((item) => item.status !== "已掌握").length;
+    $("coursewareMetric").textContent = coursewareHistoryRecords({ all: true }).length;
     $("scheduleMetric").textContent = state.schedule ? state.schedule.frequency : "未设置";
-  }
-
-  function renderClassroom() {
-    const classroom = currentClass();
-    if (!classroom) return;
-    const students = studentsForClass(classroom.id);
-    $("currentClassName").textContent = classroom.name;
-    $("currentClassMeta").innerHTML = `
-      <span class="pill green">${escapeHtml(classGradeName(classroom))}</span>
-      <span class="pill blue">数学</span>
-      <span class="pill orange">${escapeHtml(classVolumeName(classroom))}</span>
-    `;
-    $("currentClassSummary").textContent = `当前班级共有 ${students.length} 名学生。切换班级会同步年级、学科和册别，单元仍由教师按授课进度选择。`;
-    $("classCountBadge").textContent = `${state.classes.length} 个班级`;
-    $("studentCountBadge").textContent = `${students.length} 名学生`;
-    $("classList").innerHTML = state.classes.map((item) => renderClassroomItem(item)).join("");
-    $("studentList").innerHTML = students.length
-      ? students.map((student) => renderStudentItem(student)).join("")
-      : `<div class="empty-inline">当前班级还没有学生，可先添加姓名和学号。</div>`;
-  }
-
-  function renderClassroomItem(classroom) {
-    const active = classroom.id === state.activeClassId;
-    const count = studentsForClass(classroom.id).length;
-    return `
-      <article class="class-list-item ${active ? "active" : ""}">
-        <div>
-          <strong>${escapeHtml(classroom.name)}</strong>
-          <p>${escapeHtml(classGradeName(classroom))} · 数学 · ${escapeHtml(classVolumeName(classroom))} · ${count} 名学生</p>
-        </div>
-        <div class="row-actions">
-          <button class="secondary-btn small" type="button" data-action="switch" data-id="${escapeAttribute(classroom.id)}"${active ? " disabled" : ""}>切换</button>
-          <button class="secondary-btn small danger" type="button" data-action="delete" data-id="${escapeAttribute(classroom.id)}">删除</button>
-        </div>
-      </article>
-    `;
-  }
-
-  function renderStudentItem(student) {
-    return `
-      <article class="student-list-item">
-        <div>
-          <strong>${escapeHtml(student.name)}</strong>
-          <p>${student.studentNo ? `学号 ${escapeHtml(student.studentNo)}` : "未填写学号"} · ${formatDateTime(student.createdAt)}</p>
-        </div>
-        <button class="secondary-btn small danger" type="button" data-action="delete-student" data-id="${escapeAttribute(student.id)}">删除</button>
-      </article>
-    `;
-  }
-
-  function classGradeName(classroom) {
-    return content.grades[String(classroom.gradeId)]?.name || `${classroom.gradeId || ""}年级`;
-  }
-
-  function classVolumeName(classroom) {
-    return content.grades[String(classroom.gradeId)]?.volumes?.[classroom.volumeId]?.name || classroom.volumeId || "上册";
   }
 
   function collectModelRuntimeConfig() {
@@ -1135,7 +936,7 @@
             state.currentQuestions = prepared.questions;
             state.answersVisible = false;
             seedAnswerInputsWithTemplate();
-            recordGeneration("practice", unit, { source: "cache", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions) });
+            recordGeneration("practice", unit, { source: "cache", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), questions: cloneJson(state.currentQuestions), reviewStatus: "rule_checked", exportVersion: practiceExportVersion });
             setModelStatus(`已复用本地缓存练习：${state.currentQuestions.length} 题，范围仍锁定为“${unit.title}”。`, "ok");
             return;
           }
@@ -1164,7 +965,7 @@
         state.answersVisible = false;
         seedAnswerInputsWithTemplate();
         writeGenerationCache(cacheId, { questions: state.currentQuestions }, { kind: "practice", scopeKey: coursewareKey(unit), source: "llm" });
-        recordGeneration("practice", unit, { source: "llm", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), rejectedCount: prepared.rejected.length });
+        recordGeneration("practice", unit, { source: "llm", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), rejectedCount: prepared.rejected.length, questions: cloneJson(state.currentQuestions), reviewStatus: "rule_checked", exportVersion: practiceExportVersion });
         const rejectedHint = prepared.rejected.length ? `，已剔除 ${prepared.rejected.length} 题不合格题` : "";
         setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”${rejectedHint}。`, "ok");
       } finally {
@@ -1678,6 +1479,7 @@
     const slides = buildCoursewareSlides(unit);
     const reviewRecord = coursewareReviewRecord(unit);
     const hasSlides = slides.length > 0;
+    renderCoursewareHistory();
     if (!hasSlides) state.coursewareEditMode = false;
     $("knowledgePoints").hidden = true;
     $("knowledgePoints").innerHTML = "";
@@ -1701,6 +1503,46 @@
 
     $("coursewareSlides").className = `markdownflow-reader ${state.coursewareEditMode ? "editing" : ""}`;
     $("coursewareSlides").innerHTML = renderMarkdownFlowCourseware(unit, slides, reviewRecord, sourceRefs);
+  }
+
+  function coursewareHistoryRecords(options = {}) {
+    const units = options.all ? volumeData().units : volumeData().units.filter((unit) => unit.id === state.unitId);
+    return units
+      .map((unit) => {
+        const record = coursewareReviewRecord(unit);
+        if (!record) return null;
+        return { unit, record };
+      })
+      .filter(Boolean)
+      .sort((a, b) => String(b.record.updatedAt || b.record.createdAt || "").localeCompare(String(a.record.updatedAt || a.record.createdAt || "")));
+  }
+
+  function renderCoursewareHistory() {
+    const host = $("coursewareHistory");
+    if (!host) return;
+    const records = coursewareHistoryRecords();
+    if (!records.length) {
+      host.innerHTML = `<div class="history-empty">暂无历史课件。先选择单元，再点击“AI 生成导学课件”。</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div class="history-head">
+        <strong>历史课件</strong>
+        <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
+      </div>
+      <div class="history-grid">
+        ${records.map(({ unit, record }) => renderHistoryCard({
+          active: unit.id === state.unitId,
+          title: unit.title,
+          meta: `${record.reviewStatusLabel || reviewStatusLabel(record.reviewStatus)} · ${escapeHtml(record.exportVersion || reviewExportVersion)}`,
+          detail: `${(record.slides || []).length} 节 · ${formatDateTime(record.updatedAt || record.createdAt)}`,
+          action: "load-courseware",
+          unitId: unit.id,
+          actionLabel: unit.id === state.unitId ? "当前单元" : "切换到该单元",
+          disabled: unit.id === state.unitId
+        })).join("")}
+      </div>
+    `;
   }
 
   function renderMarkdownFlowCourseware(unit, slides, reviewRecord, sourceRefs) {
@@ -2025,7 +1867,7 @@
       {
         title: "复盘反馈",
         body: "把本节学习收束为方法、易错点和下一次练习方向。",
-        moves: () => ["先问：今天最容易错的是哪一步？", "追问：下次遇到同类题先画什么？", "反馈：把错因写入错题库，下一次先复习薄弱点。"]
+        moves: () => ["先问：今天最容易错的是哪一步？", "追问：下次遇到同类题先画什么？", "反馈：把错因写入本机复习记录，下一次先复习薄弱点。"]
       }
     ];
 
@@ -2233,6 +2075,86 @@
     }
     switchTab("courseware");
     window.print();
+  }
+
+  function exportPracticePdf(withAnswers) {
+    if (!requireTeacherMode("导出同步练习 PDF")) return;
+    exportQuestionsPdf(`${gradeData().name}${volumeData().name}-${unitData().title}-同步练习`, state.currentQuestions, { withAnswers });
+  }
+
+  function exportScheduledPdf(withAnswers) {
+    if (!requireTeacherMode("导出周期测验 PDF")) return;
+    exportQuestionsPdf(`${gradeData().name}${volumeData().name}-${unitData().title}-${state.schedule.frequency || "周期"}测验`, state.scheduledQuestions, { withAnswers });
+  }
+
+  function exportQuestionsPdf(title, questions, options = {}) {
+    if (!Array.isArray(questions) || !questions.length) {
+      setModelStatus("当前还没有可导出 PDF 的题目。", "warn");
+      return;
+    }
+    const withAnswers = Boolean(options.withAnswers);
+    const printable = window.open("", "_blank");
+    if (!printable) {
+      setModelStatus("浏览器拦截了 PDF 打印窗口，请允许弹窗后重试。", "warn");
+      return;
+    }
+    const safeTitle = escapeHtml(`${title}${withAnswers ? "-含答案版" : "-空白卷"}`);
+    const questionHtml = questions.map((questionItem, index) => `
+      <article class="print-question">
+        <h2>${index + 1}. ${renderStemContent(questionItem.stem)}</h2>
+        <div class="print-meta">
+          <span>${escapeHtml(questionItem.knowledgePoint)}</span>
+          <span>${escapeHtml(questionItem.questionType || "同步练习")}</span>
+          <span>${questionItem.point} 分</span>
+        </div>
+        ${withAnswers ? `
+          <section class="print-answer">
+            <p><strong>答案：</strong>${escapeHtml(questionItem.answer)}</p>
+            <p><strong>解析：</strong>${escapeHtml(questionItem.explanation)}</p>
+            <ol>${(questionItem.detailSteps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+            <p><strong>易错点：</strong>${escapeHtml(questionItem.commonMistake || "注意审题和结果格式。")}</p>
+            <p><strong>检查：</strong>${escapeHtml(questionItem.checkMethod || "用估算或逆运算检查结果。")}</p>
+          </section>
+        ` : `<div class="answer-line">答：______________________________</div>`}
+      </article>
+    `).join("");
+    printable.document.write(`<!doctype html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8">
+          <title>${safeTitle}</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            body { margin: 0; color: #172033; font-family: "Microsoft YaHei", Arial, sans-serif; }
+            header { border-bottom: 2px solid #0f766e; padding-bottom: 12px; margin-bottom: 18px; }
+            h1 { margin: 0 0 8px; font-size: 24px; }
+            header p { margin: 0; color: #667085; }
+            .print-question { break-inside: avoid; padding: 12px 0; border-bottom: 1px solid #d9e0ea; }
+            .print-question h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.7; font-weight: 800; }
+            .print-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+            .print-meta span { border: 1px solid #d9e0ea; border-radius: 999px; padding: 4px 8px; font-size: 12px; color: #475467; }
+            .answer-line { margin-top: 18px; font-size: 15px; }
+            .print-answer { background: #f8fafc; border: 1px solid #edf1f7; border-radius: 8px; padding: 10px 12px; }
+            .print-answer p { margin: 6px 0; line-height: 1.65; }
+            .print-answer ol { margin: 8px 0; padding-left: 22px; line-height: 1.65; }
+            .stem-table-wrap { margin: 10px 0; overflow: visible; }
+            .stem-table { width: 100%; border-collapse: collapse; border: 2px solid #0f766e; font-size: 14px; }
+            .stem-table th, .stem-table td { border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; }
+            .stem-table th { background: #ecfdf5; color: #0f766e; }
+            .blank-cell { display: inline-block; min-width: 64px; border-bottom: 2px solid #2563eb; color: transparent; }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>${safeTitle}</h1>
+            <p>${escapeHtml(content.textbookVersion || "人教版")} · 数学 · ${escapeHtml(unitData().title)} · 共 ${questions.length} 题 · 总分 ${paperTotal(questions)} 分</p>
+          </header>
+          ${questionHtml}
+          <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),120));<\/script>
+        </body>
+      </html>`);
+    printable.document.close();
+    setModelStatus(`${withAnswers ? "含答案版" : "空白卷"} PDF 打印窗口已打开，可选择“另存为 PDF”。`, "ok");
   }
 
   function exportCoursewarePptx() {
@@ -2483,9 +2405,10 @@
   function renderPractice() {
     const list = $("practiceList");
     const hasQuestions = state.currentQuestions.length > 0;
+    renderPracticeHistory();
     $("aiQuestionsBtn").textContent = state.practiceGenerating ? "出题中..." : hasQuestions ? "重新生成练习" : "AI 生成练习";
     $("showAnswerBtn").textContent = state.answersVisible ? "隐藏答案" : "显示答案";
-    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn", "gradePracticeBtn", "syncPracticeToGradingBtn"].forEach((id) => {
+    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn", "gradePracticeBtn", "syncPracticeToGradingBtn", "exportPracticeStudentPdfBtn", "exportPracticeTeacherPdfBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.practiceGenerating || !hasQuestions;
     });
@@ -2515,6 +2438,154 @@
 
     list.className = `question-list${state.answersVisible ? " show-answers" : ""}`;
     list.innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
+  }
+
+  function renderPracticeHistory() {
+    const host = $("practiceHistory");
+    if (!host) return;
+    const records = generationHistoryRecords(["practice"]);
+    if (!records.length) {
+      host.innerHTML = `<div class="history-empty">暂无历史出题记录。选择单元后点击“AI 生成练习”，会自动保存为历史版本。</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div class="history-head">
+        <strong>历史出题记录</strong>
+        <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
+      </div>
+      <div class="history-grid">
+        ${records.map((record) => renderHistoryCard({
+          active: record.unitId === state.unitId,
+          title: record.unitTitle,
+          meta: `${record.difficulty || state.difficulty} · ${record.itemCount || record.questions?.length || 0} 题 · ${record.totalScore || 100} 分`,
+          detail: `${generationSourceLabel(record.source)} · ${formatDateTime(record.createdAt)}`,
+          action: "load-practice",
+          unitId: record.unitId,
+          recordId: record.id,
+          actionLabel: Array.isArray(record.questions) && record.questions.length ? "载入练习" : "仅有记录",
+          disabled: !Array.isArray(record.questions) || !record.questions.length
+        })).join("")}
+      </div>
+    `;
+  }
+
+  function renderScheduleHistory() {
+    const host = $("scheduleHistory");
+    if (!host) return;
+    const records = generationHistoryRecords(["scheduled_paper"]);
+    if (!records.length) {
+      host.innerHTML = `<div class="history-empty">暂无周期测验历史。选择单元后生成测验，会自动保存为历史版本。</div>`;
+      return;
+    }
+    host.innerHTML = `
+      <div class="history-head">
+        <strong>历史测验卷</strong>
+        <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
+      </div>
+      <div class="history-grid">
+        ${records.map((record) => renderHistoryCard({
+          active: record.unitId === state.unitId,
+          title: record.unitTitle,
+          meta: `${record.frequency || state.schedule.frequency || "周期"} · ${record.itemCount || record.questions?.length || 0} 题 · ${record.totalScore || 100} 分`,
+          detail: `${generationSourceLabel(record.source)} · ${formatDateTime(record.createdAt)}`,
+          action: "load-schedule",
+          unitId: record.unitId,
+          recordId: record.id,
+          actionLabel: Array.isArray(record.questions) && record.questions.length ? "载入测验" : "仅有记录",
+          disabled: !Array.isArray(record.questions) || !record.questions.length
+        })).join("")}
+      </div>
+    `;
+  }
+
+  function generationHistoryRecords(kinds) {
+    const allowedKinds = new Set(kinds);
+    return (Array.isArray(state.generationRecords) ? state.generationRecords : [])
+      .filter((record) => (
+        allowedKinds.has(record.kind)
+        && String(record.gradeId || "") === String(state.grade)
+        && String(record.volumeId || "") === String(state.volume)
+        && String(record.unitId || "") === String(state.unitId)
+      ))
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  }
+
+  function renderHistoryCard({ active, title, meta, detail, action, unitId, recordId = "", actionLabel, disabled = false }) {
+    return `
+      <article class="history-card ${active ? "active" : ""}">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(meta)}</p>
+          <span>${escapeHtml(detail)}</span>
+        </div>
+        <button class="secondary-btn small" type="button" data-action="${escapeAttribute(action)}" data-unit-id="${escapeAttribute(unitId)}" data-record-id="${escapeAttribute(recordId)}"${disabled ? " disabled" : ""}>${escapeHtml(actionLabel)}</button>
+      </article>
+    `;
+  }
+
+  function generationSourceLabel(source) {
+    const labels = {
+      llm: "AI 生成",
+      cache: "缓存复用",
+      "rule-engine": "规则生成",
+      import: "导入",
+      local: "本地"
+    };
+    return labels[source] || source || "本地";
+  }
+
+  function handleCoursewareHistoryAction(event) {
+    const button = event.target.closest("button[data-action='load-courseware']");
+    if (!button) return;
+    setActiveUnit(button.dataset.unitId, { keepCurrentQuestions: true });
+    switchTab("courseware");
+  }
+
+  function handlePracticeHistoryAction(event) {
+    const button = event.target.closest("button[data-action='load-practice']");
+    if (!button) return;
+    const record = findGenerationRecord(button.dataset.recordId, "practice");
+    if (!record?.questions?.length) return;
+    loadQuestionRecord(record, "practice");
+  }
+
+  function handleScheduleHistoryAction(event) {
+    const button = event.target.closest("button[data-action='load-schedule']");
+    if (!button) return;
+    const record = findGenerationRecord(button.dataset.recordId, "scheduled_paper");
+    if (!record?.questions?.length) return;
+    loadQuestionRecord(record, "schedule");
+  }
+
+  function findGenerationRecord(recordId, kind) {
+    return (Array.isArray(state.generationRecords) ? state.generationRecords : [])
+      .find((record) => record.id === recordId && record.kind === kind);
+  }
+
+  function loadQuestionRecord(record, target) {
+    if (!applyScopeFromPayload(record)) {
+      setModelStatus("历史记录的教材范围与当前知识点包不匹配，无法载入。", "warn");
+      return;
+    }
+    const unit = unitData();
+    const prepared = prepareQuestionsForPaper(record.questions || [], unit, capQuestionCount(record.questions.length));
+    if (!isPreparedPaperComplete(prepared, unit, capQuestionCount(record.questions.length))) {
+      setModelStatus(formatPaperValidationError(prepared, unit, capQuestionCount(record.questions.length)), "warn");
+      return;
+    }
+    if (target === "schedule") {
+      state.scheduledQuestions = prepared.questions;
+      $("scheduledPaper").className = "question-list";
+      $("scheduledPaper").innerHTML = state.scheduledQuestions.map(renderQuestionCard).join("");
+      switchTab("schedule");
+    } else {
+      state.currentQuestions = prepared.questions;
+      state.answersVisible = false;
+      seedAnswerInputsWithTemplate();
+      switchTab("practice");
+    }
+    renderAll();
+    setModelStatus(`已载入“${unit.title}”的历史${target === "schedule" ? "测验卷" : "练习"}。`, "ok");
   }
 
   function renderQuestionCard(question, index) {
@@ -3193,7 +3264,7 @@
   function exportLocalData() {
     if (!requireTeacherMode("导出本地数据备份")) return;
     downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
-    setModelStatus("本地数据已导出，包含账号、班级、学生、课件、练习、提交、错题、成绩和迁移计划。", "ok");
+    setModelStatus("本地数据已导出，包含账号、系统设置、课件、练习、测验、判分记录和迁移计划。", "ok");
   }
 
   async function importLocalData(event) {
@@ -3208,14 +3279,13 @@
       state.coursewareReviews = data.coursewareReviews && typeof data.coursewareReviews === "object" ? data.coursewareReviews : {};
       state.generationCache = data.generationCache && typeof data.generationCache === "object" ? data.generationCache : {};
       state.pptPlans = data.pptPlans && typeof data.pptPlans === "object" ? data.pptPlans : {};
-      state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10, mistakeRatio: 40 };
+      state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10 };
       state.accounts = Array.isArray(data.accounts) && data.accounts.length ? data.accounts : defaultAccounts();
-      state.classes = Array.isArray(data.classes) && data.classes.length ? data.classes : [defaultClassroom()];
-      state.students = Array.isArray(data.students) ? data.students : [];
-      state.activeClassId = data.activeClassId && state.classes.some((classroom) => classroom.id === data.activeClassId)
-        ? data.activeClassId
-        : state.classes[0].id;
       state.subjectId = data.subjectScope?.subjectId === "math" || data.subjectId === "math" ? "math" : "math";
+      if (data.subjectScope?.gradeId) state.grade = String(data.subjectScope.gradeId);
+      if (data.subjectScope?.volumeId) state.volume = data.subjectScope.volumeId;
+      if (data.subjectScope?.unitId) state.unitId = data.subjectScope.unitId;
+      state.modelSettings = data.modelSettings && typeof data.modelSettings === "object" ? data.modelSettings : {};
       state.generationRecords = Array.isArray(data.generationRecords) ? data.generationRecords : [];
       state.submissions = Array.isArray(data.submissions) ? data.submissions : [];
       state.roleMode = "teacher";
@@ -3226,19 +3296,17 @@
       writeJson(pptPlanKey, state.pptPlans);
       writeJson(scheduleKey, state.schedule);
       writeJson(accountsKey, state.accounts);
-      writeJson(classesKey, state.classes);
-      writeJson(studentsKey, state.students);
+      writeJson(modelSettingsKey, state.modelSettings);
       writeJson(generationRecordsKey, state.generationRecords);
       writeJson(submissionsKey, state.submissions);
-      storage.setString(activeClassKey, state.activeClassId);
-      storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
+      persistSubjectScope();
       storage.setString(roleModeKey, state.roleMode);
-      applyScopeFromClass(currentClass(), { silent: true });
       buildSelectors();
-      buildClassScopeSelectors();
+      applySavedModelSettings();
       restoreScheduleControls();
       restoreTeacherControls();
       clearPracticeState();
+      clearScheduledPaperState();
       renderAll();
       setModelStatus("本地数据备份已导入并恢复。", "ok");
     } catch (error) {
@@ -3250,7 +3318,7 @@
 
   function clearLocalData() {
     if (!requireTeacherMode("清空学习数据")) return;
-    const confirmed = window.confirm("确认清空本机账号、班级、学生、错题、成绩、课件审核稿、练习记录和测验设置？此操作不会删除知识点包。建议先导出备份。");
+    const confirmed = window.confirm("确认清空本机账号、系统设置、课件审核稿、练习记录、测验记录和判分数据？此操作不会删除知识点包。建议先导出备份。");
     if (!confirmed) return;
     storage.removeMany(Object.values(localDataKeys));
     state.mistakes = [];
@@ -3258,27 +3326,24 @@
     state.coursewareReviews = {};
     state.generationCache = {};
     state.pptPlans = {};
-    state.schedule = { frequency: "每周", count: 10, mistakeRatio: 40 };
+    state.schedule = { frequency: "每周", count: 10 };
     state.accounts = defaultAccounts();
-    state.classes = [defaultClassroom()];
-    state.students = [];
-    state.activeClassId = state.classes[0].id;
     state.subjectId = "math";
+    state.modelSettings = {};
     state.generationRecords = [];
     state.submissions = [];
     state.roleMode = "teacher";
     writeJson(accountsKey, state.accounts);
-    writeJson(classesKey, state.classes);
-    writeJson(studentsKey, state.students);
+    writeJson(modelSettingsKey, state.modelSettings);
     writeJson(generationRecordsKey, state.generationRecords);
     writeJson(submissionsKey, state.submissions);
-    storage.setString(activeClassKey, state.activeClassId);
-    storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
     buildSelectors();
-    buildClassScopeSelectors();
+    persistSubjectScope();
+    applySavedModelSettings();
     restoreScheduleControls();
     restoreTeacherControls();
     clearPracticeState();
+    clearScheduledPaperState();
     renderAll();
     setModelStatus("本机学习数据已清空，知识点包和代码不受影响。", "ok");
   }
@@ -3292,10 +3357,8 @@
       pptPlans: state.pptPlans,
       schedule: state.schedule,
       accounts: state.accounts,
-      classes: state.classes,
-      students: state.students,
-      activeClassId: state.activeClassId,
-      subjectScope: { subjectId: state.subjectId || "math" },
+      subjectScope: { subjectId: state.subjectId || "math", gradeId: state.grade, volumeId: state.volume, unitId: state.unitId },
+      modelSettings: state.modelSettings,
       generationRecords: state.generationRecords,
       submissions: state.submissions,
       roleMode: state.roleMode
@@ -3510,9 +3573,9 @@
     $("answerInput").value = template;
     try {
       await navigator.clipboard.writeText(template);
-      setModelStatus("答题模板已填入同步出题页，并同步到拍照批改页。", "ok");
+      setModelStatus("答题模板已填入同步出题页，并同步到内部答案校正区。", "ok");
     } catch (error) {
-      setModelStatus("答题模板已填入同步出题页，并同步到拍照批改页。", "ok");
+      setModelStatus("答题模板已填入同步出题页，并同步到内部答案校正区。", "ok");
     }
   }
 
@@ -3750,7 +3813,7 @@
     renderMistakes();
     renderScoreTrends();
     renderMetrics();
-    setModelStatus(options.origin === "practice" ? "同步练习已判分，解析已同步到拍照批改页。" : "答案已判分并生成解析。", "ok");
+    setModelStatus(options.origin === "practice" ? "同步练习已判分，解析已同步到本机判分记录。" : "答案已判分并生成解析。", "ok");
   }
 
   function parseAnswers(text) {
@@ -4015,12 +4078,9 @@
 
   function saveScoreHistory(summary, results) {
     const unit = unitData();
-    const classroom = currentClass();
     const record = {
       id: `${Date.now()}-${unit.id}`,
       createdAt: new Date().toISOString(),
-      classId: classroom?.id || "",
-      className: classroom?.name || "",
       subjectId: state.subjectId || "math",
       gradeId: state.grade,
       gradeName: gradeData().name,
@@ -4293,21 +4353,16 @@
 
   function saveMistakesFromResults(results) {
     const wrongItems = results.filter((item) => !item.correct);
-    const classroom = currentClass();
     wrongItems.forEach((item) => {
       const existing = state.mistakes.find((mistake) => mistake.stem === item.question.stem && mistake.status !== "已掌握");
       if (existing) {
         existing.count += 1;
         existing.submitted = item.submitted;
-        existing.classId = classroom?.id || existing.classId || "";
-        existing.className = classroom?.name || existing.className || "";
         existing.updatedAt = new Date().toISOString();
         return;
       }
       state.mistakes.unshift({
         id: `${Date.now()}-${item.index}`,
-        classId: classroom?.id || "",
-        className: classroom?.name || "",
         subjectId: state.subjectId || "math",
         grade: gradeData().name,
         volume: volumeData().name,
@@ -4450,15 +4505,12 @@
     $("frequencySelect").value = state.schedule.frequency;
     state.schedule.count = capQuestionCount(state.schedule.count);
     $("scheduledCount").value = state.schedule.count;
-    $("mistakeRatio").value = state.schedule.mistakeRatio;
-    $("mistakeRatioLabel").textContent = `${state.schedule.mistakeRatio}%`;
   }
 
   function saveSchedule() {
     state.schedule = {
       frequency: $("frequencySelect").value,
       count: capQuestionCount($("scheduledCount").value),
-      mistakeRatio: clamp(Number($("mistakeRatio").value) || 0, 0, 80),
       updatedAt: new Date().toISOString()
     };
     $("scheduledCount").value = state.schedule.count;
@@ -4469,40 +4521,45 @@
 
   function renderSchedule() {
     const schedule = state.schedule;
+    renderScheduleHistory();
+    const hasScheduledQuestions = state.scheduledQuestions.length > 0;
+    $("exportScheduledStudentPdfBtn").disabled = !hasScheduledQuestions;
+    $("exportScheduledTeacherPdfBtn").disabled = !hasScheduledQuestions;
     $("scheduleStatus").innerHTML = `
       <strong>${escapeHtml(schedule.frequency)}测验已配置</strong>
-      <p>每次 ${schedule.count} 题，总分 100 分，其中错题占比 ${schedule.mistakeRatio}%。当前只从“${escapeHtml(unitData().title)}”单元知识点和本单元错题混合组卷。</p>
+      <p>每次 ${schedule.count} 题，总分 100 分，范围锁定为“${escapeHtml(unitData().title)}”单元全部客观知识点。</p>
     `;
+    if (!hasScheduledQuestions) {
+      $("scheduledPaper").className = "question-list empty-state";
+      $("scheduledPaper").innerHTML = `<div><strong>暂无周期测验卷</strong><p>选择单元后点击“生成周期测验”，或从历史记录载入。</p></div>`;
+    }
   }
 
   function buildScheduledPaper() {
     saveSchedule();
+    const unit = unitData();
     const count = capQuestionCount(state.schedule.count);
-    const mistakeCount = Math.round((count * state.schedule.mistakeRatio) / 100);
-    const activeMistakes = shuffle(currentUnitMistakes()).slice(0, mistakeCount);
-    const newQuestions = generateScopedQuestions(unitData(), Number(state.grade), state.difficulty, count);
-    const mistakeQuestions = activeMistakes.map((item, index) => ({
-      id: `scheduled-mistake-${item.id}-${index}`,
-      unitId: unitData().id,
-      unitTitle: item.unitTitle,
-      knowledgePoint: item.knowledgePoint,
-      questionType: item.questionType,
-      difficulty: item.difficulty,
-      stem: item.stem,
-      answer: item.answer,
-      explanation: item.explanation,
-      detailSteps: item.detailSteps,
-      commonMistake: item.commonMistake,
-      checkMethod: item.checkMethod,
-      sourceRefs: item.sourceRefs || getSourceRefs(unitData()),
-      point: item.point
-    }));
-    state.currentQuestions = prepareQuestionsForPaper(shuffle([...mistakeQuestions, ...newQuestions]), unitData(), count).questions;
-    seedAnswerInputsWithTemplate();
+    const generated = generateScopedQuestions(unit, Number(state.grade), state.difficulty, count);
+    const prepared = prepareQuestionsForPaper(generated, unit, count);
+    if (!isPreparedPaperComplete(prepared, unit, count)) {
+      setModelStatus(formatPaperValidationError(prepared, unit, count), "warn");
+      return;
+    }
+    state.scheduledQuestions = prepared.questions;
+    recordGeneration("scheduled_paper", unit, {
+      source: "rule-engine",
+      itemCount: state.scheduledQuestions.length,
+      totalScore: paperTotal(state.scheduledQuestions),
+      frequency: state.schedule.frequency,
+      questions: cloneJson(state.scheduledQuestions),
+      reviewStatus: "rule_checked",
+      exportVersion: practiceExportVersion
+    });
     $("scheduledPaper").className = "question-list";
-    $("scheduledPaper").innerHTML = state.currentQuestions.map(renderQuestionCard).join("");
-    renderPractice();
+    $("scheduledPaper").innerHTML = state.scheduledQuestions.map(renderQuestionCard).join("");
+    renderSchedule();
     renderMetrics();
+    setModelStatus(`周期测验已生成：${state.scheduledQuestions.length} 题，范围为“${unit.title}”。`, "ok");
   }
 
   function shuffle(items) {

@@ -44,6 +44,10 @@ button {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
   background: #111827;
   color: #f8fafc;
   padding: 28px 22px;
@@ -576,6 +580,103 @@ body[data-role-mode="student"] .teacher-only {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.module-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid #d8e4ef;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.module-toolbar.two-col,
+.module-toolbar.schedule-toolbar {
+  grid-template-columns: minmax(200px, 280px) minmax(180px, 220px) minmax(0, 1fr);
+}
+
+.module-toolbar.schedule-toolbar {
+  grid-template-columns: minmax(200px, 280px) minmax(160px, 200px) minmax(140px, 160px) auto;
+}
+
+.module-toolbar .hint {
+  align-self: center;
+  line-height: 1.65;
+}
+
+.history-list {
+  margin-bottom: 18px;
+}
+
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.history-head strong {
+  font-size: 15px;
+}
+
+.history-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.history-card.active {
+  border-color: #99f6e4;
+  background: #f4fffb;
+}
+
+.history-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.history-card p,
+.history-card span {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.history-card button {
+  flex: 0 0 auto;
+}
+
+.history-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--muted);
+  padding: 14px;
+  line-height: 1.6;
 }
 
 .courseware-actions {
@@ -3138,6 +3239,10 @@ body[data-role-mode="student"] .teacher-only {
   .grading-grid,
   .mistake-stats,
   .schedule-grid,
+  .module-toolbar,
+  .module-toolbar.two-col,
+  .module-toolbar.schedule-toolbar,
+  .history-grid,
   .classroom-grid,
   .student-form,
   .settings-grid {
