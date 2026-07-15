@@ -119,11 +119,16 @@
             </div>
             <div class="button-row">
               <button id="aiQuestionsBtn" class="primary-btn teacher-only">AI 生成练习</button>
-              <button id="exportPracticeStudentPdfBtn" class="secondary-btn teacher-only">导出空白卷 PDF</button>
-              <button id="exportPracticeTeacherPdfBtn" class="secondary-btn teacher-only">导出含答案 PDF</button>
-              <button id="exportPracticeJsonBtn" class="secondary-btn teacher-only">导出练习记录</button>
-              <button id="importPracticeBtn" class="secondary-btn teacher-only">导入历史练习</button>
               <button id="showAnswerBtn" class="secondary-btn teacher-only">显示参考答案</button>
+              <details id="practiceMoreMenu" class="action-menu teacher-only">
+                <summary class="secondary-btn">更多</summary>
+                <div class="action-menu-panel">
+                  <button id="exportPracticeStudentPdfBtn" class="menu-action">导出空白卷 PDF</button>
+                  <button id="exportPracticeTeacherPdfBtn" class="menu-action">导出含答案 PDF</button>
+                  <button id="exportPracticeJsonBtn" class="menu-action">导出练习记录</button>
+                  <button id="importPracticeBtn" class="menu-action">导入历史练习</button>
+                </div>
+              </details>
               <input id="importPracticeFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>

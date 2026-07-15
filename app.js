@@ -624,6 +624,12 @@
         if (menu) setTimeout(() => { menu.open = false; }, 0);
       });
     });
+    document.querySelectorAll("#practiceMoreMenu .menu-action").forEach((button) => {
+      button.addEventListener("click", () => {
+        const menu = $("practiceMoreMenu");
+        if (menu) setTimeout(() => { menu.open = false; }, 0);
+      });
+    });
     $("showAnswerBtn").addEventListener("click", () => {
       state.answersVisible = !state.answersVisible;
       renderPractice();
@@ -2377,8 +2383,13 @@
     });
     $("importPracticeBtn").disabled = state.practiceGenerating;
     $("paperMeta").hidden = !hasQuestions;
-    $("paperMeta").textContent = hasQuestions
-      ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。请人工审核题干、答案和分值后导出。`
+    $("paperMeta").innerHTML = hasQuestions
+      ? `
+        <span class="paper-meta-item"><strong>${state.currentQuestions.length}</strong><em>题目数</em></span>
+        <span class="paper-meta-item"><strong>${paperTotal(state.currentQuestions)}</strong><em>总分</em></span>
+        <span class="paper-meta-item wide"><strong>${escapeHtml(unitData().title)}</strong><em>单元范围</em></span>
+        <span class="paper-meta-review">请人工审核题干、答案和分值后导出</span>
+      `
       : "";
 
     if (state.practiceGenerating) {
@@ -2550,12 +2561,17 @@
   function renderQuestionCard(question, index) {
     return `
       <article class="question-card">
-        <h4>${index + 1}. ${renderStemContent(question.stem)}</h4>
-        <div class="question-meta">
-          <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
-          <span class="pill green">${escapeHtml(question.questionType || "同步练习")}</span>
-          <span class="pill orange">${escapeHtml(question.difficulty)}</span>
-          <span class="pill">${question.point} 分</span>
+        <div class="question-card-head">
+          <span class="question-index">${String(index + 1).padStart(2, "0")}</span>
+          <div class="question-main">
+            <div class="question-stem">${renderStemContent(question.stem)}</div>
+            <div class="question-meta">
+              <span class="pill blue">${escapeHtml(question.knowledgePoint)}</span>
+              <span class="pill green">${escapeHtml(question.questionType || "同步练习")}</span>
+              <span class="pill orange">${escapeHtml(question.difficulty)}</span>
+              <span class="pill">${question.point} 分</span>
+            </div>
+          </div>
         </div>
         <div class="answer-block">
           <p><strong>参考答案：</strong>${escapeHtml(question.answer)}</p>

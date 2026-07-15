@@ -5,7 +5,7 @@
 ## 当前模块
 
 - 课件生成：选择单元后生成 MarkdownFlow 导学课件，支持历史课件、审核编辑、授课全屏、PDF/Markdown/PPTX/JSON 导出。
-- 同步出题：直接复用当前单元，也可在本页修改单元；固定生成 10 道客观题，总分 100 分，覆盖本单元全部知识点，支持历史记录、人工审核、空白卷 PDF、含答案 PDF 和 JSON 导入导出。
+- 同步出题：直接复用当前单元，也可在本页修改单元；固定生成 10 道客观题，总分 100 分，覆盖本单元全部知识点。页面按教师审核台设计，默认展示历史版本、试卷摘要和题目卡片，参考答案默认折叠，导出/导入收进“更多”菜单。
 - 周期测验出题：按当前单元生成固定 10 题测验卷，支持历史记录、空白卷 PDF 和含答案 PDF。
 - 系统设置：只保留学科、年级、册别和模型配置。单元不在系统设置里选，课件/同步出题/周期测验任一页面修改单元后会同步到其他页面。
 
@@ -67,7 +67,7 @@ start_aiteacher_ocr.bat
 
 ## 本地数据
 
-当前使用 localStorage，本地数据层由 `storage-adapter.js` 封装，并提供 SQLite/后端迁移计划。schema v7 按教师端设计，保留：
+当前使用 localStorage，本地数据层由 `storage-adapter.js` 封装，并提供 SQLite/后端迁移计划。schema v8 按教师端设计，保留：
 
 - 账号与教师配置
 - 学科/年级/册别/单元范围
@@ -93,6 +93,8 @@ start_aiteacher_ocr.bat
 
 ```powershell
 node --check app.js
+node --check agent-orchestrator.js
+node --check pptx-exporter.js
 node scripts\run_mvp_checks.js
 python -m py_compile scripts\local_ocr_paddle.py
 ```
