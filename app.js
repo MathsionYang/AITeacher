@@ -575,42 +575,33 @@
       const unit = unitData();
       const fallbackSlides = buildBaseCoursewareSlides(unit);
       const runtimeConfig = collectModelRuntimeConfig();
-      const cacheId = buildGenerationCacheId("courseware", unit, runtimeConfig, { slideCount: fallbackSlides.length });
+      const cacheId = buildGenerationCacheId("courseware", unit, runtimeConfig, { slideCount: fallbackSlides.length, presentation: "markdownflow-tutor-v1" });
       const shouldReuseCache = !coursewareReviewRecord(unit)?.slides?.length;
-      let receivedChars = 0;
       switchTab("courseware");
       state.coursewareGenerating = true;
       state.coursewareEditMode = false;
-      setGenerationProgress("courseware", "AI 正在根据当前单元知识点组织课件内容，完成后统一展示。");
+      setGenerationProgress("courseware", "AI 正在把当前单元知识点输入导学课件 Agent，生成只读 MarkdownFlow 内容流。");
       renderCourseware();
       try {
         const cached = shouldReuseCache ? readGenerationCache(cacheId) : null;
         if (cached?.payload?.slides?.length) {
-          const slides = normalizeAiCoursewareSlides(cached.payload.slides, fallbackSlides, unit);
+          const slides = normalizeAiCoursewareSlides(cached.payload.slides, buildTutorCoursewareSlides(fallbackSlides, unit), unit);
           state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "cache", createdAt: cached.createdAt });
           clearPptPlanForUnit(unit);
           writeJson(coursewareReviewKey, state.coursewareReviews);
-          setModelStatus(`已复用本地缓存课件：${slides.length} 页，可继续审核编辑；点击“重新生成课件”会重新调用模型。`, "ok");
+          setModelStatus(`已复用本地缓存导学课件：${slides.length} 节，使用 MarkdownFlow 呈现。`, "ok");
           return;
         }
 
-        ensureAgentReady();
-        const generator = agentOrchestrator.generateCoursewareStream || agentOrchestrator.generateCourseware;
-        const result = await generator(
-          runtimeConfig,
-          buildAgentScope(unit),
-          fallbackSlides,
-          (token) => {
-            receivedChars += String(token || "").length;
-            setGenerationProgress("courseware", `已接收 ${receivedChars} 字内容，正在校验知识点边界与来源。`);
-          }
-        );
-        const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
-        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "llm" });
+        const tutorDraft = await createTutorCoursewareDraft(unit, fallbackSlides, runtimeConfig, (token, count) => {
+          setGenerationProgress("courseware", `导学课件 Agent 已接收 ${count} 字内容，正在组织 MarkdownFlow 阅读流。`);
+        });
+        const slides = tutorDraft.slides;
+        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: tutorDraft.source });
         clearPptPlanForUnit(unit);
         writeJson(coursewareReviewKey, state.coursewareReviews);
-        writeGenerationCache(cacheId, { slides }, { kind: "courseware", scopeKey: coursewareKey(unit), source: "llm" });
-        setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
+        writeGenerationCache(cacheId, { slides }, { kind: "courseware", scopeKey: coursewareKey(unit), source: tutorDraft.source });
+        setModelStatus(`AI 导学课件已生成 ${slides.length} 节，并使用 MarkdownFlow 呈现。`, "ok");
       } finally {
         state.coursewareGenerating = false;
         hideGenerationProgress("courseware");
@@ -624,51 +615,26 @@
     if (!requireTeacherMode("AI 导学重制")) return;
     await runWithModelStatus("remakeTutorCoursewareBtn", "重制中...", async () => {
       const unit = unitData();
-      const sourceSlides = buildCoursewareSlides(unit);
-      if (!sourceSlides.length) throw new Error("当前还没有知识点课件，请先 AI 生成或导入历史课件。");
-
-      const fallbackSlides = buildTutorCoursewareSlides(sourceSlides, unit);
+      const existingSlides = buildCoursewareSlides(unit);
+      const sourceSlides = existingSlides.length ? existingSlides : buildBaseCoursewareSlides(unit);
       const runtimeConfig = collectModelRuntimeConfig();
-      const generator = agentOrchestrator?.generateTutorCoursewareStream || agentOrchestrator?.generateTutorCourseware;
-      let slides = fallbackSlides;
-      let statusMessage = `已用本地导学模板重制 ${slides.length} 页课件，可继续审核编辑。`;
-      let statusTone = "warn";
-      let receivedChars = 0;
 
       switchTab("courseware");
       state.coursewareGenerating = true;
       state.coursewareEditMode = false;
-      setGenerationProgress("courseware", "正在把当前知识点课件重制成互动导学稿，完成后统一展示。");
+      setGenerationProgress("courseware", existingSlides.length
+        ? "正在把当前知识点课件重制成 MarkdownFlow 导学稿，完成后统一展示。"
+        : "正在把当前单元知识点直接输入导学课件 Agent，生成 MarkdownFlow 导学稿。");
       renderCourseware();
 
       try {
-        if (generator && runtimeConfig.model) {
-          try {
-            const result = await generator(
-              runtimeConfig,
-              buildAgentScope(unit),
-              sourceSlides,
-              fallbackSlides,
-              (token) => {
-                receivedChars += String(token || "").length;
-                setGenerationProgress("courseware", `导学课件 Agent 已接收 ${receivedChars} 字内容，正在整理互动提问与反馈。`);
-              }
-            );
-            slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
-            statusMessage = `AI 导学课件已重制 ${slides.length} 页，并进入可审核稿。`;
-            statusTone = "ok";
-          } catch (error) {
-            statusMessage = `模型重制失败，已使用本地导学模板完成 ${slides.length} 页：${error.message || "未知错误"}`;
-            statusTone = "warn";
-          }
-        } else {
-          statusMessage = `未检测到可用模型配置，已使用本地导学模板重制 ${slides.length} 页课件。`;
-        }
-
-        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: statusTone === "ok" ? "tutor-agent" : "tutor-template" });
+        const tutorDraft = await createTutorCoursewareDraft(unit, sourceSlides, runtimeConfig, (token, count) => {
+          setGenerationProgress("courseware", `导学课件 Agent 已接收 ${count} 字内容，正在整理互动提问与反馈。`);
+        });
+        state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(tutorDraft.slides, "draft", { source: tutorDraft.source });
         clearPptPlanForUnit(unit);
         writeJson(coursewareReviewKey, state.coursewareReviews);
-        setModelStatus(statusMessage, statusTone);
+        setModelStatus(tutorDraft.message, tutorDraft.tone);
       } finally {
         state.coursewareGenerating = false;
         hideGenerationProgress("courseware");
@@ -676,6 +642,49 @@
       }
     });
     renderCourseware();
+  }
+
+  async function createTutorCoursewareDraft(unit, sourceSlides, runtimeConfig, onToken) {
+    const fallbackSlides = buildTutorCoursewareSlides(sourceSlides, unit);
+    const generator = agentOrchestrator?.generateTutorCoursewareStream || agentOrchestrator?.generateTutorCourseware;
+    const canUseModel = Boolean(generator && runtimeConfig?.model);
+    let receivedChars = 0;
+
+    if (canUseModel) {
+      try {
+        const result = await generator(
+          runtimeConfig,
+          buildAgentScope(unit),
+          sourceSlides,
+          fallbackSlides,
+          (token) => {
+            receivedChars += String(token || "").length;
+            if (onToken) onToken(token, receivedChars);
+          }
+        );
+        const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
+        return {
+          slides,
+          source: "tutor-agent",
+          tone: "ok",
+          message: `AI 导学课件已生成 ${slides.length} 节，只使用读模式 MarkdownFlow 呈现。`
+        };
+      } catch (error) {
+        return {
+          slides: fallbackSlides,
+          source: "tutor-template",
+          tone: "warn",
+          message: `模型生成失败，已使用本地导学模板生成 ${fallbackSlides.length} 节 MarkdownFlow：${error.message || "未知错误"}`
+        };
+      }
+    }
+
+    return {
+      slides: fallbackSlides,
+      source: "tutor-template",
+      tone: "warn",
+      message: `未检测到可用模型配置，已直接用当前单元知识点生成 ${fallbackSlides.length} 节本地 MarkdownFlow 导学课。`
+    };
   }
 
   async function generateAiQuestions() {
@@ -1241,51 +1250,80 @@
     const reviewRecord = coursewareReviewRecord(unit);
     const hasSlides = slides.length > 0;
     if (!hasSlides) state.coursewareEditMode = false;
-    $("knowledgePoints").innerHTML = unit.points
-      .map(
-        (point) => `
-          <article class="knowledge-card">
-            <strong>${escapeHtml(point)}</strong>
-            <p>来源：${renderSourceLinks(sourceRefs)}</p>
-          </article>
-        `
-      )
-      .join("");
+    $("knowledgePoints").hidden = true;
+    $("knowledgePoints").innerHTML = "";
 
     updateCoursewareButtons(hasSlides);
 
     if (state.coursewareGenerating) {
-      $("coursewareSlides").className = "slide-grid empty-state";
-      $("coursewareSlides").innerHTML = `<div><strong>课件生成中</strong><p>AI 正在生成并校验内容，完成后会一次性展示。</p></div>`;
+      $("coursewareSlides").className = "markdownflow-reader empty-state";
+      $("coursewareSlides").innerHTML = `<div><strong>导学课生成中</strong><p>AI 正在生成并校验 MarkdownFlow 内容，完成后会一次性展示。</p></div>`;
       return;
     }
 
     if (!hasSlides) {
-      $("coursewareSlides").className = "slide-grid empty-state";
+      $("coursewareSlides").className = "markdownflow-reader empty-state";
       const emptyText = isTeacherMode()
-        ? "可以导入历史课件，或点击“AI 生成课件”创建当前单元课件。"
-        : "当前还没有可学习课件，请让教师模式先生成或导入课件。";
-      $("coursewareSlides").innerHTML = `<div><strong>暂无课件</strong><p>${emptyText}</p></div>`;
+        ? "点击“AI 生成导学课件”或“AI 导学重制”，系统会直接把当前单元知识点输入导学 Agent，生成只读 MarkdownFlow。"
+        : "当前还没有可阅读导学课，请让教师模式先生成或导入课件。";
+      $("coursewareSlides").innerHTML = `<div><strong>暂无 MarkdownFlow</strong><p>${emptyText}</p></div>`;
       return;
     }
 
-    $("coursewareSlides").className = "slide-grid";
-    $("coursewareSlides").innerHTML = renderCoursewareReviewStatus(reviewRecord) + slides
-      .map(
-        (slide, index) => `
-          <article class="slide-card ${state.coursewareEditMode ? "editing" : ""}" data-slide-index="${index}">
-            <div class="visual-stage visual-${escapeAttribute(slide.visualType)}">
-              ${renderSlideVisual(slide, unit, index)}
+    $("coursewareSlides").className = `markdownflow-reader ${state.coursewareEditMode ? "editing" : ""}`;
+    $("coursewareSlides").innerHTML = renderMarkdownFlowCourseware(unit, slides, reviewRecord, sourceRefs);
+  }
+
+  function renderMarkdownFlowCourseware(unit, slides, reviewRecord, sourceRefs) {
+    return `
+      <section class="markdownflow-shell">
+        <aside class="markdownflow-nav" aria-label="导学目录">
+          <div class="markdownflow-logo">AI Teacher</div>
+          <strong>${escapeHtml(unit.title)}</strong>
+          <p>${escapeHtml(`${gradeData().name}${volumeData().name} · 读模式`)}</p>
+          <ol>
+            ${slides.map((slide, index) => `<li><a href="#flow-section-${index + 1}">${escapeHtml(index + 1)}. ${escapeHtml(slide.title)}</a></li>`).join("")}
+          </ol>
+          <div class="markdownflow-nav-source">来源：${renderSourceLinks(sourceRefs)}</div>
+        </aside>
+        <article class="markdownflow-content" aria-label="MarkdownFlow 导学内容">
+          <header class="markdownflow-hero">
+            <div>
+              <p class="eyebrow">MarkdownFlow</p>
+              <h3>${escapeHtml(unit.title)}</h3>
+              <p>以当前单元知识点为输入，按“观察、追问、反馈、小测、复盘”的阅读流学习。</p>
             </div>
-            <h4 data-edit="title" contenteditable="${state.coursewareEditMode}">${index + 1}. ${escapeHtml(slide.title)}</h4>
-            <p data-edit="body" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.body)}</p>
-            <ul>${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}</ul>
-            ${renderTutorMoves(slide)}
-            <div class="source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</div>
-          </article>
-        `
-      )
-      .join("");
+            <span class="read-mode-pill">读</span>
+          </header>
+          ${renderCoursewareReviewStatus(reviewRecord)}
+          ${slides.map((slide, index) => renderMarkdownFlowSection(slide, unit, index, sourceRefs)).join("")}
+          <footer class="markdownflow-footer">
+            <span>内容由 AI 在人类指导下生成</span>
+            <span>由 MarkdownFlow 驱动</span>
+          </footer>
+        </article>
+      </section>
+    `;
+  }
+
+  function renderMarkdownFlowSection(slide, unit, index, sourceRefs) {
+    return `
+      <section id="flow-section-${index + 1}" class="markdownflow-section" data-slide-index="${index}">
+        <div class="markdownflow-section-head">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <h4 data-edit="title" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.title)}</h4>
+        </div>
+        <p class="markdownflow-body" data-edit="body" contenteditable="${state.coursewareEditMode}">${escapeHtml(slide.body)}</p>
+        <div class="markdownflow-visual visual-${escapeAttribute(slide.visualType)}">
+          ${renderSlideVisual(slide, unit, index)}
+        </div>
+        <ul class="markdownflow-points">
+          ${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}
+        </ul>
+        ${renderTutorMoves(slide)}
+        <p class="source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
+      </section>
+    `;
   }
 
   function renderCoursewareReviewStatus(record) {
@@ -1431,14 +1469,15 @@
   }
 
   function updateCoursewareButtons(hasSlides) {
-    $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
+    $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成导学课件" : "AI 生成导学课件";
     $("remakeTutorCoursewareBtn").textContent = state.coursewareGenerating ? "重制中..." : "AI 导学重制";
     $("aiPptPlanBtn").textContent = state.pptPlanGenerating ? "制作中..." : "AI 制作 PPT";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
-    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "remakeTutorCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn", "presentCoursewareBtn"].forEach((id) => {
+    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn", "presentCoursewareBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.coursewareGenerating || state.pptPlanGenerating || !hasSlides;
     });
+    $("remakeTutorCoursewareBtn").disabled = state.coursewareGenerating || state.pptPlanGenerating;
     $("importCoursewareBtn").disabled = state.coursewareGenerating || state.pptPlanGenerating;
     const moreMenu = $("coursewareMoreMenu");
     const moreSummary = $("coursewareMoreSummary");
@@ -1510,27 +1549,27 @@
     const safeSlides = sourceSlides.length ? sourceSlides : buildBaseCoursewareSlides(unit);
     const frames = [
       {
-        title: "导学目标",
+        title: "先看目标",
         body: "把本节知识点先变成学生能回答的问题，再进入讲解。",
         moves: (point) => [`先问：看到“${point}”，你觉得今天要解决什么问题？`, "追问：这个知识点通常会用图、表还是算式表达？", "反馈：能说出目标即可，不急着计算。"]
       },
       {
-        title: "情境观察",
+        title: "观察情境",
         body: "先观察图形中的数量和关系，让学生用自己的话复述条件。",
         moves: () => ["先问：图中哪些数量已经知道？", "追问：要求的问题和哪些数量直接相关？", "反馈：条件说不完整时，回到图形逐个指认。"]
       },
       {
-        title: "概念拆解",
+        title: "拆开概念",
         body: "把概念拆成可观察、可操作、可验证的三个小步骤。",
         moves: (point) => [`先问：${point} 的第一步应该先看什么？`, "追问：如果顺序换了，结果会不会变？", "反馈：让学生把步骤和图形上的位置对应起来。"]
       },
       {
-        title: "例题对话",
+        title: "边问边算",
         body: "用一题示范审题、建模、计算和检查，让学生参与每一步判断。",
         moves: () => ["先问：这一步为什么先算它？", "追问：能不能用另一种图或表检查？", "反馈：只给结果时，提醒补上数量关系。"]
       },
       {
-        title: "即时小测",
+        title: "马上小测",
         body: "用少量标准答案题确认是否会迁移，不增加跨单元内容。",
         moves: (point) => [`先问：换一个数，你还能用 ${point} 解决吗？`, "追问：答案格式应该写成什么样？", "反馈：错在审题、顺序或计算时分别提示。"]
       },
@@ -1697,7 +1736,8 @@
       setModelStatus("当前还没有可保存的课件。", "warn");
       return;
     }
-    const slides = Array.from(document.querySelectorAll("#coursewareSlides .slide-card")).map((card, index) => {
+    const slideNodes = Array.from(document.querySelectorAll("#coursewareSlides .markdownflow-section, #coursewareSlides .slide-card"));
+    const slides = slideNodes.map((card, index) => {
       const existingSlide = existingSlides[index] || {};
       return {
         title: cleanEditableText(card.querySelector('[data-edit="title"]')?.innerText || "").replace(/^\d+\.\s*/, ""),
