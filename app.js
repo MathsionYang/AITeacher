@@ -7,6 +7,7 @@
   const feedbackPhraseKey = "ai-teacher-rj-math-last-feedback-phrase-v1";
   const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
   const generationCacheKey = "ai-teacher-rj-math-generation-cache-v1";
+  const pptPlanKey = "ai-teacher-rj-math-ppt-plans-v1";
   const ocrProxyBaseUrl = "http://127.0.0.1:8790";
   const ruleEngine = window.AITeacherRuleEngine || {};
   const storage = window.AITeacherStorage?.createLocalJsonStorage?.({
@@ -22,7 +23,8 @@
     coursewareReviews: coursewareReviewKey,
     scoreHistory: scoreHistoryKey,
     roleMode: roleModeKey,
-    generationCache: generationCacheKey
+    generationCache: generationCacheKey,
+    pptPlans: pptPlanKey
   };
   const mockData = window.AI_TEACHER_MOCK_DATA || {};
   const mockEnabled = Boolean(mockData.enabled);
@@ -30,6 +32,7 @@
   const providerDefaults = window.AITeacherModelClient?.providerDefaults || {};
   const modelClient = window.AITeacherModelClient?.createModelClient?.();
   const agentOrchestrator = window.AITeacherAgentOrchestrator?.createAgentOrchestrator?.({ modelClient });
+  const pptxExporter = window.AITeacherPptxExporter;
   const requiredQuestionCount = ruleEngine.REQUIRED_QUESTION_COUNT || 10;
 
   const state = {
@@ -47,12 +50,14 @@
     activeTab: "courseware",
     coursewareEditMode: false,
     coursewareGenerating: false,
+    pptPlanGenerating: false,
     practiceGenerating: false,
     gradingResults: [],
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
     scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
     generationCache: readJson(generationCacheKey, {}, "generationCache"),
+    pptPlans: readJson(pptPlanKey, {}, "pptPlans"),
     schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule"),
     roleMode: readRoleMode()
   };
@@ -84,7 +89,7 @@
   function createFallbackStorage() {
     return {
       kind: "local-json-fallback",
-      schemaVersion: 4,
+      schemaVersion: 5,
       getString: (key, fallback = "") => {
         const value = localStorage.getItem(key);
         return value == null ? fallback : value;
@@ -93,17 +98,17 @@
       setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
       removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
       buildEnvelope: (type, data, metadata = {}) => ({
-        schemaVersion: 4,
+        schemaVersion: 5,
         storageKind: "local-json-fallback",
         type,
         exportedAt: new Date().toISOString(),
-        exportVersion: metadata.exportVersion || `${type}-v4`,
+        exportVersion: metadata.exportVersion || `${type}-v5`,
         ...metadata,
         data
       }),
       sqliteMigrationPlan: () => ({
         target: "sqlite",
-        schemaVersion: 4,
+        schemaVersion: 5,
         schema: [],
         strategy: ["加载 storage-adapter.js 后导出迁移计划"]
       })
@@ -390,6 +395,8 @@
     $("testModelBtn").addEventListener("click", testModelConnection);
     $("aiCoursewareBtn").addEventListener("click", generateAiCourseware);
     $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
+    $("aiPptPlanBtn").addEventListener("click", generateAiPptPlan);
+    $("exportPptxBtn").addEventListener("click", exportCoursewarePptx);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
     $("exportCoursewareJsonBtn").addEventListener("click", exportCoursewareJson);
     $("importCoursewareBtn").addEventListener("click", () => {
@@ -575,6 +582,7 @@
         if (cached?.payload?.slides?.length) {
           const slides = normalizeAiCoursewareSlides(cached.payload.slides, fallbackSlides, unit);
           state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "cache", createdAt: cached.createdAt });
+          clearPptPlanForUnit(unit);
           writeJson(coursewareReviewKey, state.coursewareReviews);
           setModelStatus(`已复用本地缓存课件：${slides.length} 页，可继续审核编辑；点击“重新生成课件”会重新调用模型。`, "ok");
           return;
@@ -593,6 +601,7 @@
         );
         const slides = normalizeAiCoursewareSlides(result.slides, fallbackSlides, unit);
         state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "llm" });
+        clearPptPlanForUnit(unit);
         writeJson(coursewareReviewKey, state.coursewareReviews);
         writeGenerationCache(cacheId, { slides }, { kind: "courseware", scopeKey: coursewareKey(unit), source: "llm" });
         setModelStatus(`AI 课件已生成 ${slides.length} 页，并进入可审核稿。`, "ok");
@@ -664,6 +673,44 @@
       }
     });
     renderPractice();
+  }
+
+  async function generateAiPptPlan() {
+    if (!requireTeacherMode("AI 制作 PPT")) return;
+    await runWithModelStatus("aiPptPlanBtn", "制作中...", async () => {
+      ensureAgentReady();
+      ensurePptExporterReady();
+      const unit = unitData();
+      const slides = buildCoursewareSlides(unit);
+      if (!slides.length) throw new Error("当前还没有课件，请先生成或导入课件。");
+      const context = buildPptExportContext(unit, slides);
+      const fallbackPlan = pptxExporter.buildPptPlan(context);
+      const generator = agentOrchestrator.generatePptPlanStream || agentOrchestrator.generatePptPlan;
+      let receivedChars = 0;
+      state.pptPlanGenerating = true;
+      renderCourseware();
+      try {
+        const result = await generator(
+          collectModelRuntimeConfig(),
+          buildAgentScope(unit),
+          slides,
+          fallbackPlan,
+          (token) => {
+            receivedChars += String(token || "").length;
+            setModelStatus(`PPT 制作 Agent 已接收 ${receivedChars} 字方案，正在整理版式。`, "busy");
+          }
+        );
+        const plan = pptxExporter.normalizePptPlan(result.plan, fallbackPlan, context);
+        const validation = pptxExporter.validatePptPlan(plan, unit.points || []);
+        if (!validation.ok) throw new Error(`PPT 方案未通过校验：${validation.issues.slice(0, 3).join("；")}`);
+        state.pptPlans[pptPlanRecordKey(unit)] = buildPptPlanRecord(plan, "draft", { source: "llm" });
+        writeJson(pptPlanKey, state.pptPlans);
+        setModelStatus(`PPT 制作 Agent 已生成 ${plan.pages.length} 页排版方案，可直接导出 PPTX。`, "ok");
+      } finally {
+        state.pptPlanGenerating = false;
+        renderCourseware();
+      }
+    });
   }
 
   async function runWithModelStatus(buttonId, busyText, action) {
@@ -1174,12 +1221,13 @@
   }
   function updateCoursewareButtons(hasSlides) {
     $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
+    $("aiPptPlanBtn").textContent = state.pptPlanGenerating ? "制作中..." : "AI 制作 PPT";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
-    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn"].forEach((id) => {
+    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn"].forEach((id) => {
       const button = $(id);
-      if (button) button.disabled = state.coursewareGenerating || !hasSlides;
+      if (button) button.disabled = state.coursewareGenerating || state.pptPlanGenerating || !hasSlides;
     });
-    $("importCoursewareBtn").disabled = state.coursewareGenerating;
+    $("importCoursewareBtn").disabled = state.coursewareGenerating || state.pptPlanGenerating;
     const moreMenu = $("coursewareMoreMenu");
     const moreSummary = $("coursewareMoreSummary");
     if (moreMenu && moreSummary) {
@@ -1277,6 +1325,65 @@
     };
   }
 
+  function pptPlanRecordKey(unit) {
+    return coursewareKey(unit);
+  }
+
+  function pptPlanRecord(unit) {
+    const raw = state.pptPlans[pptPlanRecordKey(unit)];
+    if (raw?.plan?.pages?.length) return raw;
+    if (raw?.pages?.length) return buildPptPlanRecord(raw, "draft", { source: "legacy-plan" });
+    return null;
+  }
+
+  function buildPptPlanRecord(plan, reviewStatus = "draft", extra = {}) {
+    const now = new Date().toISOString();
+    return {
+      schemaVersion: exportSchemaVersion,
+      exportVersion: "ppt-plan-v1",
+      reviewStatus,
+      reviewStatusLabel: reviewStatusLabel(reviewStatus),
+      createdAt: extra.createdAt || now,
+      updatedAt: now,
+      source: extra.source || "local",
+      plan
+    };
+  }
+
+  function clearPptPlanForUnit(unit) {
+    if (!state.pptPlans || !unit) return;
+    delete state.pptPlans[pptPlanRecordKey(unit)];
+    writeJson(pptPlanKey, state.pptPlans);
+  }
+
+  function ensurePptExporterReady() {
+    if (!pptxExporter?.buildPptPlan || !pptxExporter?.createPptxPackage) {
+      throw new Error("PPTX 导出模块未加载，请确认 pptx-exporter.js 已引入。");
+    }
+  }
+
+  function buildPptExportContext(unit, slides) {
+    const reviewRecord = coursewareReviewRecord(unit);
+    return {
+      version: content.version,
+      subject: content.subject,
+      textbookVersion: content.textbookVersion || "人教版",
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      unitSummary: unit.summary,
+      knowledgePoints: unit.points || [],
+      sources: getSourceRefs(unit),
+      reviewStatus: reviewRecord?.reviewStatus || "draft",
+      reviewStatusLabel: reviewRecord?.reviewStatusLabel || reviewStatusLabel("draft"),
+      exportVersion: reviewRecord?.exportVersion || reviewExportVersion,
+      slides
+    };
+  }
+
   function reviewStatusLabel(status) {
     const labels = {
       draft: "待审核",
@@ -1332,6 +1439,7 @@
       };
     });
     state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "reviewed", { source: "teacher-review" });
+    clearPptPlanForUnit(unit);
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
     renderCourseware();
@@ -1340,7 +1448,9 @@
 
   function resetCoursewareReview() {
     if (!requireTeacherMode("清空课件")) return;
-    delete state.coursewareReviews[coursewareKey(unitData())];
+    const unit = unitData();
+    delete state.coursewareReviews[coursewareKey(unit)];
+    clearPptPlanForUnit(unit);
     writeJson(coursewareReviewKey, state.coursewareReviews);
     state.coursewareEditMode = false;
     hideGenerationProgress("courseware");
@@ -1360,6 +1470,29 @@
     }
     switchTab("courseware");
     window.print();
+  }
+
+  function exportCoursewarePptx() {
+    if (!requireTeacherMode("导出 PPTX")) return;
+    ensurePptExporterReady();
+    const unit = unitData();
+    const slides = buildCoursewareSlides(unit);
+    if (!slides.length) {
+      setModelStatus("当前还没有可导出 PPTX 的课件。", "warn");
+      return;
+    }
+    const context = buildPptExportContext(unit, slides);
+    const fallbackPlan = pptxExporter.buildPptPlan(context);
+    const record = pptPlanRecord(unit);
+    const plan = pptxExporter.normalizePptPlan(record?.plan, fallbackPlan, context);
+    const validation = pptxExporter.validatePptPlan(plan, unit.points || []);
+    if (!validation.ok) {
+      setModelStatus(`PPT 导出前校验提示：${validation.issues.slice(0, 3).join("；")}。已使用本地模板补齐后导出。`, "warn");
+    }
+    const filename = `${gradeData().name}${volumeData().name}-${unit.title}-知识点课件.pptx`;
+    pptxExporter.downloadPptx(plan, filename);
+    const sourceLabel = record?.source === "llm" ? "PPT 制作 Agent 方案" : "本地模板方案";
+    setModelStatus(`PPTX 已导出：${plan.pages.length} 页，使用${sourceLabel}。`, "ok");
   }
 
   function renderSlideVisual(slide, unit, index) {
@@ -2286,7 +2419,7 @@
   function exportLocalData() {
     if (!requireTeacherMode("导出本地数据备份")) return;
     downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
-    setModelStatus("本地学习数据已导出，包含错题、成绩、审核稿、测验设置和角色模式。", "ok");
+    setModelStatus("本地学习数据已导出，包含错题、成绩、审核稿、PPT 方案、测验设置和角色模式。", "ok");
   }
 
   async function importLocalData(event) {
@@ -2300,12 +2433,14 @@
       state.scoreHistory = Array.isArray(data.scoreHistory) ? data.scoreHistory : [];
       state.coursewareReviews = data.coursewareReviews && typeof data.coursewareReviews === "object" ? data.coursewareReviews : {};
       state.generationCache = data.generationCache && typeof data.generationCache === "object" ? data.generationCache : {};
+      state.pptPlans = data.pptPlans && typeof data.pptPlans === "object" ? data.pptPlans : {};
       state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10, mistakeRatio: 40 };
       state.roleMode = data.roleMode === "student" ? "student" : "teacher";
       writeJson(mistakeKey, state.mistakes);
       writeJson(scoreHistoryKey, state.scoreHistory);
       writeJson(coursewareReviewKey, state.coursewareReviews);
       writeJson(generationCacheKey, state.generationCache);
+      writeJson(pptPlanKey, state.pptPlans);
       writeJson(scheduleKey, state.schedule);
       storage.setString(roleModeKey, state.roleMode);
       restoreScheduleControls();
@@ -2329,6 +2464,7 @@
     state.scoreHistory = [];
     state.coursewareReviews = {};
     state.generationCache = {};
+    state.pptPlans = {};
     state.schedule = { frequency: "每周", count: 10, mistakeRatio: 40 };
     state.roleMode = "teacher";
     restoreScheduleControls();
@@ -2344,6 +2480,7 @@
       scoreHistory: state.scoreHistory,
       coursewareReviews: state.coursewareReviews,
       generationCache: state.generationCache,
+      pptPlans: state.pptPlans,
       schedule: state.schedule,
       roleMode: state.roleMode
     }, {
@@ -2428,6 +2565,7 @@
       const unit = unitData();
       const slides = normalizeAiCoursewareSlides(rawSlides, buildBaseCoursewareSlides(unit), unit);
       state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, payload.reviewStatus || "imported", { source: "import", createdAt: payload.exportedAt });
+      clearPptPlanForUnit(unit);
       writeJson(coursewareReviewKey, state.coursewareReviews);
       state.coursewareEditMode = false;
       hideGenerationProgress("courseware");

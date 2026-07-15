@@ -3,16 +3,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const ruleEngine = require("../rule-engine.js");
 const storageApi = require("../storage-adapter.js");
+const pptxExporter = require("../pptx-exporter.js");
 
-assert.equal(storageApi.STORAGE_SCHEMA_VERSION, 4);
+assert.equal(storageApi.STORAGE_SCHEMA_VERSION, 5);
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("courseware_reviews")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("grading_submissions")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("generation_cache")));
+assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("ppt_plans")));
 
 const storage = storageApi.createLocalJsonStorage({ namespace: "test-ai-teacher" });
 const envelope = storage.buildEnvelope("local-data-backup", { mistakes: [] });
 assert.equal(envelope.storageKind, "local-json");
-assert.equal(envelope.schemaVersion, 4);
+assert.equal(envelope.schemaVersion, 5);
 assert.equal(envelope.namespace, "test-ai-teacher");
 assert.equal(envelope.type, "local-data-backup");
 assert.ok(storage.sqliteMigrationPlan().schema.some((sql) => sql.includes("score_history")));
@@ -28,6 +30,9 @@ assert.ok(indexSource.includes("id=\"ocrStatusPanel\""));
 assert.ok(indexSource.includes("id=\"questionCount\" type=\"number\" min=\"10\" max=\"10\" value=\"10\" disabled"));
 assert.ok(indexSource.includes("id=\"scheduledCount\" type=\"number\" min=\"10\" max=\"10\" value=\"10\" disabled"));
 assert.ok(indexSource.includes("id=\"coursewareMoreMenu\""));
+assert.ok(indexSource.includes("id=\"aiPptPlanBtn\""));
+assert.ok(indexSource.includes("id=\"exportPptxBtn\""));
+assert.ok(indexSource.includes("pptx-exporter.js"));
 assert.ok(indexSource.includes("class=\"action-menu-panel\""));
 assert.ok(indexSource.indexOf("id=\"downloadCoursewareBtn\"") > indexSource.indexOf("id=\"coursewareMoreMenu\""));
 assert.ok(indexSource.includes("id=\"appNoticeHost\""));
@@ -38,6 +43,36 @@ assert.ok(appSource.includes("parseAnswerReview(answerText, \"paddleocr\""));
 assert.ok(appSource.includes("function setOcrStatus"));
 assert.ok(appSource.includes("function showAppNotice"));
 assert.ok(stylesSource.includes(".app-notice-host"));
+assert.ok(appSource.includes("function exportCoursewarePptx"));
+assert.ok(appSource.includes("function generateAiPptPlan"));
+assert.ok(appSource.includes("pptPlans"));
+assert.ok(agentSource.includes("generatePptPlanStream"));
+assert.ok(agentSource.includes("PPT 制作 Agent"));
+assert.equal(agentSource.includes("直接生成 PPTX"), true);
+assert.ok(pptxExporter.createPptxPackage);
+const samplePlan = pptxExporter.buildPptPlan({
+  gradeName: "三年级",
+  volumeName: "上册",
+  unitTitle: "混合运算",
+  unitSummary: "用图、表、式表达数量关系。",
+  knowledgePoints: ["不含括号的两级混合运算", "含小括号的混合运算"],
+  sources: [{ name: "测试来源", usage: "范围核验", url: "https://example.com" }],
+  slides: [{
+    title: "例题精讲",
+    body: "先看数量关系，再列式计算。",
+    bullets: ["找已知条件", "确定运算顺序"],
+    visualType: "scenario",
+    visualData: {
+      kind: "stationery",
+      items: [{ type: "notebook", label: "笔记本", count: 3, priceLabel: "6元" }],
+      expression: "3×6"
+    }
+  }]
+});
+assert.equal(pptxExporter.validatePptPlan(samplePlan, ["不含括号的两级混合运算"]).ok, true);
+const pptxBytes = pptxExporter.createPptxPackage(samplePlan);
+assert.ok(pptxBytes.length > 1000);
+assert.equal(String.fromCharCode(pptxBytes[0], pptxBytes[1]), "PK");
 assert.ok(appSource.includes("已接收 ${receivedChars} 字内容"));
 assert.ok(agentSource.includes("generateQuestionsStream"));
 assert.ok(agentSource.includes("每次必须生成 10 道题"));

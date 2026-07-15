@@ -45,8 +45,9 @@ LOCAL_LLM_PROXY_BASE_URL=http://127.0.0.1:8787
 
 - 页面侧栏默认提供“本地代理（推荐）”，Base URL 为 `http://127.0.0.1:8787`，API Key 可留空。
 - `model-client.js` 提供 OpenAI-compatible 连接测试、Chat Completions 调用和 JSON 输出解析；`scripts/local_proxy_node.js` 与 `scripts/local_proxy.py` 负责本地转发。
-- `agent-orchestrator.js` 已接入课件 Agent 和出题 Agent。
+- `agent-orchestrator.js` 已接入课件 Agent、出题 Agent 和 PPT 制作 Agent。
 - AI 课件入口放在“知识点课件”页面内，生成时显示进度动画，不提前展示半成品内容，完成后生成审核稿，用户保存前仍可人工修改，并可导入/导出 JSON。
+- PPT 制作 Agent 可把已审核课件、来源和 visualData 转成结构化 `ppt_plan_json`；`pptx-exporter.js` 负责本机生成 `.pptx`，未配置模型时也可用本地模板方案导出。
 - AI 出题入口放在“同步出题”页面内，页面默认空白；生成候选客观题后进入当前单元边界、题干与知识点匹配、客观题型、开放题过滤、题型重复和 100 分制规则处理，全部完成后再展示整卷，并支持历史练习 JSON 导入/导出。
 - 批改流程已接入本地 PaddleOCR 适配器，先完成题号答案结构化、置信度提示和规则判分；批改 Agent、错题复习 Agent 和周期测验 Agent 仍按架构预留步骤评分和复习计划。
 
@@ -178,7 +179,7 @@ OCR 负责识别文字、数字、算式和题号。模型负责理解“学生�
 
 Agent 是“任务调度员 + 检查员 + 多步骤执行器”，不直接取代业务模块。
 
-当前代码中，课件 Agent 和出题 Agent 已作为显式按钮接入；其余 Agent 仍是后续本地模块扩展方向。
+当前代码中，课件 Agent、出题 Agent 和 PPT 制作 Agent 已作为显式按钮接入；其余 Agent 仍是后续本地模块扩展方向。
 
 ### 课件 Agent
 
@@ -210,6 +211,25 @@ Agent 是“任务调度员 + 检查员 + 多步骤执行器”，不直接取�
   -> 不合格则重生成
   -> 输出合格题组
 ```
+
+### PPT 制作 Agent
+
+流程：
+
+```text
+读取已审核课件
+  -> 读取知识点来源和 visualData
+  -> 调模型生成 ppt_plan_json
+  -> 检查页标题、文字长度、来源和知识点覆盖
+  -> 保存本地 PPT 方案
+  -> 交给 pptx-exporter.js 生成 PPTX
+```
+
+边界：
+
+- Agent 只输出结构化排版方案，不直接生成 PPTX、HTML、SVG 或图片。
+- PPTX 渲染器负责固定模板、坐标、形状、来源页脚和文件打包。
+- 若不调用模型，系统仍可用本地模板生成可下载 PPTX。
 
 ### 批改 Agent
 
@@ -271,7 +291,7 @@ model-client
   OpenAI-compatible 调用、流式读取、连接测试、错误归因
 
 agent-orchestrator
-  课件、出题、批改、错题复习、周期测验 Agent 编排
+  课件、出题、PPT 制作、批改、错题复习、周期测验 Agent 编排
 
 role-mode
   教师模式/学生模式、入口显隐、本地权限字段、后续教师端拆分边界
@@ -280,13 +300,13 @@ rule-engine
   判分、答案验算、客观题型过滤、开放题拒绝、题型分布、难度校验、来源校验
 
 content-store
-  知识点包、课件审核稿、题目、错题库、成绩记录、测验记录
+  知识点包、课件审核稿、PPT 方案、题目、错题库、成绩记录、测验记录
 
 ocr-adapter
   当前实现为 `scripts/local_ocr_paddle.py` 本地 PaddleOCR 代理；后续可替换客户自有 OCR 接口
 
 exporter
-  JSON、Markdown、PDF、后续 PPTX
+  JSON、Markdown、PDF、PPTX
 
 mock-data
   可替换测试数据，覆盖初始范围、错题、成绩趋势、周期测验设置

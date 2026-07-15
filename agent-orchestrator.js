@@ -67,6 +67,35 @@
       };
     }
 
+    async function generatePptPlan(runtimeConfig, scope, coursewareSlides, fallbackPlan) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const payload = await modelClient.generateJson(runtimeConfig, [
+        { role: "system", content: buildPptPlanSystemPrompt() },
+        { role: "user", content: JSON.stringify({ scope, coursewareSlides, fallbackPlan }) }
+      ]);
+      return {
+        source: "llm",
+        agent: "ppt_maker_agent",
+        plan: payload?.plan || payload?.pptPlan || payload
+      };
+    }
+
+    async function generatePptPlanStream(runtimeConfig, scope, coursewareSlides, fallbackPlan, onToken) {
+      ensureModelClient();
+      ensureRuntime(runtimeConfig);
+      const generate = modelClient.generateJsonStream || modelClient.generateJson;
+      const payload = await generate(runtimeConfig, [
+        { role: "system", content: buildPptPlanSystemPrompt() },
+        { role: "user", content: JSON.stringify({ scope, coursewareSlides, fallbackPlan }) }
+      ], {}, onToken);
+      return {
+        source: "llm",
+        agent: "ppt_maker_agent",
+        plan: payload?.plan || payload?.pptPlan || payload
+      };
+    }
+
     function ensureModelClient() {
       if (!modelClient) throw new Error("模型客户端未加载。");
     }
@@ -74,6 +103,8 @@
     return {
       generateCourseware,
       generateCoursewareStream,
+      generatePptPlan,
+      generatePptPlanStream,
       generateQuestions,
       generateQuestionsStream,
       testConnection
@@ -112,6 +143,19 @@
       "questionType 必须使用上述客观题型之一；每题必须有答案、解析、题型、详细步骤、易错点和检查方法。",
       "不要复制教材原题或商业题库题目。",
       "返回 JSON 对象：{ \"questions\": [{ \"knowledgePoint\": string, \"questionType\": string, \"difficulty\": string, \"stem\": string, \"answer\": string, \"explanation\": string, \"detailSteps\": string[], \"commonMistake\": string, \"checkMethod\": string }] }。"
+    ].join("\n");
+  }
+
+  function buildPptPlanSystemPrompt() {
+    return [
+      "你是小学数学 PPT 制作 Agent，只负责生成结构化 PPT 方案 JSON，不直接生成 PPTX、HTML、SVG 或图片。",
+      "输入包含已审核课件页、知识点、来源、visualData 和本地 fallbackPlan；你必须优先沿用 fallbackPlan 的页数、知识点覆盖和视觉数据。",
+      "PPT 排版要清爽、美观、适合小学数学课堂：每页一个重点，文字少，图形表达服务理解，不做装饰性堆砌。",
+      "可用 layout：cover、goals、visual-left、visual-right、concept、practice、summary。情境图解页优先 visual-left 或 visual-right。",
+      "每页 title 不超过 24 字，body 不超过 80 字，bullets 不超过 5 条且每条不超过 28 字。",
+      "visualData 只能复用或轻微整理输入中的结构化数据，不要创造教材原图、教材原文或商业题库内容。",
+      "每页必须保留 sources 或继承 fallbackPlan.sources；不得删除来源说明。",
+      "返回 JSON 对象：{ \"plan\": { \"title\": string, \"subtitle\": string, \"theme\": \"math-clean\", \"pages\": [{ \"layout\": string, \"type\": string, \"title\": string, \"subtitle\": string, \"body\": string, \"bullets\": string[], \"visualKind\": string, \"visualData\": object|null, \"sources\": array }], \"sources\": array } }。"
     ].join("\n");
   }
 

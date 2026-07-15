@@ -12,12 +12,13 @@ index.html
   -> scripts/local_proxy_node.js Node 本地模型代理
   -> scripts/local_proxy.py      Python 本地模型代理
   -> model-client.js       OpenAI-compatible 模型客户端
-  -> agent-orchestrator.js 课件 Agent 与出题 Agent 编排
+  -> agent-orchestrator.js 课件 Agent、出题 Agent、PPT 制作 Agent 编排
+  -> pptx-exporter.js 本地 PPT 方案校验与 PPTX 文件生成
   -> app.js        课件生成、出题、判分、错题库、周期测验
   -> storage-adapter.js  local-json 本地数据层 / SQLite 迁移 schema
 ```
 
-当前 MVP 是纯前端单机原型，覆盖人教版小学数学 3-6 年级，适合快速验证流程、交互和数据结构。产品方向保持客户电脑本地部署，不要求自建服务器；后续可把内容库、AI 调用、OCR、PDF/PPTX 导出封装为本地模块，或接入用户自行配置的模型/OCR API。
+当前 MVP 是纯前端单机原型，覆盖人教版小学数学 3-6 年级，适合快速验证流程、交互和数据结构。产品方向保持客户电脑本地部署，不要求自建服务器；内容库、AI 调用、OCR、PDF/PPTX 导出都按本地模块封装，后续可接入用户自行配置的模型/OCR API。
 
 `mock-data.js` 用于本地测试，不和教材知识包混在一起。默认只在 localStorage 没有数据时注入测试错题、历史成绩和测验设置；需要强制覆盖本地数据时，将 `mode` 改为 `replace`。
 
@@ -38,7 +39,7 @@ index.html
 - 选择教材范围和知识点。
 - 使用 AI 生成课件和同步练习。
 - 审核课件内容、知识点来源、题目边界、答案和解析。
-- 保存审核稿，导出 JSON、Markdown 或 PDF。
+- 保存审核稿，导出 JSON、Markdown、PDF 或 PPTX。
 - 查看已完成题目数、错题数、成绩趋势和薄弱知识点。
 
 端划分演进：
@@ -76,24 +77,24 @@ index.html
 - 输出导入、讲解、例题、练习、小结、作业。
 - 同一输入在同一模板版本下保持大致稳定。
 - 每页优先使用图形、表格、数轴、流程或动画表达；图形必须服务知识点理解，而不是装饰。
-- 支持人工审核修改、JSON 导入导出、PDF/Markdown 导出。
+- 支持人工审核修改、JSON 导入导出、PDF/Markdown/PPTX 导出。
 
 当前实现：
 
 - `app.js` 中 `buildCoursewareSlides()` 生成结构化课件页，并按知识点标签选择视觉模板。
 - `renderScenarioVisual()` 会把情境导入和例题精讲优先渲染为数量关系图，例如文具购物题显示 3 个笔记本、1 支钢笔和总价算式，剩余平均分题显示总量条和 4 人分组。
-- `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON。
+- `agent-orchestrator.js` 可选调用课件 Agent，基于当前单元客观知识点生成结构化课件 JSON；也可调用 PPT 制作 Agent，把已审核课件转成结构化 `ppt_plan_json`。
 - 审核稿通过 `storage-adapter.js` 写入本地 local-json 数据层，当前底层兼容 localStorage，记录包含 `reviewStatus`、`exportVersion`、`schemaVersion` 和时间戳。
 - 知识点课件默认不展示模板课件；AI 课件按钮放在“知识点课件”页面内，生成过程只展示进度动画，完成模型返回和规则校验后再一次性展示审核稿。
 - 课件审核稿可导出为 JSON，也可从历史 JSON 导入；导入时优先根据文件中的年级、册别、单元恢复范围。
-- `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF。
+- `buildCoursewareMarkdown()` 导出 Markdown，`window.print()` 配合打印样式导出 PDF，`pptx-exporter.js` 使用本地 Office Open XML 渲染器导出 `.pptx`。
 
 正式实现：
 
 - 本地前端提交教材范围、教学目标和知识点 JSON。
 - 本地 Agent 或用户配置的大模型生成结构化初稿；模型配置参考 `.env.example`，Agent 声明参考 `agents/ai-teacher-agents.yaml`。
 - 规则引擎校验知识点覆盖、来源、客观题型、开放题过滤和版权风险。
-- 用户审核后导出 JSON、PDF 或 Markdown，后续可扩展本地 PPTX 导出。
+- 用户审核后导出 JSON、PDF、Markdown 或 PPTX。PPTX 可使用本地模板直接导出，也可先让 PPT 制作 Agent 生成排版方案再导出。
 
 ### 出题系统
 

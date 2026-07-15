@@ -1,7 +1,7 @@
 (function initAITeacherStorage(global) {
   "use strict";
 
-  const STORAGE_SCHEMA_VERSION = 4;
+  const STORAGE_SCHEMA_VERSION = 5;
   const DEFAULT_NAMESPACE = "ai-teacher-rj-math";
 
   const COLLECTIONS = {
@@ -10,7 +10,8 @@
     coursewareReviews: "courseware_reviews",
     scoreHistory: "score_history",
     roleMode: "role_mode",
-    generationCache: "generation_cache"
+    generationCache: "generation_cache",
+    pptPlans: "ppt_plans"
   };
 
   const SQLITE_SCHEMA = [
@@ -20,7 +21,8 @@
     "CREATE TABLE IF NOT EXISTS grading_submissions (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, confidence REAL NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS mistakes (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS score_history (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, score INTEGER NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
-    "CREATE TABLE IF NOT EXISTS generation_cache (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS generation_cache (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);",
+    "CREATE TABLE IF NOT EXISTS ppt_plans (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, review_status TEXT NOT NULL, export_version TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);"
   ];
 
   function createLocalJsonStorage(options = {}) {

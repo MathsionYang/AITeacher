@@ -35,6 +35,19 @@ agents:
       - "验算答案、校验难度、执行版权相似度检查"
     output: "validated_question_set_json"
 
+  ppt_maker_agent:
+    role: "PPT 制作 Agent"
+    model_tasks:
+      - "把已审核课件页、知识点和 visualData 转成结构化 PPT 排版方案"
+      - "选择封面、目标页、图解页、练习页和总结页版式"
+      - "控制每页文字量、图文比例和课堂讲解顺序"
+    rule_tasks:
+      - "保留来源说明、审核状态和导出版本"
+      - "校验每页标题、文字长度、知识点覆盖和 visualData 合法性"
+      - "禁止生成 HTML、SVG、教材原图、教材原文或商业题库内容"
+      - "把最终 ppt_plan_json 交给本地 PPTX 渲染器生成文件"
+    output: "ppt_plan_json"
+
   grading_agent:
     role: "批改 Agent"
     model_tasks:
