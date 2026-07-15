@@ -17,6 +17,22 @@
           </div>
         </div>
 
+        <nav class="tabs sidebar-nav" aria-label="教师端导航">
+          <button class="tab-btn active" data-tab="courseware">导学课件</button>
+          <button class="tab-btn" data-tab="practice">同步出题</button>
+          <button class="tab-btn" data-tab="mistakes">错题库</button>
+          <button class="tab-btn" data-tab="schedule">周期测验</button>
+          <button class="tab-btn" data-tab="classes">班级管理</button>
+          <button class="tab-btn" data-tab="settings">系统设置</button>
+        </nav>
+
+        <div class="control-block">
+          <label for="subjectSelect">学科</label>
+          <select id="subjectSelect">
+            <option value="math">数学</option>
+          </select>
+        </div>
+
         <div class="control-block">
           <label for="gradeSelect">年级</label>
           <select id="gradeSelect"></select>
@@ -33,11 +49,8 @@
         </div>
 
         <div class="control-block">
-          <label for="roleModeSelect">使用模式</label>
-          <select id="roleModeSelect">
-            <option value="teacher">教师模式</option>
-            <option value="student">学生模式</option>
-          </select>
+          <label for="classSelect">当前班级</label>
+          <select id="classSelect"></select>
         </div>
 
         <div class="control-row">
@@ -57,46 +70,6 @@
 
         <button id="generatePaperBtn" class="primary-btn full">进入同步出题</button>
 
-        <div class="model-card teacher-only">
-          <div class="model-card-head">
-            <span>模型与 Agent</span>
-            <strong>可选增强</strong>
-          </div>
-          <div class="control-block">
-            <label for="modelProvider">服务商</label>
-            <select id="modelProvider"></select>
-          </div>
-          <div class="control-block">
-            <label for="modelName">模型</label>
-            <input id="modelName" type="text" placeholder="选择服务商后自动填充" autocomplete="off" />
-          </div>
-          <div class="control-block">
-            <label for="modelBaseUrl">Base URL</label>
-            <input id="modelBaseUrl" type="text" placeholder="OpenAI-compatible 地址" autocomplete="off" />
-          </div>
-          <div class="control-block">
-            <label for="modelApiKey">页面直连 API Key</label>
-            <input id="modelApiKey" type="password" placeholder="本地代理模式可留空" autocomplete="off" />
-          </div>
-          <div class="button-row compact">
-            <button id="testModelBtn" class="secondary-btn small" type="button">测试连接</button>
-          </div>
-        </div>
-
-        <div class="data-card teacher-only">
-          <div class="model-card-head">
-            <span>本地数据</span>
-            <strong>教师可见</strong>
-          </div>
-          <div class="button-row compact">
-            <button id="exportLocalDataBtn" class="secondary-btn small" type="button">导出备份</button>
-            <button id="importLocalDataBtn" class="secondary-btn small" type="button">导入备份</button>
-            <button id="clearLocalDataBtn" class="secondary-btn small danger" type="button">清空学习数据</button>
-            <input id="importLocalDataFile" class="hidden-input" type="file" accept="application/json,.json" />
-          </div>
-          <p class="model-status">错题、成绩、审核稿和测验设置仅保存在本机，可手动备份和恢复。</p>
-        </div>
-
         <div class="scope-card">
           <span>当前范围</span>
           <strong id="scopeLabel"></strong>
@@ -110,29 +83,30 @@
             <p class="eyebrow">MVP 原型</p>
             <h2>学、练、批、讲、复测一体化</h2>
           </div>
-          <div class="metric-strip">
-            <div>
-              <span id="questionMetric">0</span>
-              <p>当前题目</p>
+          <div class="topbar-side">
+            <div class="teacher-session">
+              <div>
+                <span>教师端</span>
+                <strong id="teacherNameLabel">本机教师</strong>
+              </div>
+              <button id="logoutBtn" class="secondary-btn small" type="button">退出</button>
             </div>
-            <div>
-              <span id="mistakeMetric">0</span>
-              <p>错题记录</p>
-            </div>
-            <div>
-              <span id="scheduleMetric">未设置</span>
-              <p>周期测验</p>
+            <div class="metric-strip">
+              <div>
+                <span id="questionMetric">0</span>
+                <p>当前题目</p>
+              </div>
+              <div>
+                <span id="mistakeMetric">0</span>
+                <p>错题记录</p>
+              </div>
+              <div>
+                <span id="scheduleMetric">未设置</span>
+                <p>周期测验</p>
+              </div>
             </div>
           </div>
         </header>
-
-        <nav class="tabs" aria-label="功能导航">
-          <button class="tab-btn active" data-tab="courseware">导学课件</button>
-          <button class="tab-btn" data-tab="practice">同步出题</button>
-          <button class="tab-btn" data-tab="grading">拍照批改</button>
-          <button class="tab-btn" data-tab="mistakes">错题库</button>
-          <button class="tab-btn" data-tab="schedule">周期测验</button>
-        </nav>
 
         <section id="courseware" class="tab-panel active">
           <div class="panel-heading">
@@ -199,7 +173,7 @@
           <div id="practiceAnswerPanel" class="answer-panel practice-answer-panel" hidden>
             <div class="textarea-head">
               <label for="practiceAnswerInput">直接填写答案</label>
-              <button id="syncPracticeToGradingBtn" class="secondary-btn small">同步到拍照批改</button>
+              <button id="syncPracticeToGradingBtn" class="secondary-btn small">进入拍照/OCR校正</button>
             </div>
             <textarea id="practiceAnswerInput" rows="8" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
             <div class="button-row answer-actions">
@@ -300,6 +274,162 @@
 
           <div id="scheduleStatus" class="schedule-status"></div>
           <div id="scheduledPaper" class="question-list"></div>
+        </section>
+
+        <section id="classes" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Classroom</p>
+              <h3>班级与学生管理</h3>
+            </div>
+            <button id="applyClassScopeBtn" class="primary-btn" type="button">应用班级范围</button>
+          </div>
+
+          <div class="classroom-grid">
+            <article class="classroom-card current-class-card">
+              <p class="eyebrow">当前班级</p>
+              <h4 id="currentClassName">三年级一班</h4>
+              <div id="currentClassMeta" class="class-meta"></div>
+              <p id="currentClassSummary" class="class-summary"></p>
+            </article>
+
+            <form id="classForm" class="classroom-card class-form">
+              <div>
+                <p class="eyebrow">新增班级</p>
+                <h4>班级范围设置</h4>
+              </div>
+              <div class="form-grid">
+                <div class="control-block">
+                  <label for="classNameInput">班级名称</label>
+                  <input id="classNameInput" type="text" placeholder="例如：三年级一班" autocomplete="off" />
+                </div>
+                <div class="control-block">
+                  <label for="classGradeSelect">年级</label>
+                  <select id="classGradeSelect"></select>
+                </div>
+                <div class="control-block">
+                  <label for="classSubjectSelect">学科</label>
+                  <select id="classSubjectSelect">
+                    <option value="math">数学</option>
+                  </select>
+                </div>
+                <div class="control-block">
+                  <label for="classVolumeSelect">册别</label>
+                  <select id="classVolumeSelect"></select>
+                </div>
+              </div>
+              <button class="primary-btn" type="submit">添加班级</button>
+            </form>
+          </div>
+
+          <div class="classroom-grid management-grid">
+            <article class="classroom-card">
+              <div class="list-head">
+                <div>
+                  <p class="eyebrow">Classes</p>
+                  <h4>班级列表</h4>
+                </div>
+                <span id="classCountBadge" class="pill green">0 个班级</span>
+              </div>
+              <div id="classList" class="class-list"></div>
+            </article>
+
+            <article class="classroom-card">
+              <div class="list-head">
+                <div>
+                  <p class="eyebrow">Students</p>
+                  <h4>学生列表</h4>
+                </div>
+                <span id="studentCountBadge" class="pill blue">0 名学生</span>
+              </div>
+              <form id="studentForm" class="student-form">
+                <div class="control-block">
+                  <label for="studentNameInput">学生姓名</label>
+                  <input id="studentNameInput" type="text" placeholder="请输入学生姓名" autocomplete="off" />
+                </div>
+                <div class="control-block">
+                  <label for="studentNoInput">学号</label>
+                  <input id="studentNoInput" type="text" placeholder="可选" autocomplete="off" />
+                </div>
+                <button class="secondary-btn" type="submit">添加学生</button>
+              </form>
+              <div id="studentList" class="student-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="settings" class="tab-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h3>系统设置</h3>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <article class="settings-card teacher-only">
+              <div class="settings-card-head">
+                <div>
+                  <p class="eyebrow">Model</p>
+                  <h4>模型与 Agent</h4>
+                </div>
+                <span class="pill green">可选增强</span>
+              </div>
+              <div class="form-grid">
+                <div class="control-block">
+                  <label for="modelProvider">服务商</label>
+                  <select id="modelProvider"></select>
+                </div>
+                <div class="control-block">
+                  <label for="modelName">模型</label>
+                  <input id="modelName" type="text" placeholder="选择服务商后自动填充" autocomplete="off" />
+                </div>
+                <div class="control-block">
+                  <label for="modelBaseUrl">Base URL</label>
+                  <input id="modelBaseUrl" type="text" placeholder="OpenAI-compatible 地址" autocomplete="off" />
+                </div>
+                <div class="control-block">
+                  <label for="modelApiKey">页面直连 API Key</label>
+                  <input id="modelApiKey" type="password" placeholder="本地代理模式可留空" autocomplete="off" />
+                </div>
+              </div>
+              <div class="button-row">
+                <button id="testModelBtn" class="secondary-btn" type="button">测试连接</button>
+              </div>
+              <p class="settings-note">推荐使用本地代理，Key 和上游 URL 保存在客户电脑，不进入页面。</p>
+            </article>
+
+            <article class="settings-card teacher-only">
+              <div class="settings-card-head">
+                <div>
+                  <p class="eyebrow">Local Data</p>
+                  <h4>本地数据</h4>
+                </div>
+                <span class="pill blue">教师可见</span>
+              </div>
+              <div class="button-row">
+                <button id="exportLocalDataBtn" class="secondary-btn" type="button">导出备份</button>
+                <button id="importLocalDataBtn" class="secondary-btn" type="button">导入备份</button>
+                <button id="clearLocalDataBtn" class="secondary-btn danger" type="button">清空学习数据</button>
+                <input id="importLocalDataFile" class="hidden-input" type="file" accept="application/json,.json" />
+              </div>
+              <p class="settings-note">备份包含账号、班级、学生、课件、练习、提交、错题、成绩和 SQLite 迁移计划。</p>
+            </article>
+
+            <article class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <p class="eyebrow">OCR</p>
+                  <h4>拍照/OCR 校正</h4>
+                </div>
+                <span class="pill orange">本机服务</span>
+              </div>
+              <p class="settings-note">真实拍照识别使用 PaddleOCR 本地代理，默认地址为 http://127.0.0.1:8790/ocr。同步出题页可进入拍照/OCR 校正页面完成识别、人工校正和判分。</p>
+              <div class="button-row">
+                <button class="secondary-btn" type="button" data-tab="grading">进入拍照/OCR校正</button>
+              </div>
+            </article>
+          </div>
         </section>
       </main>
     </div>

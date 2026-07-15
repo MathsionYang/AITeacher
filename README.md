@@ -11,18 +11,26 @@
 - 周期测验：配置每日/每周/每月测验计划，并生成测验卷
 - 成绩反馈：100 分制保存历史成绩，按分数段展示鼓励图、奖状、撒花和领奖台动画，并分析薄弱知识点
 - 大模型与 Agent：参考 OfferAgent 的 OpenAI-compatible 配置方式，只在生成、解析、诊断、规划环节使用模型
-- 角色模式：侧栏支持教师模式/学生模式切换，学生模式隐藏 AI 生成、审核、导出和数据管理入口
-- 规则引擎：`rule-engine.js` 统一处理题量上限、100 分归一、单元边界、题干与知识点匹配、客观题型过滤、开放题拒绝和答案等价判定；`storage-adapter.js` 提供 JSON 本地数据层和 SQLite 迁移 schema
+- 教师端优先：`login.html` 保留教师/学生登录按钮，当前只开放教师工作台；学生入口显示暂未开放，待后端账号体系接入
+- 班级管理：教师可切换学科、年级、册别和班级，新增/删除班级，给班级添加/移除学生
+- 规则引擎：`rule-engine.js` 统一处理题量上限、100 分归一、单元边界、题干与知识点匹配、客观题型过滤、开放题拒绝和答案等价判定；`storage-adapter.js` 提供 JSON 本地数据层和 SQLite 迁移 schema，预留账号、班级、学生、课件、试卷、提交和 OCR 记录表
 
 ## 打开方式
 
 直接用浏览器打开：
 
 ```text
-D:\AITeacher\index.html
+D:\AITeacher\login.html
 ```
 
-不需要安装依赖，也不需要启动服务；如需真实模型或 OCR，再分别启动本地模型代理和本地 OCR 代理。
+默认教师账号：
+
+```text
+账号：teacher
+密码：teacher123
+```
+
+不需要安装依赖，也不需要启动业务服务器；如需真实模型或 OCR，再分别启动本地模型代理和本地 OCR 代理。当前登录只是本机 MVP localStorage 会话，不是正式安全认证。
 
 ## MVP 边界
 
@@ -30,13 +38,18 @@ D:\AITeacher\index.html
 - 拍照批改已完成上传、预览、本地 PaddleOCR 识别、结构化题号答案、置信度提示、手动校正、答案解析和判分流程；手写数学仍建议保留人工确认，避免 OCR 误识别直接影响判分。
 - 判分先覆盖选择题、填空题、计算填空题、单位换算填空题等结构化题型；说明理由、综合算式、判断改错、作图等开放题会被规则引擎过滤。
 
-## 角色使用方式
+## 教师端使用方式
 
-当前 MVP 先不拆独立教师端，采用“学生学习闭环 + 教师审核能力内嵌”的单机工具形态。
+当前 MVP 已从登录页进入教师工作台，学生登录按钮保留但暂不开放。
 
-- 学生/家长：选择教材范围，查看已生成或已导入的 MarkdownFlow 导学课，可用授课全屏阅读流学习，完成同步练习，直接填写答案判分，查看逐题解析、错题库、成绩趋势和周期测验。
-- 教师/教研：生成课件和同步练习，审核课件内容、来源和题目边界，保存审核稿，导出 PDF/Markdown/PPTX/JSON，查看错题数量、已完成题目和薄弱知识点。
-- 端划分策略：MVP 阶段不拆教师端，当前已提供“教师模式/学生模式”切换；当出现班级、多学生、布置作业、权限控制和发布审核流时，再拆独立教师端。
+- 登录：打开 `login.html`，使用 `teacher / teacher123` 进入教师端。
+- 左侧导航：导学课件、同步出题、错题库、周期测验、班级管理、系统设置。
+- 范围：侧栏可设置学科、年级、册别、单元和当前班级；学科当前固定为数学。
+- 班级：进入“班级管理”页新增班级、切换班级、删除空班级，并添加/移除学生。
+- 教研：生成课件和同步练习，审核课件内容、来源和题目边界，保存审核稿，导出 PDF/Markdown/PPTX/JSON。
+- 学情：查看错题数量、已完成题目、成绩趋势和薄弱知识点；提交记录会写入本地数据层，后续可迁移到每个学生的练习记录。
+- 系统设置：集中管理模型与 Agent、本地数据备份/恢复/清理，以及拍照/OCR 校正入口。
+- 端划分策略：当前先做教师端。学生端后续由 Go 或 Java 后端账号体系开放，负责学生登录、个人练习记录、作业提交和个人学情。
 
 ## 知识点数据包
 
@@ -107,7 +120,7 @@ python scripts\local_ocr_paddle.py --port 8790
 
 ## 本地数据与测试
 
-- 本地数据：教师模式侧栏提供“导出备份 / 导入备份 / 清空学习数据”，备份使用 local-json envelope，包含错题、成绩、课件审核稿、PPT 方案、测验设置、角色模式和 SQLite 迁移计划。
+- 本地数据：教师端侧栏提供“导出备份 / 导入备份 / 清空学习数据”，备份使用 local-json envelope，包含账号、班级、学生、课件审核稿、PPT 方案、练习生成记录、提交记录、错题、成绩、测验设置和 SQLite 迁移计划。
 - 规则测试：运行 `node scripts\run_mvp_checks.js`，检查题量上限、单元边界、100 分归一、题目过滤和答案等价判定。
 - PPTX 导出：`pptx-exporter.js` 不依赖外部服务或 CDN，使用本地结构化 PPT 方案生成 Office Open XML `.pptx` 文件；未调用模型时会自动使用本地模板方案。
 - OCR 脚本检查：运行 `python -m py_compile scripts\local_ocr_paddle.py`，检查本地 OCR 代理语法。
@@ -123,6 +136,7 @@ python scripts\local_ocr_paddle.py --port 8790
 - [教材与题库版权合规方案](docs/04-copyright-compliance.md)
 - [AI 课件生成规范](docs/05-ai-courseware-generation-spec.md)
 - [大模型与 Agent 架构设计](docs/06-llm-agent-architecture.md)
+- [教师端与后端数据设计](docs/07-teacher-backend-data-design.md)
 - [人教版三年级数学上册客观知识点提炼](docs/knowledge/rj-grade3-math-a-objective-knowledge.md)
 - [人教版四年级数学上册客观知识点提炼](docs/knowledge/rj-grade4-math-a-objective-knowledge.md)
 - [人教版五年级数学上册客观知识点提炼](docs/knowledge/rj-grade5-math-a-objective-knowledge.md)

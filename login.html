@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Teacher MVP - 登录</title>
+    <style>
+      :root {
+        --bg: #eef4f8;
+        --panel: #ffffff;
+        --ink: #172033;
+        --muted: #667085;
+        --line: #d9e0ea;
+        --brand: #0f766e;
+        --brand-strong: #115e59;
+        --blue: #2563eb;
+        --orange: #d97706;
+        --red: #dc2626;
+        --shadow: 0 22px 58px rgba(23, 32, 51, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.12), transparent 34%),
+          linear-gradient(315deg, rgba(37, 99, 235, 0.11), transparent 38%),
+          var(--bg);
+        color: var(--ink);
+        font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .login-shell {
+        width: min(920px, 100%);
+        min-height: 540px;
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        overflow: hidden;
+        border: 1px solid rgba(217, 224, 234, 0.9);
+        border-radius: 18px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .intro-panel {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 34px;
+        background: #102033;
+        color: #f8fafc;
+      }
+
+      .intro-panel::after {
+        content: "";
+        position: absolute;
+        inset: auto 28px 28px auto;
+        width: 180px;
+        height: 180px;
+        border: 1px solid rgba(153, 246, 228, 0.34);
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(15, 118, 110, 0.28), transparent 68%);
+      }
+
+      .brand {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .brand-mark {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #fff;
+        font-weight: 900;
+      }
+
+      .brand h1,
+      .intro-copy h2,
+      .form-card h2 {
+        margin: 0;
+      }
+
+      .brand p,
+      .intro-copy p,
+      .hint,
+      .status-panel p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .brand p {
+        margin-top: 4px;
+        color: #aab4c3;
+      }
+
+      .intro-copy {
+        position: relative;
+        z-index: 1;
+        max-width: 360px;
+      }
+
+      .intro-copy h2 {
+        font-size: 30px;
+        line-height: 1.2;
+      }
+
+      .intro-copy p {
+        margin-top: 14px;
+        color: #cbd5e1;
+        line-height: 1.75;
+      }
+
+      .role-preview {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        gap: 10px;
+      }
+
+      .role-preview article {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 13px 14px;
+        border: 1px solid rgba(203, 213, 225, 0.18);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .role-preview strong {
+        font-size: 14px;
+      }
+
+      .role-preview span {
+        color: #99f6e4;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .form-panel {
+        padding: 42px;
+        display: grid;
+        align-content: center;
+      }
+
+      .form-card {
+        display: grid;
+        gap: 22px;
+      }
+
+      .form-card h2 {
+        font-size: 28px;
+      }
+
+      .hint {
+        margin-top: 8px;
+        line-height: 1.65;
+      }
+
+      .role-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .role-option {
+        position: relative;
+      }
+
+      .role-option input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+      }
+
+      .role-button {
+        display: grid;
+        gap: 4px;
+        min-height: 78px;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8fafc;
+        cursor: pointer;
+      }
+
+      .role-button strong {
+        color: #243044;
+      }
+
+      .role-button span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .role-option input:checked + .role-button {
+        border-color: var(--brand);
+        background: #ecfdf5;
+        box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.14);
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      label {
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 13px;
+        color: var(--ink);
+        outline: none;
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+      }
+
+      .submit-btn {
+        width: 100%;
+        border: 0;
+        border-radius: 8px;
+        padding: 13px 16px;
+        background: var(--brand);
+        color: #fff;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .submit-btn:hover {
+        background: var(--brand-strong);
+      }
+
+      .status-panel {
+        display: none;
+        border: 1px solid var(--line);
+        border-left-width: 4px;
+        border-radius: 8px;
+        padding: 12px 13px;
+        background: #f8fafc;
+      }
+
+      .status-panel[data-tone="ok"] {
+        display: block;
+        border-left-color: var(--brand);
+      }
+
+      .status-panel[data-tone="warn"] {
+        display: block;
+        border-left-color: var(--orange);
+      }
+
+      .status-panel[data-tone="error"] {
+        display: block;
+        border-left-color: var(--red);
+      }
+
+      .status-panel strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .account-tip {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .account-tip code {
+        color: #344054;
+        font-weight: 800;
+      }
+
+      @media (max-width: 780px) {
+        body {
+          place-items: start center;
+        }
+
+        .login-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .intro-panel {
+          min-height: 310px;
+        }
+
+        .form-panel {
+          padding: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="intro-panel" aria-label="产品介绍">
+        <div class="brand">
+          <div class="brand-mark">AI</div>
+          <div>
+            <h1>AI Teacher MVP</h1>
+            <p>人教版小学数学 · 本机部署</p>
+          </div>
+        </div>
+
+        <div class="intro-copy">
+          <h2>先开放教师工作台</h2>
+          <p>教师可管理班级、切换年级册别、生成导学课件和同步练习。学生端入口先保留，待后端账号体系接入后开放。</p>
+        </div>
+
+        <div class="role-preview">
+          <article>
+            <strong>教师端</strong>
+            <span>已开放</span>
+          </article>
+          <article>
+            <strong>学生端</strong>
+            <span>预留中</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="form-panel">
+        <form id="loginForm" class="form-card">
+          <div>
+            <h2>登录</h2>
+            <p class="hint">本地 MVP 默认教师账号为 <strong>teacher</strong>，密码为 <strong>teacher123</strong>。正式版本将由 Go/Java 后端接管账号、会话和权限。</p>
+          </div>
+
+          <div class="role-selector" aria-label="选择登录角色">
+            <label class="role-option">
+              <input type="radio" name="roleMode" value="teacher" checked />
+              <span class="role-button">
+                <strong>教师登录</strong>
+                <span>进入课件、出题、班级管理和审核工作台</span>
+              </span>
+            </label>
+            <label class="role-option">
+              <input type="radio" name="roleMode" value="student" />
+              <span class="role-button">
+                <strong>学生登录</strong>
+                <span>按钮保留，当前版本暂未开放</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="username">账号</label>
+            <input id="username" type="text" value="teacher" autocomplete="username" required />
+          </div>
+
+          <div class="field">
+            <label for="password">密码</label>
+            <input id="password" type="password" value="teacher123" autocomplete="current-password" required />
+          </div>
+
+          <div id="loginStatus" class="status-panel" role="status" aria-live="polite"></div>
+
+          <button class="submit-btn" type="submit">进入教师工作台</button>
+
+          <div class="account-tip">
+            <span>本地登录状态仅保存在客户电脑。</span>
+            <span><code>localStorage</code> MVP</span>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const SESSION_KEY = "ai-teacher-auth-session-v1";
+      const ACCOUNTS_KEY = "ai-teacher-accounts-v1";
+      const DEFAULT_TEACHER_HASH = "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416";
+      const loginForm = document.getElementById("loginForm");
+      const statusPanel = document.getElementById("loginStatus");
+
+      seedLocalAccounts();
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const roleMode = document.querySelector("input[name='roleMode']:checked").value;
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (roleMode === "student") {
+          setStatus("学生端暂未开放", "当前 MVP 先实现教师端。学生账号、练习记录和个人学情会在 Go/Java 后端接入后开放。", "warn");
+          return;
+        }
+
+        const accounts = readJson(ACCOUNTS_KEY, []);
+        const account = accounts.find((item) => item.role === "teacher" && item.username === username);
+        const passwordHash = await sha256(password);
+        if (!account || account.passwordHash !== passwordHash) {
+          setStatus("账号或密码不正确", "请使用本地 MVP 默认账号 teacher / teacher123，或检查本机账号配置。", "error");
+          return;
+        }
+
+        const session = {
+          schemaVersion: 1,
+          role: "teacher",
+          accountId: account.id,
+          username: account.username,
+          displayName: account.displayName || "教师",
+          loggedInAt: new Date().toISOString()
+        };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        setStatus("登录成功", "正在进入教师工作台。", "ok");
+        window.setTimeout(() => {
+          window.location.href = "index.html";
+        }, 380);
+      });
+
+      document.querySelectorAll("input[name='roleMode']").forEach((radio) => {
+        radio.addEventListener("change", () => {
+          const isTeacher = document.querySelector("input[name='roleMode']:checked").value === "teacher";
+          document.querySelector(".submit-btn").textContent = isTeacher ? "进入教师工作台" : "学生端暂未开放";
+        });
+      });
+
+      function seedLocalAccounts() {
+        const accounts = readJson(ACCOUNTS_KEY, []);
+        if (accounts.some((item) => item.role === "teacher" && item.username === "teacher")) return;
+        accounts.push({
+          id: "teacher-local-001",
+          role: "teacher",
+          username: "teacher",
+          displayName: "本机教师",
+          passwordHash: DEFAULT_TEACHER_HASH,
+          status: "active",
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      }
+
+      function readJson(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch (error) {
+          return fallback;
+        }
+      }
+
+      async function sha256(value) {
+        if (!window.crypto || !crypto.subtle) {
+          return value === "teacher123" ? DEFAULT_TEACHER_HASH : "";
+        }
+        const bytes = new TextEncoder().encode(value);
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+
+      function setStatus(title, message, tone) {
+        statusPanel.dataset.tone = tone;
+        statusPanel.innerHTML = `<strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
+</html>

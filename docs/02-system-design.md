@@ -14,6 +14,7 @@ index.html
   -> model-client.js       OpenAI-compatible 模型客户端
   -> agent-orchestrator.js 课件 Agent、出题 Agent、PPT 制作 Agent 编排
   -> pptx-exporter.js 本地 PPT 方案校验与 PPTX 文件生成
+  -> login.html    本机教师登录入口，学生入口预留
   -> app.js        课件生成、出题、判分、错题库、周期测验
   -> storage-adapter.js  local-json 本地数据层 / SQLite 迁移 schema
 ```
@@ -22,31 +23,35 @@ index.html
 
 `mock-data.js` 用于本地测试，不和教材知识包混在一起。默认只在 localStorage 没有数据时注入测试错题、历史成绩和测验设置；需要强制覆盖本地数据时，将 `mode` 改为 `replace`。
 
-## 2. 角色模式与端划分
+## 2. 登录、教师端与端划分
 
-当前 MVP 不拆独立教师端，采用同一个本地工具承载学生学习闭环和教师审核能力。角色差异先通过页面入口显隐、操作权限和本地字段控制，避免过早引入账号、班级和发布流复杂度。
-
-学生/家长路径：
-
-- 选择教材版本、年级、册别和单元。
-- 查看已生成或导入的知识点课件。
-- 生成或导入同步练习，在同步出题页直接填写答案。
-- 完成判分、逐题解析、错题入库和周期测验。
-- 查看成绩趋势和薄弱知识点。
+当前 MVP 先开放教师端。`login.html` 保留教师/学生两个登录按钮，但学生登录只提示“暂未开放”；教师登录成功后写入本机 localStorage 会话并进入 `index.html`。这只是本机 MVP 认证，正式账号、密码哈希、会话、权限和审计要由后续 Go 或 Java 后端接管。
 
 教师/教研路径：
 
-- 选择教材范围和知识点。
+- 登录教师端。
+- 通过左侧导航进入导学课件、同步出题、错题库、周期测验、班级管理和系统设置。
+- 在侧栏切换学科、年级、册别、单元和当前班级。
+- 管理班级名册，新增/删除班级，添加/移除学生。
 - 使用 AI 生成课件和同步练习。
 - 审核课件内容、知识点来源、题目边界、答案和解析。
 - 保存审核稿，导出 JSON、Markdown、PDF 或 PPTX。
 - 查看已完成题目数、错题数、成绩趋势和薄弱知识点。
+- 在系统设置中配置模型与 Agent、本地数据备份/恢复/清理，以及拍照/OCR 校正入口。
+
+学生/家长路径后续开放：
+
+- 学生通过账号登录个人空间。
+- 查看教师发布或导入的导学课。
+- 完成同步练习和测验。
+- 提交答题照片或手动答案。
+- 查看个人错题、解析和复习计划。
 
 端划分演进：
 
-- 阶段 1：增加“教师模式/学生模式”切换；学生模式隐藏模型配置、审核编辑、内容导出和数据清理，教师模式保留生成、审核、导入导出和学情统计。
-- 阶段 2：增加本地角色权限字段，配合本地数据层保存审核稿、成绩、错题和角色设置。
-- 阶段 3：只有出现多学生账号、班级作业、权限控制、发布审核流和班级报告后，才拆独立教师端。
+- 阶段 1：本机教师登录 + 班级/学生名册 + 教师端工作台。
+- 阶段 2：Go 或 Java 后端接管账号、班级、学生、课件、试卷、提交和 OCR 记录。
+- 阶段 3：开放学生端，支持学生个人练习记录、作业提交、班级报告和权限控制。
 
 ## 3. 模块拆分
 
@@ -68,6 +73,31 @@ index.html
 
 - 建议使用数据库表 `textbook_versions`、`subjects`、`grades`、`volumes`、`units`、`knowledge_points`。
 - 教研后台负责维护知识点和审核题目。
+
+### 教师端与班级管理
+
+职责：
+
+- 保存教师账号和本地登录状态。
+- 管理当前教师可见班级。
+- 管理班级下学生名册。
+- 班级默认年级、学科、册别可同步到侧栏范围。
+- 为后续每个学生的练习记录、提交记录和错题画像预留数据维度。
+
+当前实现：
+
+- `login.html` 使用本地默认教师账号 `teacher / teacher123`，写入 `ai-teacher-auth-session-v1`。
+- `app.js` 初始化时检查教师会话，没有会话则回到登录页。
+- `classes` 默认创建“三年级一班”，教师可新增、切换、删除空班级。
+- `students` 保存学生姓名、学号和所属班级，当前支持添加和移除。
+- `scoreHistory`、`mistakes`、`generationRecords`、`submissions` 会带上班级信息，后续可迁移到学生维度。
+- 左侧导航固定为 6 项：导学课件、同步出题、错题库、周期测验、班级管理、系统设置。拍照/OCR 校正作为同步出题和系统设置中的内部流程，不作为教师端一级导航。
+
+正式实现：
+
+- 后端使用 `accounts`、`teacher_profiles`、`classes`、`students`、`submissions`、`submission_answers` 等表。
+- 登录态使用服务端 session 或 JWT，密码只保存强哈希。
+- 学生端开放后，提交记录必须绑定 `student_id`，教师端按班级聚合查看。
 
 ### 课件生成
 
@@ -201,8 +231,17 @@ index.html
 ## 4. 建议后端数据模型
 
 ```text
-users
-  id, role, name, grade, created_at
+accounts
+  id, role, username, password_hash, status, created_at, updated_at
+
+teacher_profiles
+  id, account_id, name, subject_scope_json, created_at, updated_at
+
+classes
+  id, teacher_id, name, grade_id, subject_id, volume_id, status, created_at, updated_at
+
+students
+  id, class_id, account_id, name, student_no, status, created_at, updated_at
 
 textbook_versions
   id, name, publisher, stage
@@ -220,25 +259,31 @@ questions
   id, unit_id, knowledge_point_id, type, difficulty, stem, answer, explanation, scoring_rule, source_type
 
 papers
-  id, user_id, paper_type, title, scope, total_score, created_at
+  id, class_id, creator_account_id, paper_type, title, scope, total_score, review_status, created_at
 
 paper_questions
   id, paper_id, question_id, order_no, point
 
 submissions
-  id, user_id, paper_id, image_url, recognized_text, score, created_at
+  id, student_id, class_id, paper_id, origin, score, total_score, accuracy, created_at
 
 submission_items
   id, submission_id, question_id, student_answer, is_correct, score, feedback
 
+ocr_records
+  id, submission_id, image_ref, recognized_text, average_confidence, created_at
+
 mistakes
-  id, user_id, question_id, unit_id, knowledge_point_id, student_answer, error_reason, status, review_count, next_review_at
+  id, student_id, class_id, question_id, unit_id, knowledge_point_id, student_answer, error_reason, status, review_count, next_review_at
 
 schedules
   id, user_id, frequency, question_count, mistake_ratio, active, next_run_at
 
 score_records
-  id, user_id, unit_id, score, total_score, accuracy, knowledge_stats, created_at
+  id, student_id, class_id, unit_id, score, total_score, accuracy, knowledge_stats, created_at
+
+generation_records
+  id, class_id, creator_account_id, kind, scope, source, item_count, created_at
 ```
 
 ## 5. AI/OCR 接入建议

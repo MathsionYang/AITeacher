@@ -8,6 +8,14 @@
   const roleModeKey = "ai-teacher-rj-math-role-mode-v1";
   const generationCacheKey = "ai-teacher-rj-math-generation-cache-v1";
   const pptPlanKey = "ai-teacher-rj-math-ppt-plans-v1";
+  const authSessionKey = "ai-teacher-auth-session-v1";
+  const accountsKey = "ai-teacher-accounts-v1";
+  const classesKey = "ai-teacher-classes-v1";
+  const studentsKey = "ai-teacher-students-v1";
+  const activeClassKey = "ai-teacher-active-class-v1";
+  const subjectScopeKey = "ai-teacher-subject-scope-v1";
+  const generationRecordsKey = "ai-teacher-generation-records-v1";
+  const submissionsKey = "ai-teacher-submissions-v1";
   const ocrProxyBaseUrl = "http://127.0.0.1:8790";
   const ruleEngine = window.AITeacherRuleEngine || {};
   const storage = window.AITeacherStorage?.createLocalJsonStorage?.({
@@ -24,7 +32,14 @@
     scoreHistory: scoreHistoryKey,
     roleMode: roleModeKey,
     generationCache: generationCacheKey,
-    pptPlans: pptPlanKey
+    pptPlans: pptPlanKey,
+    accounts: accountsKey,
+    classes: classesKey,
+    students: studentsKey,
+    activeClassId: activeClassKey,
+    subjectScope: subjectScopeKey,
+    generationRecords: generationRecordsKey,
+    submissions: submissionsKey
   };
   const mockData = window.AI_TEACHER_MOCK_DATA || {};
   const mockEnabled = Boolean(mockData.enabled);
@@ -61,7 +76,15 @@
     generationCache: readJson(generationCacheKey, {}, "generationCache"),
     pptPlans: readJson(pptPlanKey, {}, "pptPlans"),
     schedule: readJson(scheduleKey, { frequency: "每周", count: 10, mistakeRatio: 40 }, "schedule"),
-    roleMode: readRoleMode()
+    authSession: readAuthSession(),
+    accounts: readJson(accountsKey, defaultAccounts(), "accounts"),
+    classes: readJson(classesKey, [], "classes"),
+    students: readJson(studentsKey, [], "students"),
+    activeClassId: storage.getString(activeClassKey, ""),
+    subjectId: readSubjectScope().subjectId,
+    generationRecords: readJson(generationRecordsKey, [], "generationRecords"),
+    submissions: readJson(submissionsKey, [], "submissions"),
+    roleMode: "teacher"
   };
 
   const $ = (id) => document.getElementById(id);
@@ -88,10 +111,57 @@
     return value === "student" ? "student" : "teacher";
   }
 
+  function readAuthSession() {
+    try {
+      const raw = storage.getString(authSessionKey, "");
+      const session = raw ? JSON.parse(raw) : null;
+      return session && session.role === "teacher" ? session : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function readSubjectScope() {
+    const fallback = { subjectId: "math" };
+    try {
+      const raw = storage.getString(subjectScopeKey, "");
+      const scope = raw ? JSON.parse(raw) : fallback;
+      return scope && scope.subjectId === "math" ? scope : fallback;
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function defaultAccounts() {
+    return [{
+      id: "teacher-local-001",
+      role: "teacher",
+      username: "teacher",
+      displayName: "本机教师",
+      passwordHash: "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416",
+      status: "active",
+      createdAt: new Date().toISOString()
+    }];
+  }
+
+  function defaultClassroom() {
+    const now = new Date().toISOString();
+    return {
+      id: "class-g3-1",
+      name: "三年级一班",
+      gradeId: "3",
+      subjectId: "math",
+      volumeId: "A",
+      status: "active",
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
   function createFallbackStorage() {
     return {
       kind: "local-json-fallback",
-      schemaVersion: 5,
+      schemaVersion: 6,
       getString: (key, fallback = "") => {
         const value = localStorage.getItem(key);
         return value == null ? fallback : value;
@@ -100,17 +170,17 @@
       setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
       removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
       buildEnvelope: (type, data, metadata = {}) => ({
-        schemaVersion: 5,
+        schemaVersion: 6,
         storageKind: "local-json-fallback",
         type,
         exportedAt: new Date().toISOString(),
-        exportVersion: metadata.exportVersion || `${type}-v5`,
+        exportVersion: metadata.exportVersion || `${type}-v6`,
         ...metadata,
         data
       }),
       sqliteMigrationPlan: () => ({
         target: "sqlite",
-        schemaVersion: 5,
+        schemaVersion: 6,
         schema: [],
         strategy: ["加载 storage-adapter.js 后导出迁移计划"]
       })
@@ -169,6 +239,66 @@
     writeJson(generationCacheKey, state.generationCache);
   }
 
+  function recordGeneration(kind, unit, metadata = {}) {
+    const classroom = currentClass();
+    const now = new Date().toISOString();
+    state.generationRecords = [{
+      id: `generation-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      kind,
+      createdAt: now,
+      classId: classroom?.id || "",
+      className: classroom?.name || "",
+      subjectId: state.subjectId || "math",
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      difficulty: state.difficulty,
+      ...metadata
+    }, ...(Array.isArray(state.generationRecords) ? state.generationRecords : [])].slice(0, 200);
+    writeJson(generationRecordsKey, state.generationRecords);
+  }
+
+  function recordSubmission(summary, results, options = {}) {
+    const classroom = currentClass();
+    const unit = unitData();
+    state.submissions = [{
+      id: `submission-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      origin: options.origin || "manual",
+      classId: classroom?.id || "",
+      className: classroom?.name || "",
+      studentId: options.studentId || "",
+      studentName: options.studentName || "",
+      subjectId: state.subjectId || "math",
+      gradeId: state.grade,
+      gradeName: gradeData().name,
+      volumeId: state.volume,
+      volumeName: volumeData().name,
+      unitId: unit.id,
+      unitTitle: unit.title,
+      score: summary.score,
+      total: summary.total,
+      accuracy: summary.accuracy,
+      questionCount: results.length,
+      wrongCount: summary.wrongCount,
+      knowledgeStats: summary.knowledgeStats,
+      answers: results.map((item) => ({
+        questionId: item.question.id,
+        index: item.index + 1,
+        submitted: item.submitted,
+        answer: item.question.answer,
+        correct: item.correct,
+        score: item.score,
+        point: item.question.point,
+        knowledgePoint: item.question.knowledgePoint
+      }))
+    }, ...(Array.isArray(state.submissions) ? state.submissions : [])].slice(0, 300);
+    writeJson(submissionsKey, state.submissions);
+  }
+
   function pruneGenerationCache(limit) {
     const entries = Object.entries(state.generationCache || {});
     if (entries.length <= limit) return;
@@ -209,25 +339,58 @@
   }
 
   function init() {
+    if (!ensureTeacherSession()) return;
+    seedTeacherWorkspace();
     buildSelectors();
+    buildClassScopeSelectors();
     buildModelProviderOptions();
     restoreScheduleControls();
-    restoreRoleModeControls();
+    restoreTeacherControls();
     bindEvents();
     renderAll();
   }
 
-  function restoreRoleModeControls() {
-    $("roleModeSelect").value = state.roleMode;
+  function ensureTeacherSession() {
+    if (state.authSession?.role === "teacher") return true;
+    window.location.href = "login.html";
+    return false;
+  }
+
+  function seedTeacherWorkspace() {
+    if (!Array.isArray(state.accounts) || !state.accounts.some((account) => account.role === "teacher")) {
+      state.accounts = defaultAccounts();
+      writeJson(accountsKey, state.accounts);
+    }
+    if (!Array.isArray(state.classes) || !state.classes.length) {
+      const classroom = defaultClassroom();
+      state.classes = [classroom];
+      state.activeClassId = classroom.id;
+      writeJson(classesKey, state.classes);
+      storage.setString(activeClassKey, state.activeClassId);
+    }
+    if (!Array.isArray(state.students)) {
+      state.students = [];
+      writeJson(studentsKey, state.students);
+    }
+    if (!currentClass()) {
+      state.activeClassId = state.classes[0]?.id || "";
+      storage.setString(activeClassKey, state.activeClassId);
+    }
+    applyScopeFromClass(currentClass(), { silent: true });
+    state.roleMode = "teacher";
+    storage.setString(roleModeKey, "teacher");
+  }
+
+  function restoreTeacherControls() {
+    $("subjectSelect").value = state.subjectId || "math";
+    $("subjectSelect").disabled = true;
+    refreshClassSelect();
     applyRoleMode();
   }
 
   function applyRoleMode() {
-    document.body.dataset.roleMode = state.roleMode;
-    if (!isTeacherMode()) {
-      state.coursewareEditMode = false;
-      state.answersVisible = false;
-    }
+    state.roleMode = "teacher";
+    document.body.dataset.roleMode = "teacher";
   }
 
   function isTeacherMode() {
@@ -236,7 +399,7 @@
 
   function requireTeacherMode(actionLabel) {
     if (isTeacherMode()) return true;
-    setModelStatus(`${actionLabel} 仅在教师模式开放；学生模式只保留学习、答题、解析、错题和测验。`, "warn");
+    setModelStatus(`${actionLabel} 仅在教师端开放。学生端入口已保留，当前版本暂未开放。`, "warn");
     return false;
   }
 
@@ -285,6 +448,66 @@
       state.unitId = volume.units[0].id;
     }
     $("unitSelect").value = state.unitId;
+  }
+
+  function buildClassScopeSelectors() {
+    $("classGradeSelect").innerHTML = supportedGradeEntries()
+      .map(([id, grade]) => `<option value="${id}">${grade.name}</option>`)
+      .join("");
+    $("classGradeSelect").value = state.grade;
+    refreshClassVolumeOptions();
+    $("classSubjectSelect").value = "math";
+  }
+
+  function refreshClassVolumeOptions() {
+    const gradeId = $("classGradeSelect").value || state.grade;
+    const grade = content.grades[gradeId] || gradeData();
+    const volumes = Object.entries(grade.volumes || {});
+    $("classVolumeSelect").innerHTML = volumes
+      .map(([id, volume]) => `<option value="${id}">${volume.name}</option>`)
+      .join("");
+    const currentVolume = volumes.some(([id]) => id === state.volume) ? state.volume : volumes[0]?.[0];
+    $("classVolumeSelect").value = currentVolume || "";
+  }
+
+  function refreshClassSelect() {
+    const classSelect = $("classSelect");
+    if (!classSelect) return;
+    classSelect.innerHTML = state.classes
+      .map((classroom) => `<option value="${escapeAttribute(classroom.id)}">${escapeHtml(classroom.name)}</option>`)
+      .join("");
+    classSelect.value = currentClass()?.id || "";
+  }
+
+  function currentClass() {
+    return state.classes.find((classroom) => classroom.id === state.activeClassId) || state.classes[0] || null;
+  }
+
+  function studentsForClass(classId = state.activeClassId) {
+    return state.students.filter((student) => student.classId === classId && student.status !== "deleted");
+  }
+
+  function applyScopeFromClass(classroom, options = {}) {
+    if (!classroom) return false;
+    const gradeId = String(classroom.gradeId || state.grade);
+    const grade = content.grades[gradeId] ? gradeId : state.grade;
+    const volumeId = content.grades[grade]?.volumes?.[classroom.volumeId] ? classroom.volumeId : firstVolumeId(content.grades[grade]);
+    state.subjectId = classroom.subjectId || "math";
+    state.grade = grade;
+    state.volume = volumeId;
+    const volume = content.grades[state.grade].volumes[state.volume];
+    if (!volume.units.some((unit) => unit.id === state.unitId)) state.unitId = volume.units[0].id;
+    storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
+    if (options.silent) return true;
+    $("subjectSelect").value = state.subjectId;
+    $("gradeSelect").value = state.grade;
+    refreshVolumeOptions();
+    refreshUnitOptions();
+    $("classGradeSelect").value = state.grade;
+    refreshClassVolumeOptions();
+    clearPracticeState();
+    renderAll();
+    return true;
   }
 
   function applyScopeFromPayload(payload = {}) {
@@ -346,6 +569,11 @@
   }
 
   function bindEvents() {
+    $("subjectSelect").addEventListener("change", () => {
+      $("subjectSelect").value = "math";
+      setModelStatus("当前 MVP 先开放小学数学；语文、英语等学科在后端课程库接入后扩展。", "warn");
+    });
+
     $("gradeSelect").addEventListener("change", (event) => {
       state.grade = event.target.value;
       state.volume = firstVolumeId(gradeData());
@@ -381,13 +609,25 @@
       renderAll();
     });
 
-    $("roleModeSelect").addEventListener("change", (event) => {
-      state.roleMode = event.target.value === "student" ? "student" : "teacher";
-      storage.setString(roleModeKey, state.roleMode);
-      applyRoleMode();
-      renderAll();
-      setModelStatus(state.roleMode === "teacher" ? "已切换到教师模式，可进行生成、审核和数据管理。" : "已切换到学生模式，只保留学习、答题、解析、错题和测验。", "ok");
+    $("classSelect").addEventListener("change", (event) => {
+      state.activeClassId = event.target.value;
+      storage.setString(activeClassKey, state.activeClassId);
+      const classroom = currentClass();
+      applyScopeFromClass(classroom);
+      setModelStatus(`已切换到 ${classroom?.name || "当前班级"}，年级和册别已同步。`, "ok");
     });
+
+    $("logoutBtn").addEventListener("click", logoutTeacher);
+    $("classGradeSelect").addEventListener("change", refreshClassVolumeOptions);
+    $("classForm").addEventListener("submit", addClassroom);
+    $("studentForm").addEventListener("submit", addStudent);
+    $("applyClassScopeBtn").addEventListener("click", () => {
+      const classroom = currentClass();
+      applyScopeFromClass(classroom);
+      setModelStatus(`已应用 ${classroom?.name || "当前班级"} 的年级、学科和册别。`, "ok");
+    });
+    $("classList").addEventListener("click", handleClassListAction);
+    $("studentList").addEventListener("click", handleStudentListAction);
 
     $("generatePaperBtn").addEventListener("click", () => {
       switchTab("practice");
@@ -448,7 +688,7 @@
       $("mistakeRatioLabel").textContent = `${event.target.value}%`;
     });
 
-    document.querySelectorAll(".tab-btn").forEach((button) => {
+    document.querySelectorAll("button[data-tab]").forEach((button) => {
       button.addEventListener("click", () => switchTab(button.dataset.tab));
     });
     document.addEventListener("keydown", handleCoursewarePresentationKeydown);
@@ -473,6 +713,124 @@
     });
   }
 
+  function logoutTeacher() {
+    storage.removeMany([authSessionKey]);
+    window.location.href = "login.html";
+  }
+
+  function addClassroom(event) {
+    event.preventDefault();
+    const name = cleanText($("classNameInput").value);
+    const gradeId = $("classGradeSelect").value || state.grade;
+    const volumeId = $("classVolumeSelect").value || firstVolumeId(content.grades[gradeId]);
+    if (!name) {
+      setModelStatus("请先填写班级名称。", "warn");
+      return;
+    }
+    if (state.classes.some((classroom) => classroom.name === name && classroom.status !== "deleted")) {
+      setModelStatus("同名班级已存在，请换一个班级名称。", "warn");
+      return;
+    }
+    const now = new Date().toISOString();
+    const classroom = {
+      id: `class-${Date.now()}`,
+      name,
+      gradeId,
+      subjectId: "math",
+      volumeId,
+      status: "active",
+      createdAt: now,
+      updatedAt: now
+    };
+    state.classes = [...state.classes, classroom];
+    state.activeClassId = classroom.id;
+    writeJson(classesKey, state.classes);
+    storage.setString(activeClassKey, state.activeClassId);
+    $("classForm").reset();
+    buildClassScopeSelectors();
+    refreshClassSelect();
+    applyScopeFromClass(classroom);
+    setModelStatus(`已添加班级：${classroom.name}。`, "ok");
+  }
+
+  function addStudent(event) {
+    event.preventDefault();
+    const classroom = currentClass();
+    if (!classroom) {
+      setModelStatus("请先创建或选择班级。", "warn");
+      return;
+    }
+    const name = cleanText($("studentNameInput").value);
+    const studentNo = cleanText($("studentNoInput").value);
+    if (!name) {
+      setModelStatus("请填写学生姓名。", "warn");
+      return;
+    }
+    const now = new Date().toISOString();
+    state.students = [...state.students, {
+      id: `student-${Date.now()}`,
+      classId: classroom.id,
+      name,
+      studentNo,
+      status: "active",
+      createdAt: now,
+      updatedAt: now
+    }];
+    writeJson(studentsKey, state.students);
+    $("studentForm").reset();
+    renderClassroom();
+    setModelStatus(`已添加学生：${name}。`, "ok");
+  }
+
+  function handleClassListAction(event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const id = button.dataset.id;
+    if (button.dataset.action === "switch") {
+      state.activeClassId = id;
+      storage.setString(activeClassKey, state.activeClassId);
+      refreshClassSelect();
+      applyScopeFromClass(currentClass());
+      return;
+    }
+    if (button.dataset.action === "delete") deleteClassroom(id);
+  }
+
+  function handleStudentListAction(event) {
+    const button = event.target.closest("button[data-action='delete-student']");
+    if (!button) return;
+    deleteStudent(button.dataset.id);
+  }
+
+  function deleteClassroom(id) {
+    const classroom = state.classes.find((item) => item.id === id);
+    if (!classroom) return;
+    if (studentsForClass(id).length) {
+      setModelStatus("该班级下还有学生，请先删除或转移学生后再删除班级。", "warn");
+      return;
+    }
+    if (state.classes.length <= 1) {
+      setModelStatus("至少需要保留一个班级。", "warn");
+      return;
+    }
+    state.classes = state.classes.filter((item) => item.id !== id);
+    if (state.activeClassId === id) state.activeClassId = state.classes[0]?.id || "";
+    writeJson(classesKey, state.classes);
+    storage.setString(activeClassKey, state.activeClassId);
+    refreshClassSelect();
+    applyScopeFromClass(currentClass());
+    setModelStatus(`已删除班级：${classroom.name}。`, "ok");
+  }
+
+  function deleteStudent(id) {
+    const student = state.students.find((item) => item.id === id);
+    if (!student) return;
+    state.students = state.students.filter((item) => item.id !== id);
+    writeJson(studentsKey, state.students);
+    renderClassroom();
+    setModelStatus(`已移除学生：${student.name}。`, "ok");
+  }
+
   function clearPracticeState() {
     state.currentQuestions = [];
     state.answersVisible = false;
@@ -491,25 +849,90 @@
 
   function renderAll() {
     applyRoleMode();
+    renderTeacherWorkspace();
     renderScope();
     renderCourseware();
     renderPractice();
     renderMistakes();
     renderSchedule();
+    renderClassroom();
     renderScoreTrends();
     renderMetrics();
   }
 
+  function renderTeacherWorkspace() {
+    const label = $("teacherNameLabel");
+    if (label) label.textContent = state.authSession?.displayName || state.authSession?.username || "本机教师";
+    refreshClassSelect();
+  }
+
   function renderScope() {
     const unit = unitData();
-    $("scopeLabel").textContent = `${gradeData().name}${volumeData().name} · ${unit.title}`;
-    $("scopeSummary").textContent = unit.summary;
+    const classroom = currentClass();
+    $("scopeLabel").textContent = `${classroom?.name ? `${classroom.name} · ` : ""}${gradeData().name}${volumeData().name} · ${unit.title}`;
+    $("scopeSummary").textContent = `${unit.summary} 当前学科：数学。`;
   }
 
   function renderMetrics() {
     $("questionMetric").textContent = state.currentQuestions.length;
     $("mistakeMetric").textContent = state.mistakes.filter((item) => item.status !== "已掌握").length;
     $("scheduleMetric").textContent = state.schedule ? state.schedule.frequency : "未设置";
+  }
+
+  function renderClassroom() {
+    const classroom = currentClass();
+    if (!classroom) return;
+    const students = studentsForClass(classroom.id);
+    $("currentClassName").textContent = classroom.name;
+    $("currentClassMeta").innerHTML = `
+      <span class="pill green">${escapeHtml(classGradeName(classroom))}</span>
+      <span class="pill blue">数学</span>
+      <span class="pill orange">${escapeHtml(classVolumeName(classroom))}</span>
+    `;
+    $("currentClassSummary").textContent = `当前班级共有 ${students.length} 名学生。切换班级会同步年级、学科和册别，单元仍由教师按授课进度选择。`;
+    $("classCountBadge").textContent = `${state.classes.length} 个班级`;
+    $("studentCountBadge").textContent = `${students.length} 名学生`;
+    $("classList").innerHTML = state.classes.map((item) => renderClassroomItem(item)).join("");
+    $("studentList").innerHTML = students.length
+      ? students.map((student) => renderStudentItem(student)).join("")
+      : `<div class="empty-inline">当前班级还没有学生，可先添加姓名和学号。</div>`;
+  }
+
+  function renderClassroomItem(classroom) {
+    const active = classroom.id === state.activeClassId;
+    const count = studentsForClass(classroom.id).length;
+    return `
+      <article class="class-list-item ${active ? "active" : ""}">
+        <div>
+          <strong>${escapeHtml(classroom.name)}</strong>
+          <p>${escapeHtml(classGradeName(classroom))} · 数学 · ${escapeHtml(classVolumeName(classroom))} · ${count} 名学生</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-btn small" type="button" data-action="switch" data-id="${escapeAttribute(classroom.id)}"${active ? " disabled" : ""}>切换</button>
+          <button class="secondary-btn small danger" type="button" data-action="delete" data-id="${escapeAttribute(classroom.id)}">删除</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderStudentItem(student) {
+    return `
+      <article class="student-list-item">
+        <div>
+          <strong>${escapeHtml(student.name)}</strong>
+          <p>${student.studentNo ? `学号 ${escapeHtml(student.studentNo)}` : "未填写学号"} · ${formatDateTime(student.createdAt)}</p>
+        </div>
+        <button class="secondary-btn small danger" type="button" data-action="delete-student" data-id="${escapeAttribute(student.id)}">删除</button>
+      </article>
+    `;
+  }
+
+  function classGradeName(classroom) {
+    return content.grades[String(classroom.gradeId)]?.name || `${classroom.gradeId || ""}年级`;
+  }
+
+  function classVolumeName(classroom) {
+    return content.grades[String(classroom.gradeId)]?.volumes?.[classroom.volumeId]?.name || classroom.volumeId || "上册";
   }
 
   function collectModelRuntimeConfig() {
@@ -589,6 +1012,7 @@
           state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(slides, "draft", { source: "cache", createdAt: cached.createdAt });
           clearPptPlanForUnit(unit);
           writeJson(coursewareReviewKey, state.coursewareReviews);
+          recordGeneration("courseware", unit, { source: "cache", itemCount: slides.length, reviewStatus: "draft" });
           setModelStatus(`已复用本地缓存导学课件：${slides.length} 节，使用 MarkdownFlow 呈现。`, "ok");
           return;
         }
@@ -601,6 +1025,7 @@
         clearPptPlanForUnit(unit);
         writeJson(coursewareReviewKey, state.coursewareReviews);
         writeGenerationCache(cacheId, { slides }, { kind: "courseware", scopeKey: coursewareKey(unit), source: tutorDraft.source });
+        recordGeneration("courseware", unit, { source: tutorDraft.source, itemCount: slides.length, reviewStatus: "draft" });
         setModelStatus(`AI 导学课件已生成 ${slides.length} 节，并使用 MarkdownFlow 呈现。`, "ok");
       } finally {
         state.coursewareGenerating = false;
@@ -634,6 +1059,7 @@
         state.coursewareReviews[coursewareKey(unit)] = buildCoursewareReviewRecord(tutorDraft.slides, "draft", { source: tutorDraft.source });
         clearPptPlanForUnit(unit);
         writeJson(coursewareReviewKey, state.coursewareReviews);
+        recordGeneration("courseware_remake", unit, { source: tutorDraft.source, itemCount: tutorDraft.slides.length, reviewStatus: "draft" });
         setModelStatus(tutorDraft.message, tutorDraft.tone);
       } finally {
         state.coursewareGenerating = false;
@@ -709,6 +1135,7 @@
             state.currentQuestions = prepared.questions;
             state.answersVisible = false;
             seedAnswerInputsWithTemplate();
+            recordGeneration("practice", unit, { source: "cache", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions) });
             setModelStatus(`已复用本地缓存练习：${state.currentQuestions.length} 题，范围仍锁定为“${unit.title}”。`, "ok");
             return;
           }
@@ -737,6 +1164,7 @@
         state.answersVisible = false;
         seedAnswerInputsWithTemplate();
         writeGenerationCache(cacheId, { questions: state.currentQuestions }, { kind: "practice", scopeKey: coursewareKey(unit), source: "llm" });
+        recordGeneration("practice", unit, { source: "llm", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), rejectedCount: prepared.rejected.length });
         const rejectedHint = prepared.rejected.length ? `，已剔除 ${prepared.rejected.length} 题不合格题` : "";
         setModelStatus(`AI 出题完成：${state.currentQuestions.length} 题，范围已锁定为“${unit.title}”${rejectedHint}。`, "ok");
       } finally {
@@ -778,6 +1206,7 @@
         if (!validation.ok) throw new Error(`PPT 方案未通过校验：${validation.issues.slice(0, 3).join("；")}`);
         state.pptPlans[pptPlanRecordKey(unit)] = buildPptPlanRecord(plan, "draft", { source: "llm" });
         writeJson(pptPlanKey, state.pptPlans);
+        recordGeneration("ppt_plan", unit, { source: "llm", itemCount: plan.pages.length, reviewStatus: "draft" });
         setModelStatus(`PPT 制作 Agent 已生成 ${plan.pages.length} 页排版方案，可直接导出 PPTX。`, "ok");
       } finally {
         state.pptPlanGenerating = false;
@@ -1296,7 +1725,7 @@
             <span class="read-mode-pill">读</span>
           </header>
           ${renderCoursewareReviewStatus(reviewRecord)}
-          ${slides.map((slide, index) => renderMarkdownFlowSection(slide, unit, index, sourceRefs)).join("")}
+          ${slides.map((slide, index) => renderMarkdownFlowSection(slide, unit, index)).join("")}
           <footer class="markdownflow-footer">
             <span>内容由 AI 在人类指导下生成</span>
             <span>由 MarkdownFlow 驱动</span>
@@ -1306,7 +1735,7 @@
     `;
   }
 
-  function renderMarkdownFlowSection(slide, unit, index, sourceRefs) {
+  function renderMarkdownFlowSection(slide, unit, index) {
     return `
       <section id="flow-section-${index + 1}" class="markdownflow-section" data-slide-index="${index}">
         <div class="markdownflow-section-head">
@@ -1321,7 +1750,6 @@
           ${slide.bullets.map((item, bulletIndex) => `<li data-edit="bullet" data-bullet-index="${bulletIndex}" contenteditable="${state.coursewareEditMode}">${escapeHtml(item)}</li>`).join("")}
         </ul>
         ${renderTutorMoves(slide)}
-        <p class="source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
       </section>
     `;
   }
@@ -1447,7 +1875,7 @@
               <button type="button" data-presentation-action="exit">退出</button>
             </div>
           </header>
-          ${slides.map((slide, index) => renderPresentationMarkdownFlowSection(slide, unit, index, sourceRefs)).join("")}
+          ${slides.map((slide, index) => renderPresentationMarkdownFlowSection(slide, unit, index)).join("")}
           <footer class="presentation-read-footer">
             <span>内容由 AI 在人类指导下生成</span>
             <span>由 MarkdownFlow 驱动</span>
@@ -1470,7 +1898,7 @@
     });
   }
 
-  function renderPresentationMarkdownFlowSection(slide, unit, index, sourceRefs) {
+  function renderPresentationMarkdownFlowSection(slide, unit, index) {
     return `
       <section id="presentation-flow-section-${index + 1}" class="presentation-markdownflow-section">
         <div class="presentation-section-head">
@@ -1485,7 +1913,6 @@
           ${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
         ${renderTutorMoves(slide, "presentation")}
-        <p class="presentation-source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
       </section>
     `;
   }
@@ -2766,7 +3193,7 @@
   function exportLocalData() {
     if (!requireTeacherMode("导出本地数据备份")) return;
     downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
-    setModelStatus("本地学习数据已导出，包含错题、成绩、审核稿、PPT 方案、测验设置和角色模式。", "ok");
+    setModelStatus("本地数据已导出，包含账号、班级、学生、课件、练习、提交、错题、成绩和迁移计划。", "ok");
   }
 
   async function importLocalData(event) {
@@ -2782,16 +3209,35 @@
       state.generationCache = data.generationCache && typeof data.generationCache === "object" ? data.generationCache : {};
       state.pptPlans = data.pptPlans && typeof data.pptPlans === "object" ? data.pptPlans : {};
       state.schedule = data.schedule && typeof data.schedule === "object" ? data.schedule : { frequency: "每周", count: 10, mistakeRatio: 40 };
-      state.roleMode = data.roleMode === "student" ? "student" : "teacher";
+      state.accounts = Array.isArray(data.accounts) && data.accounts.length ? data.accounts : defaultAccounts();
+      state.classes = Array.isArray(data.classes) && data.classes.length ? data.classes : [defaultClassroom()];
+      state.students = Array.isArray(data.students) ? data.students : [];
+      state.activeClassId = data.activeClassId && state.classes.some((classroom) => classroom.id === data.activeClassId)
+        ? data.activeClassId
+        : state.classes[0].id;
+      state.subjectId = data.subjectScope?.subjectId === "math" || data.subjectId === "math" ? "math" : "math";
+      state.generationRecords = Array.isArray(data.generationRecords) ? data.generationRecords : [];
+      state.submissions = Array.isArray(data.submissions) ? data.submissions : [];
+      state.roleMode = "teacher";
       writeJson(mistakeKey, state.mistakes);
       writeJson(scoreHistoryKey, state.scoreHistory);
       writeJson(coursewareReviewKey, state.coursewareReviews);
       writeJson(generationCacheKey, state.generationCache);
       writeJson(pptPlanKey, state.pptPlans);
       writeJson(scheduleKey, state.schedule);
+      writeJson(accountsKey, state.accounts);
+      writeJson(classesKey, state.classes);
+      writeJson(studentsKey, state.students);
+      writeJson(generationRecordsKey, state.generationRecords);
+      writeJson(submissionsKey, state.submissions);
+      storage.setString(activeClassKey, state.activeClassId);
+      storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
       storage.setString(roleModeKey, state.roleMode);
+      applyScopeFromClass(currentClass(), { silent: true });
+      buildSelectors();
+      buildClassScopeSelectors();
       restoreScheduleControls();
-      restoreRoleModeControls();
+      restoreTeacherControls();
       clearPracticeState();
       renderAll();
       setModelStatus("本地数据备份已导入并恢复。", "ok");
@@ -2804,7 +3250,7 @@
 
   function clearLocalData() {
     if (!requireTeacherMode("清空学习数据")) return;
-    const confirmed = window.confirm("确认清空本机错题、成绩、课件审核稿和测验设置？此操作不会删除知识点包。建议先导出备份。");
+    const confirmed = window.confirm("确认清空本机账号、班级、学生、错题、成绩、课件审核稿、练习记录和测验设置？此操作不会删除知识点包。建议先导出备份。");
     if (!confirmed) return;
     storage.removeMany(Object.values(localDataKeys));
     state.mistakes = [];
@@ -2813,9 +3259,25 @@
     state.generationCache = {};
     state.pptPlans = {};
     state.schedule = { frequency: "每周", count: 10, mistakeRatio: 40 };
+    state.accounts = defaultAccounts();
+    state.classes = [defaultClassroom()];
+    state.students = [];
+    state.activeClassId = state.classes[0].id;
+    state.subjectId = "math";
+    state.generationRecords = [];
+    state.submissions = [];
     state.roleMode = "teacher";
+    writeJson(accountsKey, state.accounts);
+    writeJson(classesKey, state.classes);
+    writeJson(studentsKey, state.students);
+    writeJson(generationRecordsKey, state.generationRecords);
+    writeJson(submissionsKey, state.submissions);
+    storage.setString(activeClassKey, state.activeClassId);
+    storage.setString(subjectScopeKey, JSON.stringify({ subjectId: state.subjectId, updatedAt: new Date().toISOString() }));
+    buildSelectors();
+    buildClassScopeSelectors();
     restoreScheduleControls();
-    restoreRoleModeControls();
+    restoreTeacherControls();
     clearPracticeState();
     renderAll();
     setModelStatus("本机学习数据已清空，知识点包和代码不受影响。", "ok");
@@ -2829,6 +3291,13 @@
       generationCache: state.generationCache,
       pptPlans: state.pptPlans,
       schedule: state.schedule,
+      accounts: state.accounts,
+      classes: state.classes,
+      students: state.students,
+      activeClassId: state.activeClassId,
+      subjectScope: { subjectId: state.subjectId || "math" },
+      generationRecords: state.generationRecords,
+      submissions: state.submissions,
       roleMode: state.roleMode
     }, {
       exportVersion: `local-data-v${exportSchemaVersion}`,
@@ -3070,7 +3539,7 @@
     $("answerInput").value = $("practiceAnswerInput").value;
     updateAnswerReviewFromText("practice-sync");
     switchTab("grading");
-    setModelStatus("同步出题页答案已同步到拍照批改页。", "ok");
+    setModelStatus("同步出题页答案已同步到拍照/OCR校正页。", "ok");
   }
 
   function previewAnswerImage(event) {
@@ -3273,6 +3742,7 @@
     $("answerInput").value = answerText || "";
     $("practiceAnswerInput").value = answerText || "";
     saveScoreHistory(summary, results);
+    recordSubmission(summary, results, { origin: options.origin || "manual" });
     saveMistakesFromResults(results);
     renderAnswerReviewPanel(answerReview);
     renderGradingResults(results, summary);
@@ -3545,9 +4015,13 @@
 
   function saveScoreHistory(summary, results) {
     const unit = unitData();
+    const classroom = currentClass();
     const record = {
       id: `${Date.now()}-${unit.id}`,
       createdAt: new Date().toISOString(),
+      classId: classroom?.id || "",
+      className: classroom?.name || "",
+      subjectId: state.subjectId || "math",
       gradeId: state.grade,
       gradeName: gradeData().name,
       volumeId: state.volume,
@@ -3819,16 +4293,22 @@
 
   function saveMistakesFromResults(results) {
     const wrongItems = results.filter((item) => !item.correct);
+    const classroom = currentClass();
     wrongItems.forEach((item) => {
       const existing = state.mistakes.find((mistake) => mistake.stem === item.question.stem && mistake.status !== "已掌握");
       if (existing) {
         existing.count += 1;
         existing.submitted = item.submitted;
+        existing.classId = classroom?.id || existing.classId || "";
+        existing.className = classroom?.name || existing.className || "";
         existing.updatedAt = new Date().toISOString();
         return;
       }
       state.mistakes.unshift({
         id: `${Date.now()}-${item.index}`,
+        classId: classroom?.id || "",
+        className: classroom?.name || "",
+        subjectId: state.subjectId || "math",
         grade: gradeData().name,
         volume: volumeData().name,
         unitTitle: unitData().title,

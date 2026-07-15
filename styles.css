@@ -430,6 +430,41 @@ body[data-role-mode="student"] .teacher-only {
   line-height: 1.2;
 }
 
+.topbar-side {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.teacher-session {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.teacher-session div {
+  min-width: 132px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 11px;
+  box-shadow: var(--shadow);
+}
+
+.teacher-session span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.teacher-session strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0;
@@ -479,6 +514,36 @@ body[data-role-mode="student"] .teacher-only {
   border-color: var(--line);
   color: var(--brand-strong);
   box-shadow: var(--shadow);
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 12px 0;
+  border-top: 1px solid #263244;
+  border-bottom: 1px solid #263244;
+}
+
+.sidebar-nav .tab-btn {
+  width: 100%;
+  text-align: left;
+  background: #1f2937;
+  border-color: #334155;
+  color: #cbd5e1;
+  box-shadow: none;
+}
+
+.sidebar-nav .tab-btn:hover {
+  background: #273449;
+  color: #f8fafc;
+}
+
+.sidebar-nav .tab-btn.active {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+  color: var(--brand-strong);
+  box-shadow: none;
 }
 
 .tab-panel {
@@ -2632,6 +2697,151 @@ body[data-role-mode="student"] .teacher-only {
   background: #f8fafc;
 }
 
+.classroom-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.management-grid {
+  align-items: start;
+}
+
+.classroom-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.classroom-card h4 {
+  margin: 4px 0 12px;
+  font-size: 18px;
+}
+
+.current-class-card {
+  background: linear-gradient(180deg, #f8fffd, #ffffff);
+}
+
+.class-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.class-summary,
+.class-list-item p,
+.student-list-item p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.class-list,
+.student-list {
+  display: grid;
+  gap: 10px;
+}
+
+.class-list-item,
+.student-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.class-list-item.active {
+  border-color: #99f6e4;
+  background: #ecfdf5;
+}
+
+.class-list-item strong,
+.student-list-item strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.student-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.empty-inline {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--muted);
+  background: #f8fafc;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+}
+
+.settings-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-card h4 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.settings-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.settings-card .button-row {
+  margin-top: 12px;
+}
+
 .empty-state {
   min-height: 160px;
   display: grid;
@@ -2907,6 +3117,13 @@ body[data-role-mode="student"] .teacher-only {
     flex-direction: column;
   }
 
+  .topbar-side,
+  .teacher-session {
+    width: 100%;
+    justify-items: stretch;
+    justify-content: stretch;
+  }
+
   .courseware-actions {
     justify-content: flex-start;
   }
@@ -2920,7 +3137,10 @@ body[data-role-mode="student"] .teacher-only {
   .tag-grid,
   .grading-grid,
   .mistake-stats,
-  .schedule-grid {
+  .schedule-grid,
+  .classroom-grid,
+  .student-form,
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 
