@@ -1374,26 +1374,29 @@
 
   function moveCoursewarePresentation(delta) {
     if (!state.coursewarePresenting) return;
-    const slides = buildCoursewareSlides(unitData());
-    if (!slides.length) return;
-    state.coursewarePresentationIndex = clampInt(state.coursewarePresentationIndex + delta, 0, slides.length - 1);
-    renderCoursewarePresentation();
+    const panel = $("coursewarePresentation");
+    const content = panel?.querySelector(".presentation-markdownflow-content");
+    if (content) content.scrollBy({ top: delta * Math.max(360, content.clientHeight * 0.72), behavior: "smooth" });
   }
 
   function jumpCoursewarePresentation(index) {
     if (!state.coursewarePresenting) return;
-    const slides = buildCoursewareSlides(unitData());
-    if (!slides.length) return;
-    state.coursewarePresentationIndex = clampInt(index, 0, slides.length - 1);
-    renderCoursewarePresentation();
+    const panel = $("coursewarePresentation");
+    const content = panel?.querySelector(".presentation-markdownflow-content");
+    if (!content) return;
+    if (index <= 0) {
+      content.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      content.scrollTo({ top: content.scrollHeight, behavior: "smooth" });
+    }
   }
 
   function handleCoursewarePresentationKeydown(event) {
     if (!state.coursewarePresenting) return;
-    if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+    if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(event.key)) {
       event.preventDefault();
       moveCoursewarePresentation(1);
-    } else if (["ArrowLeft", "PageUp"].includes(event.key)) {
+    } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(event.key)) {
       event.preventDefault();
       moveCoursewarePresentation(-1);
     } else if (event.key === "Home") {
@@ -1401,7 +1404,7 @@
       jumpCoursewarePresentation(0);
     } else if (event.key === "End") {
       event.preventDefault();
-      jumpCoursewarePresentation(buildCoursewareSlides(unitData()).length - 1);
+      jumpCoursewarePresentation(1);
     } else if (event.key === "Escape") {
       closeCoursewarePresentation();
     }
@@ -1419,53 +1422,72 @@
     const unit = unitData();
     const slides = buildCoursewareSlides(unit);
     if (!panel || !slides.length) return;
-    const index = clampInt(state.coursewarePresentationIndex, 0, slides.length - 1);
-    state.coursewarePresentationIndex = index;
-    const slide = slides[index];
     const sourceRefs = getSourceRefs(unit);
     panel.hidden = false;
     panel.innerHTML = `
-      <div class="presentation-shell">
-        <header class="presentation-topbar">
-          <div>
-            <span>${escapeHtml(`${gradeData().name}${volumeData().name}`)} · ${escapeHtml(unit.title)}</span>
-            <strong>${escapeHtml(slide.title)}</strong>
-          </div>
-          <div class="presentation-actions">
-            <span>${index + 1} / ${slides.length}</span>
-            <button type="button" data-presentation-action="exit">退出</button>
-          </div>
-        </header>
-        <main class="presentation-slide">
-          <section class="presentation-visual visual-${escapeAttribute(slide.visualType)}">
-            ${renderSlideVisual(slide, unit, index)}
-          </section>
-          <section class="presentation-content">
-            <p class="eyebrow">Courseware</p>
-            <h2>${index + 1}. ${escapeHtml(slide.title)}</h2>
-            <p>${escapeHtml(slide.body)}</p>
-            <ul>${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-            ${renderTutorMoves(slide, "presentation")}
-          </section>
+      <div class="presentation-markdownflow-shell">
+        <aside class="presentation-markdownflow-nav" aria-label="授课目录">
+          <div class="presentation-brand">AI Teacher</div>
+          <strong>${escapeHtml(unit.title)}</strong>
+          <p>${escapeHtml(`${gradeData().name}${volumeData().name} · 读模式`)}</p>
+          <ol>
+            ${slides.map((slide, index) => `<li><a href="#presentation-flow-section-${index + 1}" data-presentation-target="${index + 1}">${escapeHtml(index + 1)}. ${escapeHtml(slide.title)}</a></li>`).join("")}
+          </ol>
+          <div class="presentation-source">来源：${renderSourceLinks(sourceRefs)}</div>
+        </aside>
+        <main class="presentation-markdownflow-content" aria-label="MarkdownFlow 授课内容">
+          <header class="presentation-read-header">
+            <div>
+              <p class="eyebrow">MarkdownFlow</p>
+              <h2>${escapeHtml(unit.title)}</h2>
+              <p>按“观察、追问、反馈、小测、复盘”的阅读流讲课。</p>
+            </div>
+            <div class="presentation-read-actions">
+              <span>读</span>
+              <button type="button" data-presentation-action="exit">退出</button>
+            </div>
+          </header>
+          ${slides.map((slide, index) => renderPresentationMarkdownFlowSection(slide, unit, index, sourceRefs)).join("")}
+          <footer class="presentation-read-footer">
+            <span>内容由 AI 在人类指导下生成</span>
+            <span>由 MarkdownFlow 驱动</span>
+          </footer>
         </main>
-        <footer class="presentation-footer">
-          <button type="button" data-presentation-action="prev" ${index === 0 ? "disabled" : ""}>上一页</button>
-          <div>
-            <span style="--progress:${((index + 1) / slides.length) * 100}%"></span>
-          </div>
-          <button type="button" data-presentation-action="next" ${index === slides.length - 1 ? "disabled" : ""}>下一页</button>
-        </footer>
-        <p class="presentation-source">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
       </div>
     `;
+    panel.querySelectorAll("[data-presentation-target]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const target = panel.querySelector(`#presentation-flow-section-${link.dataset.presentationTarget}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
     panel.querySelectorAll("[data-presentation-action]").forEach((button) => {
       button.addEventListener("click", () => {
         const action = button.dataset.presentationAction;
-        if (action === "prev") moveCoursewarePresentation(-1);
-        if (action === "next") moveCoursewarePresentation(1);
         if (action === "exit") closeCoursewarePresentation();
       });
     });
+  }
+
+  function renderPresentationMarkdownFlowSection(slide, unit, index, sourceRefs) {
+    return `
+      <section id="presentation-flow-section-${index + 1}" class="presentation-markdownflow-section">
+        <div class="presentation-section-head">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <h3>${escapeHtml(slide.title)}</h3>
+        </div>
+        <p class="presentation-section-body">${escapeHtml(slide.body)}</p>
+        <div class="presentation-section-visual visual-${escapeAttribute(slide.visualType)}">
+          ${renderSlideVisual(slide, unit, index)}
+        </div>
+        <ul class="presentation-section-points">
+          ${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        </ul>
+        ${renderTutorMoves(slide, "presentation")}
+        <p class="presentation-source-note">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
+      </section>
+    `;
   }
 
   function updateCoursewareButtons(hasSlides) {
