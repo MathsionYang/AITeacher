@@ -30,10 +30,14 @@ assert.ok(indexSource.includes("id=\"scheduledCount\" type=\"number\" min=\"10\"
 assert.ok(indexSource.includes("id=\"coursewareMoreMenu\""));
 assert.ok(indexSource.includes("class=\"action-menu-panel\""));
 assert.ok(indexSource.indexOf("id=\"downloadCoursewareBtn\"") > indexSource.indexOf("id=\"coursewareMoreMenu\""));
+assert.ok(indexSource.includes("id=\"appNoticeHost\""));
+assert.equal(indexSource.includes("id=\"modelStatus\""), false);
 assert.ok(appSource.includes("http://127.0.0.1:8790"));
 assert.ok(appSource.includes("function formatDateTime"));
 assert.ok(appSource.includes("parseAnswerReview(answerText, \"paddleocr\""));
 assert.ok(appSource.includes("function setOcrStatus"));
+assert.ok(appSource.includes("function showAppNotice"));
+assert.ok(stylesSource.includes(".app-notice-host"));
 assert.ok(appSource.includes("已接收 ${receivedChars} 字内容"));
 assert.ok(agentSource.includes("generateQuestionsStream"));
 assert.ok(agentSource.includes("每次必须生成 10 道题"));

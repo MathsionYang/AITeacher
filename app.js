@@ -59,6 +59,7 @@
 
   const $ = (id) => document.getElementById(id);
   let celebrationTimer = null;
+  let noticeTimer = null;
 
   function readJson(key, fallback, mockField) {
     try {
@@ -682,10 +683,47 @@
   }
 
   function setModelStatus(message, tone = "info") {
-    const status = $("modelStatus");
-    if (!status) return;
-    status.textContent = message;
-    status.dataset.tone = tone;
+    showAppNotice(message, tone);
+  }
+
+  function showAppNotice(message, tone = "info") {
+    const host = $("appNoticeHost");
+    if (!host || !message) return;
+    window.clearTimeout(noticeTimer);
+    const role = tone === "error" || tone === "warn" ? "alert" : "status";
+    host.innerHTML = `
+      <section class="app-notice" data-tone="${escapeAttribute(tone)}" role="${role}">
+        <div>
+          <strong>${escapeHtml(noticeTitle(tone))}</strong>
+          <p>${escapeHtml(message)}</p>
+        </div>
+        <button type="button" class="notice-close" aria-label="关闭提醒">×</button>
+      </section>
+    `;
+    host.hidden = false;
+    const closeButton = host.querySelector(".notice-close");
+    if (closeButton) closeButton.addEventListener("click", () => hideAppNotice());
+    const duration = tone === "busy" ? 0 : tone === "error" ? 9000 : tone === "warn" ? 7000 : 5200;
+    if (duration) noticeTimer = window.setTimeout(hideAppNotice, duration);
+  }
+
+  function hideAppNotice() {
+    const host = $("appNoticeHost");
+    if (!host) return;
+    window.clearTimeout(noticeTimer);
+    host.innerHTML = "";
+    host.hidden = true;
+  }
+
+  function noticeTitle(tone) {
+    const titles = {
+      ok: "操作完成",
+      warn: "需要确认",
+      error: "操作失败",
+      busy: "处理中",
+      info: "提醒"
+    };
+    return titles[tone] || "提醒";
   }
 
   function setOcrStatus(message, tone = "info") {
