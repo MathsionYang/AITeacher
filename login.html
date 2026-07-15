@@ -1,466 +1,663 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Teacher MVP - 登录</title>
-    <style>
-      :root {
-        --bg: #eef4f8;
-        --panel: #ffffff;
-        --ink: #172033;
-        --muted: #667085;
-        --line: #d9e0ea;
-        --brand: #0f766e;
-        --brand-strong: #115e59;
-        --blue: #2563eb;
-        --orange: #d97706;
-        --red: #dc2626;
-        --shadow: 0 22px 58px rgba(23, 32, 51, 0.16);
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>课题通 EduForge — 教师登录</title>
+  <style>
+    /* ========================
+       Design Tokens
+       ======================== */
+    :root {
+      --teal-50:  #f0fdfa;
+      --teal-100: #ccfbf1;
+      --teal-200: #99f6e4;
+      --teal-400: #2dd4bf;
+      --teal-500: #14b8a6;
+      --teal-600: #0d9488;
+      --teal-700: #0f766e;
+      --teal-800: #115e59;
 
-      * {
-        box-sizing: border-box;
-      }
+      --slate-50:  #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-400: #94a3b8;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
 
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 24px;
-        background:
-          linear-gradient(135deg, rgba(15, 118, 110, 0.12), transparent 34%),
-          linear-gradient(315deg, rgba(37, 99, 235, 0.11), transparent 38%),
-          var(--bg);
-        color: var(--ink);
-        font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
-      }
+      --rose-400: #fb7185;
+      --rose-500: #f43f5e;
+      --amber-400: #fbbf24;
+      --amber-500: #f59e0b;
+      --blue-500: #3b82f6;
+      --blue-600: #2563eb;
 
-      button,
-      input {
-        font: inherit;
-      }
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
 
-      .login-shell {
-        width: min(920px, 100%);
-        min-height: 540px;
-        display: grid;
-        grid-template-columns: 0.95fr 1.05fr;
-        overflow: hidden;
-        border: 1px solid rgba(217, 224, 234, 0.9);
-        border-radius: 18px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
-      }
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    }
 
-      .intro-panel {
-        position: relative;
-        display: flex;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      background: linear-gradient(135deg, #e0f2fe 0%, #ccfbf1 30%, #fef3c7 60%, #fce7f3 100%);
+      background-size: 400% 400%;
+      animation: bgShift 18s ease infinite;
+      position: relative;
+      overflow: hidden;
+    }
+
+    @keyframes bgShift {
+      0%, 100% { background-position: 0% 50%; }
+      25% { background-position: 100% 0%; }
+      50% { background-position: 100% 100%; }
+      75% { background-position: 0% 100%; }
+    }
+
+    /* Ambient floating orbs */
+    body::before,
+    body::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.3;
+      pointer-events: none;
+    }
+    body::before {
+      width: 420px;
+      height: 420px;
+      background: var(--teal-400);
+      top: -100px;
+      right: -100px;
+      animation: floatOrb1 12s ease-in-out infinite;
+    }
+    body::after {
+      width: 340px;
+      height: 340px;
+      background: var(--amber-400);
+      bottom: -80px;
+      left: -80px;
+      animation: floatOrb2 15s ease-in-out infinite;
+    }
+
+    @keyframes floatOrb1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(-60px, 40px) scale(1.1); }
+      66% { transform: translate(30px, -30px) scale(0.9); }
+    }
+    @keyframes floatOrb2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(50px, -30px) scale(1.15); }
+      66% { transform: translate(-40px, 20px) scale(0.85); }
+    }
+
+    /* ========================
+       Login Card
+       ======================== */
+    .login-card {
+      position: relative;
+      z-index: 1;
+      width: 920px;
+      max-width: 100%;
+      min-height: 540px;
+      display: flex;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.04),
+        0 24px 80px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      overflow: hidden;
+      transition: all 0.4s var(--ease-out-expo);
+    }
+
+    /* ========================
+       Left Panel — Illustration
+       ======================== */
+    .illustration-panel {
+      flex: 1;
+      background: linear-gradient(160deg, var(--teal-50) 0%, #ecfdf5 50%, #f0fdfa 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 48px 36px;
+      border-right: 1px solid rgba(153, 246, 228, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Decorative grid */
+    .illustration-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(13, 148, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13, 148, 136, 0.03) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .brand-tag {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--teal-200);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--teal-700);
+      letter-spacing: 0.3px;
+      margin-bottom: 32px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(13, 148, 136, 0.08);
+    }
+    .brand-tag::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--teal-500);
+      animation: breathe 2s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    /* Teacher Illustration (image) */
+    .teacher-figure {
+      position: relative;
+      z-index: 1;
+      width: 220px;
+      margin-bottom: 24px;
+      animation: float 4s ease-in-out infinite;
+      filter: drop-shadow(0 8px 24px rgba(13, 148, 136, 0.18));
+    }
+    .teacher-figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .platform-desc {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      margin-top: 0;
+    }
+    .platform-desc h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--teal-800);
+      margin-bottom: 4px;
+    }
+    .platform-desc p {
+      font-size: 12px;
+      color: var(--slate-500);
+      font-weight: 500;
+    }
+
+    /* ========================
+       Right Panel — Form
+       ======================== */
+    .form-panel {
+      flex: 1.25;
+      padding: 52px 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .form-header {
+      margin-bottom: 36px;
+      text-align: center;
+    }
+    .form-header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--slate-900);
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin: 0;
+    }
+
+    /* Input Groups */
+    .field {
+      margin-bottom: 20px;
+    }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-700);
+      margin-bottom: 8px;
+      letter-spacing: 0.1px;
+    }
+    .input-wrapper {
+      position: relative;
+    }
+    .input-wrapper .icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+    .input-wrapper .icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: var(--slate-400);
+      fill: none;
+      stroke-width: 1.8;
+      transition: stroke var(--duration, 0.2s) var(--ease-out-quart);
+    }
+    .input-wrapper input {
+      width: 100%;
+      padding: 14px 16px 14px 48px;
+      border: 1.5px solid var(--slate-200);
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      color: var(--slate-900);
+      background: rgba(255, 255, 255, 0.7);
+      outline: none;
+      transition: all 0.25s var(--ease-out-quart);
+      --duration: 0.25s;
+    }
+    .input-wrapper input::placeholder {
+      color: var(--slate-400);
+    }
+    .input-wrapper input:hover {
+      border-color: var(--slate-300);
+    }
+    .input-wrapper input:focus {
+      border-color: var(--teal-500);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.08);
+    }
+    .input-wrapper input:focus ~ .icon svg,
+    .input-wrapper input:focus + .icon svg {
+      stroke: var(--teal-500);
+    }
+
+    /* Row for options */
+    .options-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .remember input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--slate-300);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-out-quart);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .remember input[type="checkbox"]:checked {
+      background: var(--teal-600);
+      border-color: var(--teal-600);
+    }
+    .remember input[type="checkbox"]:checked::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 2px;
+      width: 5px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .remember span {
+      font-size: 13px;
+      color: var(--slate-600);
+      font-weight: 500;
+    }
+    .forgot-link {
+      font-size: 13px;
+      color: var(--teal-600);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s var(--ease-out-quart);
+    }
+    .forgot-link:hover {
+      color: var(--teal-800);
+    }
+
+    /* Submit Button */
+    .btn-login {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, var(--teal-600), var(--teal-700));
+      border: none;
+      border-radius: var(--radius-md);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: all 0.25s var(--ease-out-quart);
+      box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2), 0 8px 24px rgba(13, 148, 136, 0.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-login::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.25s var(--ease-out-quart);
+    }
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28), 0 12px 32px rgba(13, 148, 136, 0.16);
+    }
+    .btn-login:hover::before {
+      opacity: 1;
+    }
+    .btn-login:active {
+      transform: translateY(0) scale(0.98);
+      box-shadow: 0 1px 4px rgba(13, 148, 136, 0.2);
+    }
+    .btn-login .arrow {
+      display: inline-block;
+      transition: transform 0.25s var(--ease-out-quart);
+      margin-left: 4px;
+    }
+    .btn-login:hover .arrow {
+      transform: translateX(3px);
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 28px 0;
+    }
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--slate-200);
+    }
+    .divider span {
+      font-size: 12px;
+      color: var(--slate-400);
+      font-weight: 600;
+    }
+
+    /* Demo Account */
+    .demo-hint {
+      text-align: center;
+      padding: 14px;
+      background: var(--teal-50);
+      border: 1px solid var(--teal-100);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      color: var(--teal-700);
+      line-height: 1.6;
+    }
+    .demo-hint strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    /* ========================
+       Responsive
+       ======================== */
+    @media (max-width: 800px) {
+      .login-card {
         flex-direction: column;
-        justify-content: space-between;
-        padding: 34px;
-        background: #102033;
-        color: #f8fafc;
+        min-height: auto;
       }
-
-      .intro-panel::after {
-        content: "";
-        position: absolute;
-        inset: auto 28px 28px auto;
-        width: 180px;
-        height: 180px;
-        border: 1px solid rgba(153, 246, 228, 0.34);
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(15, 118, 110, 0.28), transparent 68%);
+      .illustration-panel {
+        padding: 32px 24px 16px;
+        border-right: none;
+        border-bottom: 1px solid rgba(153, 246, 228, 0.4);
       }
-
-      .brand {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        gap: 14px;
+      .teacher-figure {
+        width: 160px;
+        margin-bottom: 16px;
       }
-
-      .brand-mark {
-        width: 48px;
-        height: 48px;
-        display: grid;
-        place-items: center;
-        border-radius: 8px;
-        background: var(--brand);
-        color: #fff;
-        font-weight: 900;
-      }
-
-      .brand h1,
-      .intro-copy h2,
-      .form-card h2 {
-        margin: 0;
-      }
-
-      .brand p,
-      .intro-copy p,
-      .hint,
-      .status-panel p {
-        margin: 0;
-        color: var(--muted);
-      }
-
-      .brand p {
-        margin-top: 4px;
-        color: #aab4c3;
-      }
-
-      .intro-copy {
-        position: relative;
-        z-index: 1;
-        max-width: 360px;
-      }
-
-      .intro-copy h2 {
-        font-size: 30px;
-        line-height: 1.2;
-      }
-
-      .intro-copy p {
-        margin-top: 14px;
-        color: #cbd5e1;
-        line-height: 1.75;
-      }
-
-      .role-preview {
-        position: relative;
-        z-index: 1;
-        display: grid;
-        gap: 10px;
-      }
-
-      .role-preview article {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 14px;
-        padding: 13px 14px;
-        border: 1px solid rgba(203, 213, 225, 0.18);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.06);
-      }
-
-      .role-preview strong {
-        font-size: 14px;
-      }
-
-      .role-preview span {
-        color: #99f6e4;
-        font-size: 12px;
-        font-weight: 800;
-      }
-
       .form-panel {
-        padding: 42px;
-        display: grid;
-        align-content: center;
+        padding: 28px 28px 36px;
       }
-
-      .form-card {
-        display: grid;
-        gap: 22px;
+      .form-header h1 {
+        font-size: 26px;
       }
+    }
+  </style>
+</head>
+<body>
 
-      .form-card h2 {
-        font-size: 28px;
-      }
+  <div class="login-card">
+    <!-- ====== Left Panel ====== -->
+    <div class="illustration-panel">
+      <div class="brand-tag">人教版 · 小学数学智能一体化原型平台</div>
 
-      .hint {
-        margin-top: 8px;
-        line-height: 1.65;
-      }
+      <div class="teacher-figure">
+        <img src="img/teacher-illustration.png" alt="教师形象" />
+      </div>
 
-      .role-selector {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
+      <div class="platform-desc">
+        <h3>课题通 EduForge</h3>
+        <p>为小学数学教师打造的智能备课平台</p>
+      </div>
+    </div>
 
-      .role-option {
-        position: relative;
-      }
+    <!-- ====== Right Panel ====== -->
+    <div class="form-panel">
+      <div class="form-header">
+        <h1>欢迎回来</h1>
+      </div>
 
-      .role-option input {
-        position: absolute;
-        inset: 0;
-        opacity: 0;
-      }
-
-      .role-button {
-        display: grid;
-        gap: 4px;
-        min-height: 78px;
-        padding: 13px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #f8fafc;
-        cursor: pointer;
-      }
-
-      .role-button strong {
-        color: #243044;
-      }
-
-      .role-button span {
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.45;
-      }
-
-      .role-option input:checked + .role-button {
-        border-color: var(--brand);
-        background: #ecfdf5;
-        box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.14);
-      }
-
-      .field {
-        display: grid;
-        gap: 8px;
-      }
-
-      label {
-        font-size: 13px;
-        font-weight: 800;
-      }
-
-      input[type="text"],
-      input[type="password"] {
-        width: 100%;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 12px 13px;
-        color: var(--ink);
-        outline: none;
-      }
-
-      input[type="text"]:focus,
-      input[type="password"]:focus {
-        border-color: var(--brand);
-        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-      }
-
-      .submit-btn {
-        width: 100%;
-        border: 0;
-        border-radius: 8px;
-        padding: 13px 16px;
-        background: var(--brand);
-        color: #fff;
-        font-weight: 900;
-        cursor: pointer;
-      }
-
-      .submit-btn:hover {
-        background: var(--brand-strong);
-      }
-
-      .status-panel {
-        display: none;
-        border: 1px solid var(--line);
-        border-left-width: 4px;
-        border-radius: 8px;
-        padding: 12px 13px;
-        background: #f8fafc;
-      }
-
-      .status-panel[data-tone="ok"] {
-        display: block;
-        border-left-color: var(--brand);
-      }
-
-      .status-panel[data-tone="warn"] {
-        display: block;
-        border-left-color: var(--orange);
-      }
-
-      .status-panel[data-tone="error"] {
-        display: block;
-        border-left-color: var(--red);
-      }
-
-      .status-panel strong {
-        display: block;
-        margin-bottom: 4px;
-      }
-
-      .account-tip {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.6;
-      }
-
-      .account-tip code {
-        color: #344054;
-        font-weight: 800;
-      }
-
-      @media (max-width: 780px) {
-        body {
-          place-items: start center;
-        }
-
-        .login-shell {
-          grid-template-columns: 1fr;
-        }
-
-        .intro-panel {
-          min-height: 310px;
-        }
-
-        .form-panel {
-          padding: 28px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="login-shell">
-      <section class="intro-panel" aria-label="产品介绍">
-        <div class="brand">
-          <div class="brand-mark">AI</div>
-          <div>
-            <h1>AI Teacher MVP</h1>
-            <p>人教版小学数学 · 本机部署</p>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="field">
+          <label for="username">账号 / 工号</label>
+          <div class="input-wrapper">
+            <div class="icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M6 20v-1a6 6 0 0 1 12 0v1"/>
+              </svg>
+            </div>
+            <input
+              type="text"
+              id="username"
+              placeholder="请输入您的工号或账号"
+              required
+              autocomplete="username"
+            />
           </div>
         </div>
 
-        <div class="intro-copy">
-          <h2>先开放教师工作台</h2>
-          <p>教师可设置年级册别、生成导学课件、同步练习和周期测验。当前 MVP 只做教师端，后续如需在线作答再由 Go/Java 后端接入账号体系。</p>
+        <div class="field">
+          <label for="password">登录密码</label>
+          <div class="input-wrapper">
+            <div class="icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <circle cx="12" cy="16" r="1"/>
+              </svg>
+            </div>
+            <input
+              type="password"
+              id="password"
+              placeholder="请输入密码"
+              required
+              autocomplete="current-password"
+            />
+          </div>
         </div>
 
-        <div class="role-preview">
-          <article>
-            <strong>教师端</strong>
-            <span>已开放</span>
-          </article>
+        <div class="options-row">
+          <label class="remember">
+            <input type="checkbox" checked />
+            <span>记住登录状态</span>
+          </label>
+          <a href="#" class="forgot-link" onclick="event.preventDefault();alert('请联系管理员重置密码')">忘记密码？</a>
         </div>
-      </section>
 
-      <section class="form-panel">
-        <form id="loginForm" class="form-card">
-          <div>
-            <h2>登录</h2>
-            <p class="hint">本地 MVP 默认教师账号为 <strong>teacher</strong>，密码为 <strong>teacher123</strong>。正式版本将由 Go/Java 后端接管账号、会话和权限。</p>
-          </div>
+        <button type="submit" class="btn-login">
+          进入同步出题<span class="arrow">→</span>
+        </button>
+      </form>
 
-          <div class="field">
-            <label for="username">账号</label>
-            <input id="username" type="text" value="teacher" autocomplete="username" required />
-          </div>
+      <div class="divider"><span>演示账号</span></div>
 
-          <div class="field">
-            <label for="password">密码</label>
-            <input id="password" type="password" value="teacher123" autocomplete="current-password" required />
-          </div>
+      <div class="demo-hint">
+        <strong>试用账号</strong>
+        账号：teacher001 &nbsp;|&nbsp; 密码：123456
+      </div>
+    </div>
+  </div>
 
-          <div id="loginStatus" class="status-panel" role="status" aria-live="polite"></div>
+  <script>
+    const SESSION_KEY = "ai-teacher-auth-session-v1";
+    const ACCOUNTS_KEY = "ai-teacher-accounts-v1";
+    const DEFAULT_ACCOUNTS = [
+      {
+        id: "teacher-local-001",
+        role: "teacher",
+        username: "teacher",
+        displayName: "本机教师",
+        passwordHash: "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416",
+        status: "active"
+      },
+      {
+        id: "teacher-local-demo",
+        role: "teacher",
+        username: "teacher001",
+        displayName: "演示教师",
+        passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+        status: "active"
+      }
+    ];
 
-          <button class="submit-btn" type="submit">进入教师工作台</button>
+    seedLocalAccounts();
 
-          <div class="account-tip">
-            <span>本地登录状态仅保存在客户电脑。</span>
-            <span><code>localStorage</code> MVP</span>
-          </div>
-        </form>
-      </section>
-    </main>
+    async function handleLogin(event) {
+      event.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = event.target.querySelector('.btn-login');
 
-    <script>
-      const SESSION_KEY = "ai-teacher-auth-session-v1";
-      const ACCOUNTS_KEY = "ai-teacher-accounts-v1";
-      const DEFAULT_TEACHER_HASH = "cde383eee8ee7a4400adf7a15f716f179a2eb97646b37e089eb8d6d04e663416";
-      const loginForm = document.getElementById("loginForm");
-      const statusPanel = document.getElementById("loginStatus");
+      // Button loading state
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '验证中…';
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.75';
 
-      seedLocalAccounts();
+      const accounts = readJson(ACCOUNTS_KEY, []);
+      const account = accounts.find((item) => item.role === "teacher" && item.username === username);
+      const passwordHash = await sha256(password);
 
-      loginForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const roleMode = "teacher";
-        const username = document.getElementById("username").value.trim();
-        const password = document.getElementById("password").value;
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
 
-        const accounts = readJson(ACCOUNTS_KEY, []);
-        const account = accounts.find((item) => item.role === "teacher" && item.username === username);
-        const passwordHash = await sha256(password);
         if (!account || account.passwordHash !== passwordHash) {
-          setStatus("账号或密码不正确", "请使用本地 MVP 默认账号 teacher / teacher123，或检查本机账号配置。", "error");
+          alert('账号或密码不正确，请使用演示账号 teacher001 / 123456。');
           return;
         }
 
-        const session = {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
           schemaVersion: 1,
           role: "teacher",
           accountId: account.id,
           username: account.username,
-          displayName: account.displayName || "教师",
+          displayName: account.displayName || "本机教师",
           loggedInAt: new Date().toISOString()
-        };
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-        setStatus("登录成功", "正在进入教师工作台。", "ok");
-        window.setTimeout(() => {
-          window.location.href = "index.html";
-        }, 380);
+        }));
+        alert('验证成功！正在为您初始化 EduForge「课题通」一体化工作台。\n\n欢迎您，' + (account.displayName || username) + '！');
+        window.location.href = "index.html";
+      }, 800);
+    }
+
+    function seedLocalAccounts() {
+      const accounts = readJson(ACCOUNTS_KEY, []);
+      let changed = false;
+      DEFAULT_ACCOUNTS.forEach((account) => {
+        if (accounts.some((item) => item.role === account.role && item.username === account.username)) return;
+        accounts.push({ ...account, createdAt: new Date().toISOString() });
+        changed = true;
       });
+      if (changed) localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    }
 
-      function seedLocalAccounts() {
-        const accounts = readJson(ACCOUNTS_KEY, []);
-        if (accounts.some((item) => item.role === "teacher" && item.username === "teacher")) return;
-        accounts.push({
-          id: "teacher-local-001",
-          role: "teacher",
-          username: "teacher",
-          displayName: "本机教师",
-          passwordHash: DEFAULT_TEACHER_HASH,
-          status: "active",
-          createdAt: new Date().toISOString()
-        });
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    function readJson(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch (error) {
+        return fallback;
       }
+    }
 
-      function readJson(key, fallback) {
-        try {
-          const raw = localStorage.getItem(key);
-          return raw ? JSON.parse(raw) : fallback;
-        } catch (error) {
-          return fallback;
-        }
+    async function sha256(value) {
+      if (!window.crypto || !crypto.subtle) {
+        if (value === "teacher123") return DEFAULT_ACCOUNTS[0].passwordHash;
+        if (value === "123456") return DEFAULT_ACCOUNTS[1].passwordHash;
+        return "";
       }
+      const bytes = new TextEncoder().encode(value);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+  </script>
 
-      async function sha256(value) {
-        if (!window.crypto || !crypto.subtle) {
-          return value === "teacher123" ? DEFAULT_TEACHER_HASH : "";
-        }
-        const bytes = new TextEncoder().encode(value);
-        const digest = await crypto.subtle.digest("SHA-256", bytes);
-        return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-      }
-
-      function setStatus(title, message, tone) {
-        statusPanel.dataset.tone = tone;
-        statusPanel.innerHTML = `<strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p>`;
-      }
-
-      function escapeHtml(value) {
-        return String(value)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-    </script>
-  </body>
+</body>
 </html>

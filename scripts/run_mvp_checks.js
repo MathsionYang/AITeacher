@@ -5,30 +5,33 @@ const ruleEngine = require("../rule-engine.js");
 const storageApi = require("../storage-adapter.js");
 const pptxExporter = require("../pptx-exporter.js");
 
-assert.equal(storageApi.STORAGE_SCHEMA_VERSION, 7);
+assert.equal(storageApi.STORAGE_SCHEMA_VERSION, 8);
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("courseware_reviews")));
-assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("grading_submissions")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("generation_cache")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("ppt_plans")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("accounts")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("model_settings")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("papers")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("scheduled_papers")));
-assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("ocr_records")));
 assert.ok(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("generation_records")));
+assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("grading_submissions")), false);
+assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("ocr_records")), false);
+assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("score_history")), false);
+assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("mistakes")), false);
 assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("classes")), false);
 assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("students")), false);
 assert.equal(storageApi.SQLITE_SCHEMA.some((sql) => sql.includes("student_id")), false);
 
 const storage = storageApi.createLocalJsonStorage({ namespace: "test-ai-teacher" });
-const envelope = storage.buildEnvelope("local-data-backup", { mistakes: [] });
+const envelope = storage.buildEnvelope("local-data-backup", { generationRecords: [] });
 assert.equal(envelope.storageKind, "local-json");
-assert.equal(envelope.schemaVersion, 7);
+assert.equal(envelope.schemaVersion, 8);
 assert.equal(envelope.namespace, "test-ai-teacher");
 assert.equal(envelope.type, "local-data-backup");
-assert.ok(storage.sqliteMigrationPlan().schema.some((sql) => sql.includes("score_history")));
+assert.equal(storage.sqliteMigrationPlan().schema.some((sql) => sql.includes("score_history")), false);
 assert.ok(storage.sqliteMigrationPlan().collections.modelSettings);
 assert.equal(Boolean(storage.sqliteMigrationPlan().collections.classes), false);
+assert.equal(Boolean(storage.sqliteMigrationPlan().collections.gradingSubmissions), false);
 
 const rootDir = path.resolve(__dirname, "..");
 const appSource = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
@@ -37,13 +40,19 @@ const stylesSource = fs.readFileSync(path.join(rootDir, "styles.css"), "utf8");
 const loginSource = fs.readFileSync(path.join(rootDir, "login.html"), "utf8");
 const ocrProxySource = fs.readFileSync(path.join(rootDir, "scripts", "local_ocr_paddle.py"), "utf8");
 const agentSource = fs.readFileSync(path.join(rootDir, "agent-orchestrator.js"), "utf8");
-assert.ok(loginSource.includes("进入教师工作台"));
+assert.ok(loginSource.includes("课题通"));
+assert.ok(loginSource.includes("EduForge"));
+assert.ok(loginSource.includes("进入同步出题"));
+assert.ok(loginSource.includes("teacher001"));
+assert.ok(loginSource.includes("123456"));
 assert.equal(loginSource.includes("学生登录"), false);
 assert.equal(loginSource.includes("学生端暂未开放"), false);
 assert.ok(loginSource.includes("ai-teacher-auth-session-v1"));
 assert.ok(indexSource.includes("id=\"subjectSelect\""));
 assert.equal(indexSource.includes("id=\"classSelect\""), false);
 assert.ok(indexSource.includes("id=\"teacherNameLabel\""));
+assert.ok(indexSource.includes("<h1>课题通</h1>"));
+assert.ok(indexSource.includes("<title>课题通 EduForge"));
 assert.ok(indexSource.includes("id=\"logoutBtn\""));
 assert.ok(indexSource.includes("class=\"tabs sidebar-nav\""));
 assert.equal(indexSource.includes("aria-label=\"功能导航\""), false);
@@ -53,6 +62,14 @@ assert.ok(indexSource.includes("data-tab=\"practice\">同步出题</button>"));
 assert.ok(indexSource.includes("data-tab=\"schedule\">周期测验出题</button>"));
 assert.ok(indexSource.includes("data-tab=\"settings\">系统设置</button>"));
 assert.equal(indexSource.includes("data-tab=\"mistakes\">"), false);
+assert.equal(indexSource.includes("id=\"practiceAnswerPanel\""), false);
+assert.equal(indexSource.includes("id=\"gradePracticeBtn\""), false);
+assert.equal(indexSource.includes("id=\"copyAnswersBtn\""), false);
+assert.equal(indexSource.includes("id=\"syncPracticeToGradingBtn\""), false);
+assert.equal(indexSource.includes("id=\"gradeBtn\""), false);
+assert.equal(indexSource.includes("id=\"runOcrBtn\""), false);
+assert.equal(indexSource.includes("id=\"ocrStatusPanel\""), false);
+assert.equal(indexSource.includes("id=\"mistakeList\""), false);
 assert.equal(indexSource.includes("data-tab=\"classes\""), false);
 assert.equal(indexSource.includes("id=\"classForm\""), false);
 assert.equal(indexSource.includes("id=\"studentForm\""), false);
@@ -69,8 +86,6 @@ assert.ok(indexSource.includes("id=\"exportPracticeStudentPdfBtn\""));
 assert.ok(indexSource.includes("id=\"exportPracticeTeacherPdfBtn\""));
 assert.ok(indexSource.includes("id=\"exportScheduledStudentPdfBtn\""));
 assert.ok(indexSource.includes("id=\"exportScheduledTeacherPdfBtn\""));
-assert.ok(indexSource.includes("id=\"runOcrBtn\""));
-assert.ok(indexSource.includes("id=\"ocrStatusPanel\""));
 assert.ok(indexSource.includes("id=\"questionCount\""));
 assert.ok(indexSource.includes("id=\"scheduledCount\""));
 assert.ok(indexSource.includes("min=\"10\" max=\"10\" value=\"10\" disabled"));
@@ -86,10 +101,14 @@ assert.ok(indexSource.includes("id=\"appNoticeHost\""));
 assert.equal(indexSource.includes("id=\"modelStatus\""), false);
 assert.ok(appSource.includes("http://127.0.0.1:8790"));
 assert.ok(appSource.includes("authSessionKey"));
+assert.ok(appSource.includes("login.html"));
+assert.equal(appSource.includes("login2.html"), false);
 assert.equal(appSource.includes("classesKey"), false);
 assert.equal(appSource.includes("studentsKey"), false);
 assert.ok(appSource.includes("generationRecordsKey"));
-assert.ok(appSource.includes("submissionsKey"));
+assert.equal(appSource.includes("$('gradePracticeBtn')"), false);
+assert.equal(appSource.includes("$('runOcrBtn')"), false);
+assert.equal(appSource.includes("$('mistakePaperBtn')"), false);
 assert.ok(appSource.includes("function ensureTeacherSession"));
 assert.ok(appSource.includes("function saveSettings"));
 assert.ok(appSource.includes("function setActiveUnit"));
@@ -104,8 +123,8 @@ assert.equal(appSource.includes("function addStudent"), false);
 assert.ok(appSource.includes("function recordSubmission"));
 assert.ok(appSource.includes("function recordGeneration"));
 assert.ok(appSource.includes("function formatDateTime"));
-assert.ok(appSource.includes("parseAnswerReview(answerText, \"paddleocr\""));
-assert.ok(appSource.includes("function setOcrStatus"));
+assert.equal(indexSource.includes("判分并生成解析"), false);
+assert.equal(indexSource.includes("直接填写答案"), false);
 assert.ok(appSource.includes("function showAppNotice"));
 assert.ok(stylesSource.includes(".app-notice-host"));
 assert.ok(stylesSource.includes(".teacher-session"));
@@ -374,7 +393,7 @@ const openEndedQuestions = [
     difficulty: "基础",
     stem: "下面这道题的计算对吗？如果不对，请改正。 A. 对 B. 错 C. 不能确定 D. 都不对",
     answer: "B",
-    explanation: "判断改错题不进入自动判分题库。"
+    explanation: "判断改错题不进入当前出题范围。"
   }
 ];
 
@@ -536,4 +555,4 @@ assert.equal(ruleEngine.isCorrectAnswer("10%", "0.1"), true);
 assert.equal(ruleEngine.isCorrectAnswer("25 和 35", "25和35"), true);
 assert.equal(ruleEngine.isCorrectAnswer("25 和 36", "25和35"), false);
 
-console.log("MVP rule/storage/OCR checks passed.");
+console.log("MVP rule/storage checks passed.");

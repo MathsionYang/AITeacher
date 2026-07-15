@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Teacher MVP - 人教版小学数学</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>课题通 EduForge - 人教版小学数学</title>
+    <link rel="stylesheet" href="styles-new.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-mark">AI</div>
+          <div class="brand-mark">EF</div>
           <div>
-            <h1>AI Teacher</h1>
+            <h1>课题通</h1>
             <p>教师端 · 本机出题备课</p>
           </div>
         </div>
@@ -36,7 +36,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Teacher Workspace</p>
-            <h2>课件、同步练习和周期测验</h2>
+            <h2>课件、同步出题和周期测验</h2>
           </div>
           <div class="topbar-side">
             <div class="teacher-session">
@@ -123,9 +123,7 @@
               <button id="exportPracticeTeacherPdfBtn" class="secondary-btn teacher-only">导出含答案 PDF</button>
               <button id="exportPracticeJsonBtn" class="secondary-btn teacher-only">导出练习记录</button>
               <button id="importPracticeBtn" class="secondary-btn teacher-only">导入历史练习</button>
-              <button id="showAnswerBtn" class="secondary-btn teacher-only">显示答案</button>
-              <button id="copyAnswersBtn" class="secondary-btn">填入答题模板</button>
-              <button id="syncPracticeToGradingBtn" class="secondary-btn small hidden-action" type="button" hidden>内部判分校正</button>
+              <button id="showAnswerBtn" class="secondary-btn teacher-only">显示参考答案</button>
               <input id="importPracticeFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>
@@ -144,7 +142,7 @@
               </select>
             </div>
             <input id="questionCount" class="hidden-input" type="number" min="10" max="10" value="10" disabled />
-            <p class="hint">历史出题记录按章节归档；重新出题会生成新记录，不覆盖旧记录。</p>
+            <p class="hint">历史出题记录按章节归档；重新出题会生成新记录，不覆盖旧记录。人工审核题目和答案无误后，再导出试题。</p>
           </div>
 
           <div id="practiceHistory" class="history-list"></div>
@@ -157,18 +155,6 @@
           </div>
           <div id="paperMeta" class="paper-meta"></div>
           <div id="practiceList" class="question-list empty-state"></div>
-          <div id="practiceAnswerPanel" class="answer-panel practice-answer-panel" hidden>
-            <div class="textarea-head">
-              <label for="practiceAnswerInput">直接填写答案</label>
-            </div>
-            <textarea id="practiceAnswerInput" rows="8" placeholder="示例：&#10;1. 24&#10;2. 36&#10;3. 15"></textarea>
-            <div class="button-row answer-actions">
-              <button id="gradePracticeBtn" class="primary-btn">判分并生成解析</button>
-            </div>
-            <p class="hint">教师可在这里快速验算答案，结果只保存在本机判分记录中。</p>
-          </div>
-          <div id="practiceGradingSummary" class="score-panel"></div>
-          <div id="practiceResults" class="result-list"></div>
         </section>
 
         <section id="schedule" class="tab-panel">
@@ -280,32 +266,9 @@
             </article>
           </div>
         </section>
-
-        <section id="grading" class="tab-panel internal-panel" hidden>
-          <button id="gradeBtn" class="primary-btn" type="button">判分并生成解析</button>
-          <input id="answerImage" type="file" accept="image/*" />
-          <img id="answerPreview" alt="答题照片预览" />
-          <button id="runOcrBtn" class="secondary-btn small" type="button">OCR 识别</button>
-          <button id="simulateOcrBtn" class="secondary-btn small" type="button">模拟识别</button>
-          <textarea id="answerInput" rows="10"></textarea>
-          <div id="ocrStatusPanel" class="ocr-status-panel" data-tone="info"></div>
-          <div id="ocrReviewPanel" class="ocr-review-panel" hidden></div>
-          <div id="gradingSummary" class="score-panel"></div>
-          <div id="performanceFeedback" class="performance-feedback"></div>
-          <div id="trendPanel" class="trend-panel"></div>
-          <div id="gradingResults" class="result-list"></div>
-        </section>
-
-        <section id="mistakes" class="tab-panel internal-panel" hidden>
-          <button id="mistakePaperBtn" class="primary-btn" type="button">随机生成错题卷</button>
-          <button id="clearMasteredBtn" class="secondary-btn" type="button">清理已掌握</button>
-          <div id="mistakeStats" class="mistake-stats"></div>
-          <div id="mistakeList" class="mistake-list empty-state"></div>
-        </section>
       </main>
     </div>
     <div id="coursewarePresentation" class="courseware-presentation" hidden></div>
-    <div id="celebrationLayer" class="celebration-layer" aria-hidden="true"></div>
     <div id="appNoticeHost" class="app-notice-host" aria-live="polite" aria-atomic="false"></div>
 
     <script src="data.js"></script>

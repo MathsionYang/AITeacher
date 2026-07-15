@@ -181,13 +181,13 @@
       "题干内容必须能直接证明它属于所填 knowledgePoint，不能只把知识点标签贴到无关计算题上。",
       "例如混合运算题必须出现两级运算或小括号；线段图/表格数量关系题必须出现表格、线段图或明确数量关系；统计题必须出现统计表、统计图或数据读取。",
       "每次必须生成 10 道题，并覆盖当前 scope.knowledgePoints 中的全部知识点，每个知识点至少 1 道。",
-      "只生成客观、易判分题型：选择题、填空题、计算填空题、单位换算填空题、数据填空题。",
+      "只生成便于教师快速审核、答案标准明确的题型：选择题、填空题、计算填空题、单位换算填空题、数据填空题。",
       "不要生成说明理由题、综合算式题、判断改错题、开放问答题、作图题或需要人工主观判分的题。",
       "选择题必须在题干中给出 A/B/C/D 或 ①②③④ 选项，answer 只写标准选项；填空题 answer 必须是短标准答案。",
       "如果题干问‘哪个算式结果等于 N’，必须逐项验算，确保恰好一个选项等于 N，且 answer 指向该选项。",
-      "questionType 必须使用上述客观题型之一；每题必须有答案、解析、题型、详细步骤、易错点和检查方法。",
+      "questionType 必须使用上述客观题型之一；每题必须有标准答案、题型、分步核对提示、易错核查和检查方式，供教师人工审核。",
       "不要复制教材原题或商业题库题目。",
-      "返回 JSON 对象：{ \"questions\": [{ \"knowledgePoint\": string, \"questionType\": string, \"difficulty\": string, \"stem\": string, \"answer\": string, \"explanation\": string, \"detailSteps\": string[], \"commonMistake\": string, \"checkMethod\": string }] }。"
+      "返回 JSON 对象：{ \"questions\": [{ \"knowledgePoint\": string, \"questionType\": string, \"difficulty\": string, \"stem\": string, \"answer\": string, \"explanation\": string, \"detailSteps\": string[], \"commonMistake\": string, \"checkMethod\": string }] }，其中 explanation 表示教师校验提示，不是学生判分解析。"
     ].join("\n");
   }
 

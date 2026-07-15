@@ -1,22 +1,19 @@
 (function initAITeacherStorage(global) {
   "use strict";
 
-  const STORAGE_SCHEMA_VERSION = 7;
+  const STORAGE_SCHEMA_VERSION = 8;
   const DEFAULT_NAMESPACE = "ai-teacher-rj-math";
 
   const COLLECTIONS = {
-    mistakes: "mistakes",
     schedule: "schedule",
     coursewareReviews: "courseware_reviews",
-    scoreHistory: "score_history",
     roleMode: "role_mode",
     generationCache: "generation_cache",
     pptPlans: "ppt_plans",
     accounts: "accounts",
     subjectScope: "subject_scope",
     modelSettings: "model_settings",
-    generationRecords: "generation_records",
-    gradingSubmissions: "grading_submissions"
+    generationRecords: "generation_records"
   };
 
   const SQLITE_SCHEMA = [
@@ -33,10 +30,6 @@
     "CREATE TABLE IF NOT EXISTS papers (id TEXT PRIMARY KEY, creator_account_id TEXT, paper_type TEXT NOT NULL, scope_key TEXT NOT NULL, title TEXT NOT NULL, total_score INTEGER NOT NULL, review_status TEXT NOT NULL, export_version TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS questions (id TEXT PRIMARY KEY, unit_id TEXT NOT NULL, knowledge_point TEXT NOT NULL, question_type TEXT NOT NULL, difficulty TEXT NOT NULL, answer TEXT NOT NULL, review_status TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS paper_questions (id TEXT PRIMARY KEY, paper_id TEXT NOT NULL, question_id TEXT NOT NULL, order_no INTEGER NOT NULL, point INTEGER NOT NULL, payload_json TEXT NOT NULL);",
-    "CREATE TABLE IF NOT EXISTS grading_submissions (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, confidence REAL NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
-    "CREATE TABLE IF NOT EXISTS ocr_records (id TEXT PRIMARY KEY, submission_id TEXT, image_ref TEXT, recognized_text TEXT NOT NULL, average_confidence REAL NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
-    "CREATE TABLE IF NOT EXISTS mistakes (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);",
-    "CREATE TABLE IF NOT EXISTS score_history (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, score INTEGER NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS generation_cache (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS generation_records (id TEXT PRIMARY KEY, kind TEXT NOT NULL, scope_key TEXT NOT NULL, source TEXT, item_count INTEGER NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);",
     "CREATE TABLE IF NOT EXISTS ppt_plans (id TEXT PRIMARY KEY, scope_key TEXT NOT NULL, review_status TEXT NOT NULL, export_version TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);"
@@ -110,7 +103,7 @@
           "创建 SQLite schema",
           "按 collection 将 JSON payload 写入对应表",
           "保留 schemaVersion/exportVersion/reviewStatus 用于回滚和兼容导入",
-          "后端上线时由 Go 或 Java 服务接管教师账号、教材范围、课件、试卷、生成记录、OCR 和本地判分记录"
+          "后端上线时由 Go 或 Java 服务接管教师账号、教材范围、课件、试卷和生成记录"
         ]
       };
     }

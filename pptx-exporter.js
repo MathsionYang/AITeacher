@@ -56,7 +56,7 @@
       kind: "ppt_plan",
       theme: "math-clean",
       title: `${context.gradeName || ""}${context.volumeName || ""}-${context.unitTitle || "课件"}`.trim(),
-      subtitle: "AI Teacher PPT 制作 Agent 本地渲染",
+      subtitle: "课题通 EduForge PPT 制作 Agent 本地渲染",
       createdAt: new Date().toISOString(),
       reviewStatus: context.reviewStatus || "draft",
       reviewStatusLabel: context.reviewStatusLabel || "待审核",
@@ -536,17 +536,17 @@
 
   function themeXml() {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="AI Teacher Math">
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="EduForge Math">
   <a:themeElements>
-    <a:clrScheme name="AI Teacher">
+    <a:clrScheme name="EduForge">
       <a:dk1><a:srgbClr val="${THEME.ink}"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
       <a:dk2><a:srgbClr val="334155"/></a:dk2><a:lt2><a:srgbClr val="F8FAFC"/></a:lt2>
       <a:accent1><a:srgbClr val="${THEME.teal}"/></a:accent1><a:accent2><a:srgbClr val="${THEME.blue}"/></a:accent2><a:accent3><a:srgbClr val="${THEME.amber}"/></a:accent3>
       <a:accent4><a:srgbClr val="${THEME.green}"/></a:accent4><a:accent5><a:srgbClr val="${THEME.red}"/></a:accent5><a:accent6><a:srgbClr val="64748B"/></a:accent6>
       <a:hlink><a:srgbClr val="${THEME.blue}"/></a:hlink><a:folHlink><a:srgbClr val="${THEME.teal}"/></a:folHlink>
     </a:clrScheme>
-    <a:fontScheme name="AI Teacher Font"><a:majorFont><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:majorFont><a:minorFont><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:minorFont></a:fontScheme>
-    <a:fmtScheme name="AI Teacher Format"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
+    <a:fontScheme name="EduForge Font"><a:majorFont><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:majorFont><a:minorFont><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:minorFont></a:fontScheme>
+    <a:fmtScheme name="EduForge Format"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
   </a:themeElements>
   <a:objectDefaults/><a:extraClrSchemeLst/>
 </a:theme>`;
@@ -555,14 +555,14 @@
   function appPropsXml(slideCount) {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>AI Teacher</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>${slideCount}</Slides><Company>AI Teacher Local</Company>
+  <Application>EduForge</Application><PresentationFormat>On-screen Show (16:9)</PresentationFormat><Slides>${slideCount}</Slides><Company>EduForge Local</Company>
 </Properties>`;
   }
 
   function corePropsXml(plan) {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>${xml(plan.title || "AI Teacher PPT")}</dc:title><dc:creator>AI Teacher PPT Agent</dc:creator><cp:lastModifiedBy>AI Teacher</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
+  <dc:title>${xml(plan.title || "课题通 EduForge PPT")}</dc:title><dc:creator>EduForge PPT Agent</dc:creator><cp:lastModifiedBy>EduForge</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified>
 </cp:coreProperties>`;
   }
 

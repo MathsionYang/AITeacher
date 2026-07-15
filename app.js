@@ -54,10 +54,6 @@
     difficulty: initialScope.difficulty || "基础",
     questionCount: requiredQuestionCount,
     currentQuestions: [],
-    answerReview: { entries: [], summary: { averageConfidence: 0, lowConfidenceCount: 0, missingCount: 0 } },
-    lastOcrResult: null,
-    lastOcrText: "",
-    ocrRecognizing: false,
     answersVisible: false,
     activeTab: "courseware",
     coursewareEditMode: false,
@@ -67,7 +63,6 @@
     pptPlanGenerating: false,
     practiceGenerating: false,
     scheduledQuestions: [],
-    gradingResults: [],
     mistakes: readJson(mistakeKey, [], "mistakes"),
     coursewareReviews: readJson(coursewareReviewKey, {}, "coursewareReviews"),
     scoreHistory: readJson(scoreHistoryKey, [], "scoreHistory"),
@@ -144,7 +139,7 @@
   function createFallbackStorage() {
     return {
       kind: "local-json-fallback",
-      schemaVersion: 7,
+      schemaVersion: 8,
       getString: (key, fallback = "") => {
         const value = localStorage.getItem(key);
         return value == null ? fallback : value;
@@ -153,17 +148,17 @@
       setJson: (key, value) => localStorage.setItem(key, JSON.stringify(value)),
       removeMany: (keys) => keys.forEach((key) => localStorage.removeItem(key)),
       buildEnvelope: (type, data, metadata = {}) => ({
-        schemaVersion: 7,
+        schemaVersion: 8,
         storageKind: "local-json-fallback",
         type,
         exportedAt: new Date().toISOString(),
-        exportVersion: metadata.exportVersion || `${type}-v7`,
+        exportVersion: metadata.exportVersion || `${type}-v8`,
         ...metadata,
         data
       }),
       sqliteMigrationPlan: () => ({
         target: "sqlite",
-        schemaVersion: 7,
+        schemaVersion: 8,
         schema: [],
         strategy: ["加载 storage-adapter.js 后导出迁移计划"]
       })
@@ -633,16 +628,6 @@
       state.answersVisible = !state.answersVisible;
       renderPractice();
     });
-    $("copyAnswersBtn").addEventListener("click", copyAnswerTemplate);
-    $("gradePracticeBtn").addEventListener("click", gradePracticeAnswers);
-    $("syncPracticeToGradingBtn").addEventListener("click", syncPracticeAnswersToGrading);
-    $("runOcrBtn").addEventListener("click", runPaddleOcr);
-    $("simulateOcrBtn").addEventListener("click", simulateOcr);
-    $("gradeBtn").addEventListener("click", gradeAnswers);
-    $("answerImage").addEventListener("change", previewAnswerImage);
-    $("answerInput").addEventListener("input", () => updateAnswerReviewFromText("manual"));
-    $("mistakePaperBtn").addEventListener("click", buildMistakePaper);
-    $("clearMasteredBtn").addEventListener("click", clearMastered);
     $("saveScheduleBtn").addEventListener("click", saveSchedule);
     $("scheduledPaperBtn").addEventListener("click", buildScheduledPaper);
     $("exportScheduledStudentPdfBtn").addEventListener("click", () => exportScheduledPdf(false));
@@ -657,14 +642,6 @@
     });
     document.addEventListener("keydown", handleCoursewarePresentationKeydown);
     document.addEventListener("fullscreenchange", handleCoursewareFullscreenChange);
-
-    $("mistakeList").addEventListener("click", (event) => {
-      const action = event.target.dataset.action;
-      const id = event.target.dataset.id;
-      if (!action || !id) return;
-      if (action === "master") markMistakeMastered(id);
-      if (action === "delete") deleteMistake(id);
-    });
   }
 
   function switchTab(tab) {
@@ -685,17 +662,7 @@
   function clearPracticeState() {
     state.currentQuestions = [];
     state.answersVisible = false;
-    state.gradingResults = [];
     hideGenerationProgress("practice");
-    $("gradingSummary").classList.remove("active");
-    $("gradingSummary").innerHTML = "";
-    $("gradingResults").innerHTML = "";
-    $("performanceFeedback").innerHTML = "";
-    $("answerInput").value = "";
-    $("practiceAnswerInput").value = "";
-    $("practiceGradingSummary").classList.remove("active");
-    $("practiceGradingSummary").innerHTML = "";
-    $("practiceResults").innerHTML = "";
   }
 
   function clearScheduledPaperState() {
@@ -713,9 +680,7 @@
     renderScope();
     renderCourseware();
     renderPractice();
-    renderMistakes();
     renderSchedule();
-    renderScoreTrends();
     renderMetrics();
   }
 
@@ -775,7 +740,7 @@
         "必须覆盖当前单元全部 knowledgePoints，每个知识点至少 1 题",
         "不得复制教材原文、课本例题或商业题库题目",
         "总分由本地规则统一归一为 100 分",
-        "同一题型不要过度重复，解析必须包含审题、建模、计算、检查"
+        "同一题型不要过度重复，教师校验提示必须包含审题、建模、计算、检查"
       ]
     };
   }
@@ -935,7 +900,6 @@
           if (isPreparedPaperComplete(prepared, unit, requestedCount)) {
             state.currentQuestions = prepared.questions;
             state.answersVisible = false;
-            seedAnswerInputsWithTemplate();
             recordGeneration("practice", unit, { source: "cache", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), questions: cloneJson(state.currentQuestions), reviewStatus: "rule_checked", exportVersion: practiceExportVersion });
             setModelStatus(`已复用本地缓存练习：${state.currentQuestions.length} 题，范围仍锁定为“${unit.title}”。`, "ok");
             return;
@@ -963,7 +927,6 @@
         if (!isPreparedPaperComplete(prepared, unit, requestedCount)) throw new Error(formatPaperValidationError(prepared, unit, requestedCount));
         state.currentQuestions = prepared.questions;
         state.answersVisible = false;
-        seedAnswerInputsWithTemplate();
         writeGenerationCache(cacheId, { questions: state.currentQuestions }, { kind: "practice", scopeKey: coursewareKey(unit), source: "llm" });
         recordGeneration("practice", unit, { source: "llm", itemCount: state.currentQuestions.length, totalScore: paperTotal(state.currentQuestions), rejectedCount: prepared.rejected.length, questions: cloneJson(state.currentQuestions), reviewStatus: "rule_checked", exportVersion: practiceExportVersion });
         const rejectedHint = prepared.rejected.length ? `，已剔除 ${prepared.rejected.length} 题不合格题` : "";
@@ -1549,7 +1512,7 @@
     return `
       <section class="markdownflow-shell">
         <aside class="markdownflow-nav" aria-label="导学目录">
-          <div class="markdownflow-logo">AI Teacher</div>
+          <div class="markdownflow-logo">EduForge</div>
           <strong>${escapeHtml(unit.title)}</strong>
           <p>${escapeHtml(`${gradeData().name}${volumeData().name} · 读模式`)}</p>
           <ol>
@@ -1697,7 +1660,7 @@
     panel.innerHTML = `
       <div class="presentation-markdownflow-shell">
         <aside class="presentation-markdownflow-nav" aria-label="授课目录">
-          <div class="presentation-brand">AI Teacher</div>
+          <div class="presentation-brand">课题通 EduForge</div>
           <strong>${escapeHtml(unit.title)}</strong>
           <p>${escapeHtml(`${gradeData().name}${volumeData().name} · 读模式`)}</p>
           <ol>
@@ -2109,11 +2072,11 @@
         </div>
         ${withAnswers ? `
           <section class="print-answer">
-            <p><strong>答案：</strong>${escapeHtml(questionItem.answer)}</p>
-            <p><strong>解析：</strong>${escapeHtml(questionItem.explanation)}</p>
+            <p><strong>参考答案：</strong>${escapeHtml(questionItem.answer)}</p>
+            <p><strong>教师校验提示：</strong>${escapeHtml(questionItem.explanation)}</p>
             <ol>${(questionItem.detailSteps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-            <p><strong>易错点：</strong>${escapeHtml(questionItem.commonMistake || "注意审题和结果格式。")}</p>
-            <p><strong>检查：</strong>${escapeHtml(questionItem.checkMethod || "用估算或逆运算检查结果。")}</p>
+            <p><strong>易错核查：</strong>${escapeHtml(questionItem.commonMistake || "注意审题和结果格式。")}</p>
+            <p><strong>检查方式：</strong>${escapeHtml(questionItem.checkMethod || "用估算或逆运算检查结果。")}</p>
           </section>
         ` : `<div class="answer-line">答：______________________________</div>`}
       </article>
@@ -2407,27 +2370,24 @@
     const hasQuestions = state.currentQuestions.length > 0;
     renderPracticeHistory();
     $("aiQuestionsBtn").textContent = state.practiceGenerating ? "出题中..." : hasQuestions ? "重新生成练习" : "AI 生成练习";
-    $("showAnswerBtn").textContent = state.answersVisible ? "隐藏答案" : "显示答案";
-    ["showAnswerBtn", "copyAnswersBtn", "exportPracticeJsonBtn", "gradePracticeBtn", "syncPracticeToGradingBtn", "exportPracticeStudentPdfBtn", "exportPracticeTeacherPdfBtn"].forEach((id) => {
+    $("showAnswerBtn").textContent = state.answersVisible ? "隐藏参考答案" : "显示参考答案";
+    ["showAnswerBtn", "exportPracticeJsonBtn", "exportPracticeStudentPdfBtn", "exportPracticeTeacherPdfBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.practiceGenerating || !hasQuestions;
     });
     $("importPracticeBtn").disabled = state.practiceGenerating;
-    $("practiceAnswerPanel").hidden = !hasQuestions;
     $("paperMeta").hidden = !hasQuestions;
     $("paperMeta").textContent = hasQuestions
-      ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。`
+      ? `当前试卷：${state.currentQuestions.length} 题，总分 ${paperTotal(state.currentQuestions)} 分，范围限定为“${unitData().title}”。请人工审核题干、答案和分值后导出。`
       : "";
 
     if (state.practiceGenerating) {
-      $("practiceAnswerPanel").hidden = true;
       list.className = "question-list empty-state";
       list.innerHTML = `<div><strong>练习生成中</strong><p>AI 正在生成并校验题目，完成后会一次性展示整卷。</p></div>`;
       return;
     }
 
     if (!hasQuestions) {
-      $("practiceAnswerPanel").hidden = true;
       list.className = "question-list empty-state";
       const emptyText = isTeacherMode()
         ? "可以导入历史练习，或点击“AI 生成练习”创建当前单元同步题。"
@@ -2581,7 +2541,6 @@
     } else {
       state.currentQuestions = prepared.questions;
       state.answersVisible = false;
-      seedAnswerInputsWithTemplate();
       switchTab("practice");
     }
     renderAll();
@@ -2599,8 +2558,8 @@
           <span class="pill">${question.point} 分</span>
         </div>
         <div class="answer-block">
-          <p><strong>答案：</strong>${escapeHtml(question.answer)}</p>
-          <p><strong>解析：</strong>${escapeHtml(question.explanation)}</p>
+          <p><strong>参考答案：</strong>${escapeHtml(question.answer)}</p>
+          <p><strong>教师校验提示：</strong>${escapeHtml(question.explanation)}</p>
           ${renderExplanationDetail(question)}
         </div>
       </article>
@@ -2611,12 +2570,6 @@
     const unit = unitData();
     state.questionCount = capQuestionCount(state.questionCount);
     state.currentQuestions = normalizePaperPoints(generateScopedQuestions(unit, Number(state.grade), state.difficulty, state.questionCount));
-    seedAnswerInputsWithTemplate();
-    state.gradingResults = [];
-    $("gradingSummary").classList.remove("active");
-    $("gradingSummary").innerHTML = "";
-    $("gradingResults").innerHTML = "";
-    $("performanceFeedback").innerHTML = "";
   }
 
   function generateScopedQuestions(unit, grade, difficulty, count) {
@@ -3179,10 +3132,10 @@
     const steps = question.detailSteps || [];
     return `
       <div class="explanation-detail">
-        <strong>详细步骤</strong>
+        <strong>步骤核对</strong>
         <ol>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-        <p><strong>易错点：</strong>${escapeHtml(question.commonMistake || "注意审题和结果格式。")}</p>
-        <p><strong>检查：</strong>${escapeHtml(question.checkMethod || "用估算或逆运算检查结果。")}</p>
+        <p><strong>易错核查：</strong>${escapeHtml(question.commonMistake || "注意审题和结果格式。")}</p>
+        <p><strong>检查方式：</strong>${escapeHtml(question.checkMethod || "用估算或逆运算检查结果。")}</p>
       </div>
     `;
   }
@@ -3263,8 +3216,8 @@
 
   function exportLocalData() {
     if (!requireTeacherMode("导出本地数据备份")) return;
-    downloadJson(buildLocalDataPayload(), `AI-Teacher-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
-    setModelStatus("本地数据已导出，包含账号、系统设置、课件、练习、测验、判分记录和迁移计划。", "ok");
+    downloadJson(buildLocalDataPayload(), `EduForge-${content.version}-${new Date().toISOString().slice(0, 10)}-本地数据备份.json`);
+    setModelStatus("本地数据已导出，包含账号、系统设置、课件、练习、测验、生成记录和迁移计划。", "ok");
   }
 
   async function importLocalData(event) {
@@ -3318,7 +3271,7 @@
 
   function clearLocalData() {
     if (!requireTeacherMode("清空学习数据")) return;
-    const confirmed = window.confirm("确认清空本机账号、系统设置、课件审核稿、练习记录、测验记录和判分数据？此操作不会删除知识点包。建议先导出备份。");
+    const confirmed = window.confirm("确认清空本机账号、系统设置、课件审核稿、练习记录和测验记录？此操作不会删除知识点包。建议先导出备份。");
     if (!confirmed) return;
     storage.removeMany(Object.values(localDataKeys));
     state.mistakes = [];
@@ -3484,9 +3437,6 @@
       difficulty: state.difficulty,
       questionCount: state.currentQuestions.length,
       totalScore: paperTotal(state.currentQuestions),
-      answersText: $("practiceAnswerInput").value || $("answerInput").value || "",
-      answerReview: state.answerReview,
-      gradingResults: state.gradingResults,
       questions: state.currentQuestions
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
@@ -3516,11 +3466,6 @@
       }
       state.currentQuestions = prepared.questions;
       state.answersVisible = false;
-      seedAnswerInputsWithTemplate();
-      if (payload.answersText) {
-        $("practiceAnswerInput").value = payload.answersText;
-        $("answerInput").value = payload.answersText;
-      }
       state.practiceGenerating = false;
       hideGenerationProgress("practice");
       switchTab("practice");
@@ -3628,7 +3573,7 @@
     }
 
     if (!state.currentQuestions.length) {
-      setOcrStatus("当前还没有同步练习题，会先识别图片文字；要自动判分，请先在“同步出题”页生成或导入练习。", "warn");
+      setOcrStatus("当前还没有同步练习题。OCR 是后续扩展能力，当前 MVP 只保留出题和导出流程。", "warn");
     }
 
     const button = $("runOcrBtn");
@@ -3698,9 +3643,9 @@
     if (!answerText) {
       message = "OCR 服务已返回，但没有识别出可用文本。请换一张更清晰、光线更均匀的答题照片。";
     } else if (!state.currentQuestions.length) {
-      message += " 当前还没有同步练习题，已先把识别文本填入校正区；生成或导入练习后再判分。";
+      message += " 当前 MVP 不开放自动批改，只保留识别结果用于后续扩展。";
     } else {
-      message += " 请在校正区确认后点击“判分并生成解析”。";
+      message += " 请在后续扩展流程中进行人工校正。";
     }
     setOcrStatus(message, answerText ? (lowConfidence ? "warn" : "ok") : "warn");
     setModelStatus(message, answerText ? (lowConfidence ? "warn" : "ok") : "warn");
@@ -3813,7 +3758,7 @@
     renderMistakes();
     renderScoreTrends();
     renderMetrics();
-    setModelStatus(options.origin === "practice" ? "同步练习已判分，解析已同步到本机判分记录。" : "答案已判分并生成解析。", "ok");
+    setModelStatus("旧版校正流程已处理；当前 MVP 用户界面不开放自动批改。", "ok");
   }
 
   function parseAnswers(text) {
@@ -4038,7 +3983,7 @@
             <p><strong>学生答案：</strong>${escapeHtml(item.submitted || "未作答")}</p>
             <p><strong>校正状态：</strong>${Math.round((item.answerConfidence || 0) * 100)}% · ${escapeHtml(answerReviewStatusLabel(item.answerReviewStatus || "missing"))}</p>
             <p><strong>正确答案：</strong>${escapeHtml(question.answer)}</p>
-            <p><strong>解析思路：</strong>${escapeHtml(question.explanation)}</p>
+            <p><strong>校验提示：</strong>${escapeHtml(question.explanation)}</p>
             ${renderExplanationDetail(question)}
           </article>
         `;
@@ -4259,8 +4204,8 @@
     if (!records.length) {
       panel.innerHTML = `
         <div class="trend-empty">
-          <strong>成绩趋势</strong>
-          <p>完成一次判分后，这里会保存成绩，并分析当前单元的薄弱知识点。</p>
+          <strong>历史表现扩展</strong>
+          <p>当前 MVP 不开放自动批改和成绩趋势，这里仅保留旧版数据兼容。</p>
         </div>
       `;
       return;
@@ -4271,7 +4216,7 @@
       <div class="trend-head">
         <div>
           <p class="eyebrow">Progress</p>
-          <h3>成绩趋势与薄弱知识点</h3>
+          <h3>历史表现与知识点统计</h3>
         </div>
         <span>${scopedRecords.length ? "当前单元" : "全部记录"} · 最近 ${records.length} 次</span>
       </div>
@@ -4299,7 +4244,7 @@
       <text x="${point.x}" y="${height - 8}" text-anchor="middle" font-size="11" fill="#667085">${index + 1}</text>
     `).join("");
     return `
-      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="成绩趋势图">
+      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="历史表现趋势图">
         <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#cbd5e1"/>
         <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#cbd5e1"/>
         <line x1="${pad}" y1="${pad + (height - pad * 2) * 0.4}" x2="${width - pad}" y2="${pad + (height - pad * 2) * 0.4}" stroke="#edf1f7"/>

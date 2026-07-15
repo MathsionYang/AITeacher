@@ -1,4 +1,4 @@
-# AI Teacher MVP 系统设计
+# 课题通 EduForge MVP 系统设计
 
 ## 1. 当前形态
 
@@ -10,9 +10,9 @@ login.html
 index.html
   -> 四模块教师工作台
 app.js
-  -> 状态、渲染、出题、课件、判分、导出
+  -> 状态、渲染、出题、课件、导出
 rule-engine.js
-  -> 题目规则、单元边界、题型过滤、答案判定
+  -> 题目规则、单元边界、题型过滤、答案可判定性校验
 storage-adapter.js
   -> local-json 数据层与 SQLite 迁移计划
 model-client.js
@@ -21,7 +21,7 @@ agent-orchestrator.js
   -> 课件 Agent、出题 Agent、PPT Agent
 ```
 
-不需要业务服务器。模型和 OCR 如需真实调用，分别通过客户电脑上的本地代理访问。
+不需要业务服务器。真实模型调用通过客户电脑上的本地代理访问；OCR/拍照批改不进入当前 MVP。
 
 ## 2. 信息架构
 
@@ -32,7 +32,7 @@ agent-orchestrator.js
 - 周期测验出题
 - 系统设置
 
-隐藏的内部判分/OCR结构保留给流程复用，但不作为一级导航展示。
+当前教师端不提供学生答题、自动判分、OCR 批改、错题库和成绩趋势入口。
 
 ## 3. 状态模型
 
@@ -48,7 +48,6 @@ coursewareReviews = 课件审核稿
 generationRecords = 课件/出题/测验生成历史
 currentQuestions = 当前同步练习
 scheduledQuestions = 当前周期测验卷
-scoreHistory = 本机判分历史
 ```
 
 单元同步规则：
@@ -92,7 +91,8 @@ scoreHistory = 本机判分历史
    - 开放题过滤
    - 答案可判定
 4. 合格题进入 `currentQuestions`。
-5. 生成记录写入 `generationRecords`，含题目快照。
+5. 教师查看题目、参考答案、分值和知识点标签，人工审核无误后导出。
+6. 生成记录写入 `generationRecords`，含题目快照。
 
 导出：
 
@@ -126,12 +126,11 @@ scoreHistory = 本机判分历史
 - `papers`
 - `questions`
 - `paper_questions`
-- `grading_submissions`
-- `ocr_records`
-- `score_history`
 - `generation_cache`
 - `generation_records`
 - `ppt_plans`
+
+旧版 `grading_submissions`、`ocr_records`、`score_history` 字段可在迁移时兼容读取，但不是当前 MVP 的用户可见模块。
 
 不再设计 `classes`、`students`、`student_id` 作为当前 MVP 表结构。
 

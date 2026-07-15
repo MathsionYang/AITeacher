@@ -1,7 +1,7 @@
 interface:
-  display_name: "AI Teacher Math Agents"
-  short_description: "Local-first小学数学课件、出题、批改、错题复习和周期测验编排"
-  default_prompt: "Use AI Teacher agents to generate textbook-aligned original math courseware, questions, grading feedback, and review plans from audited knowledge points."
+  display_name: "课题通 EduForge Math Agents"
+  short_description: "Local-first小学数学课件、同步出题、PPT制作和周期测验出题编排"
+  default_prompt: "Use EduForge agents to generate textbook-aligned original math courseware, auditable question sets, PPT plans, and scheduled papers from audited knowledge points."
 
 runtime:
   protocol: "openai-compatible-chat-completions"
@@ -61,35 +61,13 @@ agents:
       - "把最终 ppt_plan_json 交给本地 PPTX 渲染器生成文件"
     output: "ppt_plan_json"
 
-  grading_agent:
-    role: "批改 Agent"
-    model_tasks:
-      - "理解 OCR/人工校正后的学生作答过程"
-      - "为错题生成逐题解析、错因和同类提醒"
-    rule_tasks:
-      - "接收图片并调用 OCR"
-      - "结构化题号和答案"
-      - "选择题、填空题、计算填空题、单位换算填空题优先走确定性判分"
-      - "把错题写入错题库"
-    output: "grading_report_json"
-
-  mistake_review_agent:
-    role: "错题复习 Agent"
-    model_tasks:
-      - "根据历史错题解释薄弱点和复习优先级"
-    rule_tasks:
-      - "按知识点聚类错题"
-      - "生成错题卷"
-      - "安排间隔复习并更新掌握状态"
-    output: "review_plan_json"
-
   scheduled_exam_agent:
     role: "周期测验 Agent"
     model_tasks:
-      - "根据学情生成测验讲评建议"
+      - "根据当前单元知识点生成可审核测验卷候选题"
     rule_tasks:
-      - "到时间自动组卷"
-      - "混合新题和错题"
-      - "控制难度、题量和错题占比"
-      - "提交后更新学情报告"
+      - "只围绕当前单元组卷"
+      - "固定 10 题，总分 100 分"
+      - "覆盖本单元全部知识点"
+      - "教师人工审核后导出空白卷或含答案卷"
     output: "scheduled_exam_json"
