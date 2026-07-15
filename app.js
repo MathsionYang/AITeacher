@@ -50,6 +50,8 @@
     activeTab: "courseware",
     coursewareEditMode: false,
     coursewareGenerating: false,
+    coursewarePresenting: false,
+    coursewarePresentationIndex: 0,
     pptPlanGenerating: false,
     practiceGenerating: false,
     gradingResults: [],
@@ -395,6 +397,7 @@
     $("testModelBtn").addEventListener("click", testModelConnection);
     $("aiCoursewareBtn").addEventListener("click", generateAiCourseware);
     $("aiQuestionsBtn").addEventListener("click", generateAiQuestions);
+    $("presentCoursewareBtn").addEventListener("click", startCoursewarePresentation);
     $("aiPptPlanBtn").addEventListener("click", generateAiPptPlan);
     $("exportPptxBtn").addEventListener("click", exportCoursewarePptx);
     $("downloadCoursewareBtn").addEventListener("click", downloadCourseware);
@@ -447,6 +450,8 @@
     document.querySelectorAll(".tab-btn").forEach((button) => {
       button.addEventListener("click", () => switchTab(button.dataset.tab));
     });
+    document.addEventListener("keydown", handleCoursewarePresentationKeydown);
+    document.addEventListener("fullscreenchange", handleCoursewareFullscreenChange);
 
     $("mistakeList").addEventListener("click", (event) => {
       const action = event.target.dataset.action;
@@ -1219,11 +1224,140 @@
       </article>
     `;
   }
+
+  async function startCoursewarePresentation() {
+    const unit = unitData();
+    const slides = buildCoursewareSlides(unit);
+    if (!slides.length) {
+      setModelStatus("当前还没有可授课的课件，请先生成或导入课件。", "warn");
+      return;
+    }
+    state.coursewarePresenting = true;
+    state.coursewarePresentationIndex = 0;
+    renderCoursewarePresentation();
+    const panel = $("coursewarePresentation");
+    if (panel?.requestFullscreen) {
+      try {
+        await panel.requestFullscreen();
+      } catch (error) {
+        setModelStatus("浏览器未允许独占全屏，已使用页面全屏授课模式。", "warn");
+      }
+    }
+  }
+
+  function closeCoursewarePresentation() {
+    state.coursewarePresenting = false;
+    const panel = $("coursewarePresentation");
+    const isFullscreen = document.fullscreenElement === panel;
+    if (isFullscreen && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
+  }
+
+  function moveCoursewarePresentation(delta) {
+    if (!state.coursewarePresenting) return;
+    const slides = buildCoursewareSlides(unitData());
+    if (!slides.length) return;
+    state.coursewarePresentationIndex = clampInt(state.coursewarePresentationIndex + delta, 0, slides.length - 1);
+    renderCoursewarePresentation();
+  }
+
+  function jumpCoursewarePresentation(index) {
+    if (!state.coursewarePresenting) return;
+    const slides = buildCoursewareSlides(unitData());
+    if (!slides.length) return;
+    state.coursewarePresentationIndex = clampInt(index, 0, slides.length - 1);
+    renderCoursewarePresentation();
+  }
+
+  function handleCoursewarePresentationKeydown(event) {
+    if (!state.coursewarePresenting) return;
+    if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+      event.preventDefault();
+      moveCoursewarePresentation(1);
+    } else if (["ArrowLeft", "PageUp"].includes(event.key)) {
+      event.preventDefault();
+      moveCoursewarePresentation(-1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      jumpCoursewarePresentation(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      jumpCoursewarePresentation(buildCoursewareSlides(unitData()).length - 1);
+    } else if (event.key === "Escape") {
+      closeCoursewarePresentation();
+    }
+  }
+
+  function handleCoursewareFullscreenChange() {
+    const panel = $("coursewarePresentation");
+    if (state.coursewarePresenting && panel && document.fullscreenElement !== panel && !document.fullscreenElement) {
+      closeCoursewarePresentation();
+    }
+  }
+
+  function renderCoursewarePresentation() {
+    const panel = $("coursewarePresentation");
+    const unit = unitData();
+    const slides = buildCoursewareSlides(unit);
+    if (!panel || !slides.length) return;
+    const index = clampInt(state.coursewarePresentationIndex, 0, slides.length - 1);
+    state.coursewarePresentationIndex = index;
+    const slide = slides[index];
+    const sourceRefs = getSourceRefs(unit);
+    panel.hidden = false;
+    panel.innerHTML = `
+      <div class="presentation-shell">
+        <header class="presentation-topbar">
+          <div>
+            <span>${escapeHtml(`${gradeData().name}${volumeData().name}`)} · ${escapeHtml(unit.title)}</span>
+            <strong>${escapeHtml(slide.title)}</strong>
+          </div>
+          <div class="presentation-actions">
+            <span>${index + 1} / ${slides.length}</span>
+            <button type="button" data-presentation-action="exit">退出</button>
+          </div>
+        </header>
+        <main class="presentation-slide">
+          <section class="presentation-visual visual-${escapeAttribute(slide.visualType)}">
+            ${renderSlideVisual(slide, unit, index)}
+          </section>
+          <section class="presentation-content">
+            <p class="eyebrow">Courseware</p>
+            <h2>${index + 1}. ${escapeHtml(slide.title)}</h2>
+            <p>${escapeHtml(slide.body)}</p>
+            <ul>${slide.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </section>
+        </main>
+        <footer class="presentation-footer">
+          <button type="button" data-presentation-action="prev" ${index === 0 ? "disabled" : ""}>上一页</button>
+          <div>
+            <span style="--progress:${((index + 1) / slides.length) * 100}%"></span>
+          </div>
+          <button type="button" data-presentation-action="next" ${index === slides.length - 1 ? "disabled" : ""}>下一页</button>
+        </footer>
+        <p class="presentation-source">参考来源：${renderSourceLinks(slide.sources || sourceRefs)}</p>
+      </div>
+    `;
+    panel.querySelectorAll("[data-presentation-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.presentationAction;
+        if (action === "prev") moveCoursewarePresentation(-1);
+        if (action === "next") moveCoursewarePresentation(1);
+        if (action === "exit") closeCoursewarePresentation();
+      });
+    });
+  }
+
   function updateCoursewareButtons(hasSlides) {
     $("aiCoursewareBtn").textContent = state.coursewareGenerating ? "生成中..." : hasSlides ? "重新生成课件" : "AI 生成课件";
     $("aiPptPlanBtn").textContent = state.pptPlanGenerating ? "制作中..." : "AI 制作 PPT";
     $("toggleReviewBtn").textContent = state.coursewareEditMode ? "退出审核" : "审核编辑";
-    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn"].forEach((id) => {
+    ["toggleReviewBtn", "saveCoursewareBtn", "resetCoursewareBtn", "exportCoursewareJsonBtn", "exportPdfBtn", "downloadCoursewareBtn", "aiPptPlanBtn", "exportPptxBtn", "presentCoursewareBtn"].forEach((id) => {
       const button = $(id);
       if (button) button.disabled = state.coursewareGenerating || state.pptPlanGenerating || !hasSlides;
     });
@@ -1231,8 +1365,8 @@
     const moreMenu = $("coursewareMoreMenu");
     const moreSummary = $("coursewareMoreSummary");
     if (moreMenu && moreSummary) {
-      if (state.coursewareGenerating) moreMenu.open = false;
-      moreSummary.setAttribute("aria-disabled", state.coursewareGenerating ? "true" : "false");
+      if (state.coursewareGenerating || state.pptPlanGenerating) moreMenu.open = false;
+      moreSummary.setAttribute("aria-disabled", state.coursewareGenerating || state.pptPlanGenerating ? "true" : "false");
     }
   }
 

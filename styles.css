@@ -2380,6 +2380,178 @@ body[data-role-mode="student"] .teacher-only {
   margin: 0 auto;
 }
 
+.courseware-presentation {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: #f8fafc;
+  color: var(--ink);
+}
+
+.courseware-presentation[hidden] {
+  display: none;
+}
+
+.presentation-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 14px;
+  padding: 22px;
+}
+
+.presentation-topbar,
+.presentation-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.presentation-topbar {
+  padding: 14px 18px;
+}
+
+.presentation-topbar span,
+.presentation-actions span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.presentation-topbar strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.presentation-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.presentation-actions button,
+.presentation-footer button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: var(--brand-strong);
+  font-weight: 900;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+.presentation-actions button:hover,
+.presentation-footer button:hover:not(:disabled) {
+  background: #d9fbec;
+}
+
+.presentation-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.presentation-slide {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
+  gap: 18px;
+}
+
+.presentation-visual,
+.presentation-content {
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.presentation-visual {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.presentation-visual > * {
+  width: 100%;
+  min-height: 360px;
+}
+
+.presentation-content {
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.presentation-content h2 {
+  margin: 4px 0 18px;
+  font-size: 34px;
+  line-height: 1.25;
+}
+
+.presentation-content p:not(.eyebrow) {
+  margin: 0 0 18px;
+  color: #334155;
+  font-size: 19px;
+  line-height: 1.8;
+}
+
+.presentation-content ul {
+  margin: 0;
+  padding-left: 24px;
+  color: #334155;
+  font-size: 18px;
+  line-height: 1.85;
+}
+
+.presentation-footer {
+  padding: 12px 14px;
+}
+
+.presentation-footer > div {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.presentation-footer > div span {
+  display: block;
+  width: var(--progress);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 180ms ease;
+}
+
+.presentation-source {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.presentation-source a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.presentation-source a:hover {
+  text-decoration: underline;
+}
+
 .empty-state strong {
   display: block;
   color: var(--ink);
@@ -2443,6 +2615,18 @@ body[data-role-mode="student"] .teacher-only {
   .flow-visual span:not(:last-child)::after {
     display: none;
   }
+
+  .presentation-slide {
+    grid-template-columns: 1fr;
+  }
+
+  .presentation-visual > * {
+    min-height: 260px;
+  }
+
+  .presentation-content {
+    padding: 24px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -2480,6 +2664,29 @@ body[data-role-mode="student"] .teacher-only {
   .award-stage {
     --walk-distance: min(128px, 40vw);
   }
+
+  .presentation-shell {
+    padding: 12px;
+  }
+
+  .presentation-topbar,
+  .presentation-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .presentation-actions {
+    justify-content: space-between;
+  }
+
+  .presentation-content h2 {
+    font-size: 26px;
+  }
+
+  .presentation-content p:not(.eyebrow),
+  .presentation-content ul {
+    font-size: 16px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2505,6 +2712,7 @@ body[data-role-mode="student"] .teacher-only {
   .sidebar,
   .topbar,
   .tabs,
+  .courseware-presentation,
   .celebration-layer,
   #courseware .button-row,
   #knowledgePoints {
