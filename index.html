@@ -141,15 +141,20 @@
               <p class="eyebrow">Courseware</p>
               <h3>知识点课件生成</h3>
             </div>
-            <div class="button-row">
+            <div class="button-row courseware-actions">
               <button id="aiCoursewareBtn" class="primary-btn teacher-only">AI 生成课件</button>
               <button id="toggleReviewBtn" class="secondary-btn teacher-only">审核编辑</button>
-              <button id="saveCoursewareBtn" class="secondary-btn teacher-only">保存审核稿</button>
-              <button id="resetCoursewareBtn" class="secondary-btn teacher-only">清空课件</button>
-              <button id="exportCoursewareJsonBtn" class="secondary-btn teacher-only">导出课件记录</button>
-              <button id="importCoursewareBtn" class="secondary-btn teacher-only">导入历史课件</button>
               <button id="exportPdfBtn" class="primary-btn teacher-only">导出 PDF</button>
-              <button id="downloadCoursewareBtn" class="secondary-btn teacher-only">导出 Markdown</button>
+              <details id="coursewareMoreMenu" class="action-menu teacher-only">
+                <summary id="coursewareMoreSummary" class="secondary-btn">更多</summary>
+                <div class="action-menu-panel">
+                  <button id="saveCoursewareBtn" class="menu-action">保存审核稿</button>
+                  <button id="downloadCoursewareBtn" class="menu-action">导出 Markdown</button>
+                  <button id="exportCoursewareJsonBtn" class="menu-action">导出课件记录</button>
+                  <button id="importCoursewareBtn" class="menu-action">导入历史课件</button>
+                  <button id="resetCoursewareBtn" class="menu-action danger">清空课件</button>
+                </div>
+              </details>
               <input id="importCoursewareFile" class="hidden-input" type="file" accept="application/json,.json" />
             </div>
           </div>

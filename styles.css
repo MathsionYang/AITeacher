@@ -378,6 +378,96 @@ body[data-role-mode="student"] .teacher-only {
   gap: 8px;
 }
 
+.courseware-actions {
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.action-menu {
+  position: relative;
+}
+
+.action-menu summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-menu summary::after {
+  content: "⌄";
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  transform: translateY(-1px);
+}
+
+.action-menu summary[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.action-menu[open] summary::after {
+  transform: rotate(180deg) translateY(1px);
+}
+
+.action-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 172px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  display: grid;
+  gap: 4px;
+}
+
+.menu-action {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #172033;
+  font-weight: 800;
+  text-align: left;
+  padding: 9px 10px;
+}
+
+.menu-action:hover {
+  background: #eef4ff;
+  color: #1d4ed8;
+}
+
+.menu-action.danger {
+  color: #be123c;
+}
+
+.menu-action.danger:hover {
+  background: #fff1f2;
+}
+
+.menu-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.menu-action:disabled:hover {
+  background: transparent;
+  color: #172033;
+}
+
+.menu-action.danger:disabled:hover {
+  color: #be123c;
+}
+
 .hidden-input {
   display: none;
 }
@@ -2233,6 +2323,15 @@ body[data-role-mode="student"] .teacher-only {
   .topbar,
   .panel-heading {
     flex-direction: column;
+  }
+
+  .courseware-actions {
+    justify-content: flex-start;
+  }
+
+  .action-menu-panel {
+    left: 0;
+    right: auto;
   }
 
   .slide-grid,

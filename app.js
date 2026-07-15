@@ -332,6 +332,12 @@
     $("toggleReviewBtn").addEventListener("click", toggleCoursewareReview);
     $("saveCoursewareBtn").addEventListener("click", saveCoursewareReview);
     $("resetCoursewareBtn").addEventListener("click", resetCoursewareReview);
+    document.querySelectorAll("#coursewareMoreMenu .menu-action").forEach((button) => {
+      button.addEventListener("click", () => {
+        const menu = $("coursewareMoreMenu");
+        if (menu) setTimeout(() => { menu.open = false; }, 0);
+      });
+    });
     $("showAnswerBtn").addEventListener("click", () => {
       state.answersVisible = !state.answersVisible;
       renderPractice();
@@ -846,6 +852,12 @@
       if (button) button.disabled = state.coursewareGenerating || !hasSlides;
     });
     $("importCoursewareBtn").disabled = state.coursewareGenerating;
+    const moreMenu = $("coursewareMoreMenu");
+    const moreSummary = $("coursewareMoreSummary");
+    if (moreMenu && moreSummary) {
+      if (state.coursewareGenerating) moreMenu.open = false;
+      moreSummary.setAttribute("aria-disabled", state.coursewareGenerating ? "true" : "false");
+    }
   }
 
   function buildCoursewareSlides(unit) {
