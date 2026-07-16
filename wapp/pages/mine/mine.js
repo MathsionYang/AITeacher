@@ -1,5 +1,6 @@
-const mock = require("../../data/mock");
+const curriculum = require("../../data/curriculum");
 const storage = require("../../utils/storage");
+const teacherService = require("../../utils/teacher-service");
 
 const app = getApp();
 
@@ -7,10 +8,10 @@ Page({
   data: {
     teacher: {},
     scope: {},
-    gradeOptions: mock.gradeOptions,
+    gradeOptions: curriculum.gradeOptions,
     gradeNames: [],
     gradeIndex: 0,
-    volumeOptions: mock.volumeOptions,
+    volumeOptions: curriculum.volumeOptions,
     volumeNames: [],
     volumeIndex: 0,
     modelConfig: {},
@@ -37,16 +38,16 @@ Page({
     app.bootstrap();
     const state = storage.getState();
     const scope = app.globalData.scope;
-    const gradeIndex = Math.max(0, mock.gradeOptions.findIndex((item) => item.id === scope.grade));
-    const volumeIndex = Math.max(0, mock.volumeOptions.findIndex((item) => item.id === scope.volume));
+    const gradeIndex = Math.max(0, curriculum.gradeOptions.findIndex((item) => item.id === scope.grade));
+    const volumeIndex = Math.max(0, curriculum.volumeOptions.findIndex((item) => item.id === scope.volume));
     const histories = state.histories || {};
     this.setData({
       teacher: app.globalData.teacher,
       scope,
       gradeIndex,
       volumeIndex,
-      gradeNames: mock.gradeOptions.map((item) => item.name),
-      volumeNames: mock.volumeOptions.map((item) => item.name),
+      gradeNames: curriculum.gradeOptions.map((item) => item.name),
+      volumeNames: curriculum.volumeOptions.map((item) => item.name),
       modelConfig: app.globalData.modelConfig,
       stats: {
         courseware: (histories.courseware || []).length,
@@ -57,7 +58,7 @@ Page({
   },
 
   onGradeChange(event) {
-    const grade = mock.gradeOptions[Number(event.detail.value)];
+    const grade = curriculum.gradeOptions[Number(event.detail.value)];
     if (!grade) return;
     app.setScope({ grade: grade.id, gradeName: grade.name });
     this.refresh();
@@ -65,7 +66,7 @@ Page({
   },
 
   onVolumeChange(event) {
-    const volume = mock.volumeOptions[Number(event.detail.value)];
+    const volume = curriculum.volumeOptions[Number(event.detail.value)];
     if (!volume) return;
     app.setScope({ volume: volume.id, volumeName: volume.name });
     this.refresh();
@@ -79,6 +80,14 @@ Page({
     this.setData({ modelConfig });
   },
 
+  onCloudEnabledChange(event) {
+    const modelConfig = Object.assign({}, this.data.modelConfig, {
+      cloudEnabled: Boolean(event.detail.value),
+      connected: false
+    });
+    this.setData({ modelConfig });
+  },
+
   toggleModelSettings() {
     this.setData({
       modelSettingsExpanded: !this.data.modelSettingsExpanded
@@ -87,14 +96,36 @@ Page({
 
   saveModelConfig() {
     app.setModelConfig(this.data.modelConfig);
-    wx.showToast({ title: "模型配置已保存", icon: "success" });
+    this.refresh();
+    wx.showToast({ title: "云开发配置已保存", icon: "success" });
   },
 
   testModel() {
-    const modelConfig = Object.assign({}, this.data.modelConfig, { connected: true });
-    app.setModelConfig(modelConfig);
-    this.setData({ modelConfig });
-    wx.showToast({ title: "已保留测试入口", icon: "none" });
+    app.setModelConfig(this.data.modelConfig);
+    wx.showLoading({ title: "测试中" });
+    teacherService.testModel(app)
+      .then((result) => {
+        wx.hideLoading();
+        const modelConfig = Object.assign({}, this.data.modelConfig, { connected: Boolean(result.ok) });
+        app.setModelConfig(modelConfig);
+        this.setData({ modelConfig });
+        wx.showModal({
+          title: "连接测试",
+          content: result.message || "连接正常",
+          showCancel: false
+        });
+      })
+      .catch((error) => {
+        wx.hideLoading();
+        const modelConfig = Object.assign({}, this.data.modelConfig, { connected: false });
+        app.setModelConfig(modelConfig);
+        this.setData({ modelConfig });
+        wx.showModal({
+          title: "连接失败",
+          content: error.message || String(error),
+          showCancel: false
+        });
+      });
   },
 
   exportPlaceholder() {

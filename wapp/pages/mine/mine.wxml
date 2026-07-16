@@ -27,7 +27,7 @@
     <view class="msc-icon">🧠</view>
     <view class="msc-info">
       <text class="msc-name">{{modelConfig.providerName}} · {{modelConfig.model}}</text>
-      <text class="msc-mode">{{modelConfig.connected ? '已连接' : '未连接'}} · 本地运行</text>
+      <text class="msc-mode">{{modelConfig.connected ? '已连接' : '未连接'}} · {{modelConfig.cloudEnabled ? '云函数' : '本地预览'}}</text>
     </view>
     <view class="msc-dot {{modelConfig.connected ? 'online' : 'offline'}}"></view>
   </view>
@@ -84,28 +84,28 @@
   <view class="profile-menu model-summary-menu">
     <view class="profile-menu-item model-summary-item" bindtap="toggleModelSettings">
       <view class="pmi-icon green">AI</view>
-      <text class="pmi-text">本地模型</text>
-      <text class="pmi-value model-summary-value">{{modelConfig.providerName}} · {{modelConfig.model}}</text>
+      <text class="pmi-text">云开发</text>
+      <text class="pmi-value model-summary-value">{{modelConfig.cloudEnabled ? modelConfig.cloudEnvId || '默认环境' : '未启用'}}</text>
       <text class="pmi-arrow">{{modelSettingsExpanded ? '收起' : '配置'}}</text>
     </view>
   </view>
   <view wx:if="{{modelSettingsExpanded}}" class="profile-menu model-form">
-    <view class="form-row">
-      <text class="form-label">服务商</text>
-      <input class="form-input" value="{{modelConfig.providerName}}" data-field="providerName" bindinput="onModelInput" />
+    <view class="cloud-row">
+      <view>
+        <text class="form-label">启用云开发</text>
+        <text class="form-help">正式发布后由云函数保存模型 URL 和 Key</text>
+      </view>
+      <switch checked="{{modelConfig.cloudEnabled}}" color="#0d9488" bindchange="onCloudEnabledChange" />
     </view>
     <view class="form-row">
-      <text class="form-label">模型</text>
-      <input class="form-input" value="{{modelConfig.model}}" data-field="model" bindinput="onModelInput" />
+      <text class="form-label">云环境 ID</text>
+      <input class="form-input" value="{{modelConfig.cloudEnvId}}" data-field="cloudEnvId" bindinput="onModelInput" placeholder="留空则使用默认云环境" />
     </view>
     <view class="form-row">
-      <text class="form-label">Base URL</text>
-      <input class="form-input" value="{{modelConfig.baseUrl}}" data-field="baseUrl" bindinput="onModelInput" />
+      <text class="form-label">当前模型</text>
+      <input class="form-input" value="{{modelConfig.model}}" data-field="model" bindinput="onModelInput" placeholder="由云函数环境变量或云数据库配置" />
     </view>
-    <view class="form-row">
-      <text class="form-label">API Key</text>
-      <input class="form-input" password value="{{modelConfig.apiKey}}" data-field="apiKey" bindinput="onModelInput" placeholder="本地代理可留空" />
-    </view>
+    <view class="form-note">小程序前端不保存大模型 API Key。模型 URL 和 Key 请放在 CloudBase 云函数环境变量或云数据库加密配置中。</view>
     <view class="form-actions">
       <button class="btn-secondary primary" bindtap="saveModelConfig">保存配置</button>
       <button class="btn-secondary" bindtap="testModel">测试连接</button>

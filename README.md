@@ -11,6 +11,17 @@
 
 左侧导航固定为四项：`课件生成`、`同步出题`、`周期测验出题`、`系统设置`。侧栏采用固定高度和 sticky 布局，不随右侧长内容一起滚动。
 
+## 微信小程序
+
+小程序教师端代码位于 `wapp/`，当前已经按微信小程序项目结构整理：
+
+- 默认本地预览，生成课件和试卷仍可用于 UI 联调。
+- 已预留 CloudBase 云函数骨架：`testModel`、`generateCourseware`、`generateQuestions`。
+- 前端不保存大模型 API Key；正式模型 URL 和 Key 应放在云函数环境变量或云数据库加密配置中。
+- 小程序项目配置已声明 `cloudfunctionRoot: "cloudfunctions/"`。
+
+详见 [微信小程序与云开发方案](docs/08-miniprogram-cloudbase-design.md)。
+
 ## 打开方式
 
 直接用浏览器打开：

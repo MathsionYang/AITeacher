@@ -1,4 +1,4 @@
-const generator = require("../../utils/generator");
+const teacherService = require("../../utils/teacher-service");
 
 const app = getApp();
 
@@ -53,17 +53,25 @@ Page({
   generateCourseware() {
     const unit = this.data.unit;
     this.setData({ loading: true, editing: false });
-    setTimeout(() => {
-      const courseware = generator.generateCourseware(app.globalData.scope, unit);
-      app.addHistory("courseware", courseware);
-      this.setData({
-        loading: false,
-        courseware,
-        editSlides: courseware.slides.map((slide) => Object.assign({}, slide))
+    teacherService.generateCourseware(app, app.globalData.scope, unit)
+      .then((courseware) => {
+        app.addHistory("courseware", courseware);
+        this.setData({
+          loading: false,
+          courseware,
+          editSlides: courseware.slides.map((slide) => Object.assign({}, slide))
+        });
+        this.refresh();
+        wx.showToast({ title: "课件已生成", icon: "success" });
+      })
+      .catch((error) => {
+        this.setData({ loading: false });
+        wx.showModal({
+          title: "生成失败",
+          content: error.message || String(error),
+          showCancel: false
+        });
       });
-      this.refresh();
-      wx.showToast({ title: "课件已生成", icon: "success" });
-    }, 700);
   },
 
   loadHistory(event) {
@@ -114,7 +122,7 @@ Page({
 
   openPresenter() {
     if (!this.data.courseware) return;
-    wx.navigateTo({ url: `/pages/presenter/presenter?id=${this.data.courseware.id}` });
+    wx.navigateTo({ url: "/pages/presenter/presenter?id=" + this.data.courseware.id });
   },
 
   exportPlaceholder() {
@@ -125,4 +133,3 @@ Page({
     wx.showToast({ title: "历史课件在本页下方", icon: "none" });
   }
 });
-

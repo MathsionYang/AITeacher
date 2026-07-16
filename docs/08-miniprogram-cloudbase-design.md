@@ -168,7 +168,7 @@ knowledge_packages
 
 - 保留 wapp 当前 UI。
 - 课件和出题按钮先接统一 service 层。
-- service 层支持 mock/dev 与 cloud 两种模式切换。
+- service 层支持本地预览与 CloudBase 云函数两种模式切换。
 - 不再新增学生端和判分模块。
 
 ### 第 2 阶段：接入 CloudBase
@@ -212,3 +212,17 @@ knowledge_packages
 - 周期测验只围绕当前单元知识点生成 10-100 道题。
 - 历史课件、历史出题、历史测验支持查询和删除。
 - README 能直接定位到本方案文档。
+
+
+## 12. 已落地代码骨架
+
+当前仓库已经在 `wapp/` 下预留 CloudBase 接入骨架：
+
+- `wapp/utils/teacher-service.js`：小程序统一服务层，负责在本地预览和云函数之间切换。
+- `wapp/project.config.json`：已配置 `cloudfunctionRoot: "cloudfunctions/"`。
+- `wapp/cloudfunctions/testModel`：模型连通性测试云函数骨架。
+- `wapp/cloudfunctions/generateCourseware`：课件生成云函数骨架。
+- `wapp/cloudfunctions/generateQuestions`：出题云函数骨架。
+- `wapp/data/curriculum.js`：小程序端教材范围与知识点数据，后续可迁移到云数据库。
+
+默认 `cloudEnabled=false`，方便开发工具里本地预览 UI。正式接入时，在“我的 / 模型设置”中开启云开发并填写云环境 ID，生成按钮会走对应云函数；云函数未实现模型逻辑时会返回明确错误，不会把本地预览数据伪装成云端 AI 结果。

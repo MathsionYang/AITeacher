@@ -1,12 +1,13 @@
 const storage = require("./utils/storage");
-const mock = require("./data/mock");
+const curriculum = require("./data/curriculum");
+const teacherService = require("./utils/teacher-service");
 
 const defaultModelConfig = {
-  provider: "local_proxy",
-  providerName: "本地代理",
-  model: "qwen-plus",
-  baseUrl: "http://127.0.0.1:8787",
-  apiKey: "",
+  provider: "cloudbase",
+  providerName: "云开发",
+  model: "云函数配置",
+  cloudEnabled: false,
+  cloudEnvId: "",
   connected: false
 };
 
@@ -17,20 +18,31 @@ App({
       name: "王老师",
       verified: true
     },
-    scope: mock.defaultScope,
+    scope: curriculum.defaultScope,
     currentUnitId: "g5a-u2",
-    modelConfig: defaultModelConfig
+    modelConfig: defaultModelConfig,
+    cloudInitialized: false,
+    cloudEnvId: ""
   },
 
   onLaunch() {
     this.bootstrap();
+    this.initCloud();
   },
 
   bootstrap() {
     const state = storage.getState();
-    this.globalData.scope = state.scope || mock.defaultScope;
+    this.globalData.scope = state.scope || curriculum.defaultScope;
     this.globalData.currentUnitId = state.currentUnitId || this.globalData.currentUnitId;
-    this.globalData.modelConfig = state.modelConfig || defaultModelConfig;
+    this.globalData.modelConfig = Object.assign({}, defaultModelConfig, state.modelConfig || {});
+  },
+
+  initCloud() {
+    try {
+      return teacherService.initCloudIfNeeded(this);
+    } catch (error) {
+      return false;
+    }
   },
 
   getState() {
@@ -39,19 +51,20 @@ App({
 
   saveState(patch) {
     const nextState = storage.updateState(patch);
-    this.globalData.scope = nextState.scope || this.globalData.scope || mock.defaultScope;
+    this.globalData.scope = nextState.scope || this.globalData.scope || curriculum.defaultScope;
     this.globalData.currentUnitId = nextState.currentUnitId || this.globalData.currentUnitId;
-    this.globalData.modelConfig = nextState.modelConfig || this.globalData.modelConfig || defaultModelConfig;
+    this.globalData.modelConfig = Object.assign({}, defaultModelConfig, nextState.modelConfig || this.globalData.modelConfig || {});
+    this.initCloud();
     return nextState;
   },
 
   getUnits() {
-    return mock.getUnits(this.globalData.scope);
+    return curriculum.getUnits(this.globalData.scope);
   },
 
   getCurrentUnit() {
     const units = this.getUnits();
-    return mock.findUnit(units, this.globalData.currentUnitId) || units[0];
+    return curriculum.findUnit(units, this.globalData.currentUnitId) || units[0];
   },
 
   setCurrentUnit(unitId) {
@@ -61,7 +74,7 @@ App({
 
   setScope(scopePatch) {
     const scope = Object.assign({}, this.globalData.scope, scopePatch);
-    const units = mock.getUnits(scope);
+    const units = curriculum.getUnits(scope);
     const currentUnitId = units[0] ? units[0].id : this.globalData.currentUnitId;
     this.globalData.scope = scope;
     this.globalData.currentUnitId = currentUnitId;
@@ -69,7 +82,7 @@ App({
   },
 
   setModelConfig(modelConfig) {
-    this.globalData.modelConfig = Object.assign({}, this.globalData.modelConfig, modelConfig);
+    this.globalData.modelConfig = Object.assign({}, defaultModelConfig, this.globalData.modelConfig, modelConfig);
     return this.saveState({ modelConfig: this.globalData.modelConfig });
   },
 

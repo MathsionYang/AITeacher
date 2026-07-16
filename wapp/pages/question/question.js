@@ -1,4 +1,4 @@
-const generator = require("../../utils/generator");
+const teacherService = require("../../utils/teacher-service");
 
 const app = getApp();
 
@@ -83,15 +83,26 @@ Page({
     const unit = this.data.unit;
     const isSchedule = this.data.mode === "schedule";
     this.setData({ loading: true, showAnswers: false });
-    setTimeout(() => {
-      const paper = isSchedule
-        ? generator.generateSchedule(unit, { count: this.data.scheduleCount, frequency: this.data.frequency })
-        : generator.generatePractice(unit, this.data.difficulty);
+    teacherService.generatePaper(app, {
+      mode: this.data.mode,
+      scope: app.globalData.scope,
+      unit,
+      count: isSchedule ? this.data.scheduleCount : 10,
+      frequency: this.data.frequency,
+      difficulty: this.data.difficulty
+    }).then((paper) => {
       app.addHistory(isSchedule ? "schedule" : "practice", paper);
       this.setData({ loading: false, paper });
       this.refresh();
       wx.showToast({ title: "试卷已生成", icon: "success" });
-    }, 700);
+    }).catch((error) => {
+      this.setData({ loading: false });
+      wx.showModal({
+        title: "生成失败",
+        content: error.message || String(error),
+        showCancel: false
+      });
+    });
   },
 
   toggleAnswers() {
