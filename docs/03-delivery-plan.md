@@ -15,6 +15,8 @@
 - 规则引擎已覆盖单元边界、客观题过滤、开放题拒绝、题型分布、答案判定。
 - 本地数据层 schema v8 已按 teacher-only 设计。
 - 左侧导航已固定，不随右侧长内容滚动。
+- 5 张 1080×1440（3:4）竖版界面截图已归档到 `docs/xiaohongshu-posts/images/`：登录页、课件生成、同步出题、周期测验出题、系统设置。
+- 小红书内容运营方案、7 篇小红书笔记、抖音口播稿和发布清单已按当前教师端功能同步。
 
 ## 暂不做
 
@@ -42,3 +44,10 @@ node --check app.js
 node scripts\run_mvp_checks.js
 python -m py_compile scripts\local_ocr_paddle.py
 ```
+
+## 交付素材
+
+- 产品界面截图：`docs/xiaohongshu-posts/images/ui-01-login-1080x1440.png` 至 `ui-05-settings-1080x1440.png`。
+- 小红书图文稿：`docs/xiaohongshu-posts/`。
+- 抖音短视频口播稿：`docs/douyin-posts/`。
+- 登录页教师插画：`img/teacher-illustration.png`。

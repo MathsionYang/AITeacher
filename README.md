@@ -89,6 +89,28 @@ start_aiteacher_ocr.bat
 
 每个 JS 文件对应 `docs/knowledge/` 下的一份客观知识点提炼文档。
 
+## 界面与内容素材
+
+当前界面截图和内容发布素材已统一放在：
+
+```text
+docs\xiaohongshu-posts\images
+```
+
+已归档 5 张 1080×1440（3:4）竖版界面图：
+
+- `ui-01-login-1080x1440.png`：教师登录页
+- `ui-02-courseware-1080x1440.png`：课件生成页
+- `ui-03-practice-1080x1440.png`：同步出题页
+- `ui-04-schedule-1080x1440.png`：周期测验出题页
+- `ui-05-settings-1080x1440.png`：系统设置页
+
+小红书与抖音发布文档分别位于：
+
+- `docs/xiaohongshu-content-plan.md`
+- `docs/xiaohongshu-posts/`
+- `docs/douyin-posts/`
+
 ## 测试
 
 ```powershell
@@ -108,3 +130,6 @@ python -m py_compile scripts\local_ocr_paddle.py
 - [AI 课件生成规范](docs/05-ai-courseware-generation-spec.md)
 - [大模型与 Agent 架构设计](docs/06-llm-agent-architecture.md)
 - [教师端与后端数据设计](docs/07-teacher-backend-data-design.md)
+- [小红书内容运营方案](docs/xiaohongshu-content-plan.md)
+- [小红书发布清单与配图建议](docs/xiaohongshu-posts/发布清单与配图建议.md)
+- [抖音发布清单与素材建议](docs/douyin-posts/发布清单与配图建议.md)

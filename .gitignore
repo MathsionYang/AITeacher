@@ -23,6 +23,7 @@ books/
 .env
 .env.*
 !.env.example
+.workbuddy/
 
 # OS/editor noise
 .DS_Store
