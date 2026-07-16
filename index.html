@@ -13,7 +13,6 @@
           <div class="brand-mark">EF</div>
           <div>
             <h1>课题通</h1>
-            <p>教师端 · 本机出题备课</p>
           </div>
         </div>
 
@@ -40,28 +39,25 @@
           </div>
           <div class="topbar-side">
             <div class="teacher-session">
-              <div>
-                <span>教师端</span>
-                <strong id="teacherNameLabel">本机教师</strong>
-              </div>
-              <button id="logoutBtn" class="secondary-btn small" type="button">退出</button>
-            </div>
-            <div class="metric-strip">
-              <div>
-                <span id="questionMetric">0</span>
-                <p>当前题目</p>
-              </div>
-              <div>
-                <span id="coursewareMetric">0</span>
-                <p>历史课件</p>
-              </div>
-              <div>
-                <span id="scheduleMetric">未设置</span>
-                <p>周期测验</p>
-              </div>
+              <button id="logoutBtn" class="logout-icon-btn" type="button" aria-label="退出登录" title="退出登录"></button>
             </div>
           </div>
         </header>
+
+        <section class="metric-strip dashboard-metrics" aria-label="工作台统计">
+          <article>
+            <span id="questionMetric">0</span>
+            <p>当前题目</p>
+          </article>
+          <article>
+            <span id="coursewareMetric">0</span>
+            <p>历史课件</p>
+          </article>
+          <article>
+            <span id="scheduleMetric">未设置</span>
+            <p>周期测验</p>
+          </article>
+        </section>
 
         <section id="courseware" class="tab-panel active">
           <div class="panel-heading">
@@ -190,7 +186,7 @@
             </div>
             <div class="control-block">
               <label for="scheduledCount">测验题量</label>
-              <input id="scheduledCount" type="number" min="10" max="10" value="10" disabled />
+              <input id="scheduledCount" type="number" min="10" max="100" value="10" step="1" />
             </div>
             <button id="saveScheduleBtn" class="secondary-btn">保存设置</button>
           </div>

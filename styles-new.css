@@ -310,8 +310,10 @@ button {
   display: flex;
   justify-content: space-between;
   gap: 32px;
-  align-items: flex-end;
+  align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--slate-200);
 }
 
 .eyebrow {
@@ -340,94 +342,63 @@ button {
 .teacher-session {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px 4px 4px;
-  background: var(--panel);
-  border: 1px solid var(--slate-200);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--dur-normal) var(--ease-out-quart);
-}
-
-.teacher-session:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.teacher-session::before {
-  content: "";
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
-  display: inline-grid;
-  place-items: center;
-  background-image:
-    linear-gradient(135deg, var(--brand-500), var(--brand-700)),
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 60%);
-  background-blend-mode: overlay;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.teacher-session div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 0 8px 0 10px;
-  min-width: auto;
+  justify-content: center;
+  padding: 0;
   background: transparent;
-  border: none;
+  border: 0;
   box-shadow: none;
 }
 
-.teacher-session span {
-  display: block;
-  color: var(--brand-600);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  line-height: 1;
+.teacher-session:hover {
+  box-shadow: none;
 }
 
-.teacher-session strong {
-  display: block;
-  margin-top: 0;
-  color: var(--slate-900);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-/* Logout — inside pill, no border */
-.teacher-session #logoutBtn {
+.logout-icon-btn {
+  width: 38px;
+  height: 38px;
   border: 0;
-  background: var(--slate-100);
+  background: #ffffff;
   color: var(--slate-600);
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-left: 4px;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--slate-200);
   transition: all var(--dur-fast) var(--ease-out-quart);
 }
 
-.teacher-session #logoutBtn:hover {
+.logout-icon-btn::before {
+  content: "⏻";
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.logout-icon-btn:hover {
   background: var(--red-500);
+  border-color: var(--red-500);
   color: white;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
-/* Metric Strip — compact row */
+/* Metric Cards */
 .metric-strip {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  gap: 12px;
 }
 
-.metric-strip div {
+.dashboard-metrics {
+  grid-template-columns: repeat(3, minmax(132px, 1fr));
+  width: min(100%, 560px);
+  margin: 0 0 18px;
+}
+
+.metric-strip > article {
   background: var(--panel);
   border: 1px solid var(--slate-200);
-  border-radius: var(--radius-md);
-  padding: 10px 16px;
+  border-radius: 8px;
+  padding: 14px 16px;
   box-shadow: var(--shadow-sm);
   transition: all var(--dur-normal) var(--ease-out-quart);
   position: relative;
@@ -435,29 +406,29 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-width: 90px;
+  min-height: 76px;
 }
 
-.metric-strip div::before {
+.metric-strip > article::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 12px;
+  bottom: 12px;
   width: 3px;
   border-radius: 0 3px 3px 0;
   background: var(--brand-400);
 }
 
-.metric-strip div:nth-child(2)::before {
+.metric-strip > article:nth-child(2)::before {
   background: var(--amber-400);
 }
 
-.metric-strip div:nth-child(3)::before {
+.metric-strip > article:nth-child(3)::before {
   background: var(--blue-500);
 }
 
-.metric-strip div:hover {
+.metric-strip > article:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -465,7 +436,7 @@ button {
 .metric-strip span {
   display: block;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 22px;
   color: var(--brand-700);
   letter-spacing: -0.5px;
   line-height: 1.1;
@@ -816,7 +787,14 @@ textarea {
 }
 
 .module-toolbar.schedule-toolbar {
-  grid-template-columns: minmax(200px, 280px) minmax(160px, 200px) minmax(140px, 160px) auto;
+  grid-template-columns: minmax(200px, 280px) minmax(160px, 200px) minmax(140px, 160px) max-content;
+}
+
+#saveScheduleBtn {
+  justify-self: start;
+  width: auto;
+  min-width: 96px;
+  padding-inline: 16px;
 }
 
 .module-toolbar .hint {
@@ -1015,6 +993,98 @@ textarea {
 
 .history-card button {
   flex: 0 0 auto;
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--slate-200);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.history-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.history-table th,
+.history-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--slate-100);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.history-table th {
+  background: #f8fafc;
+  color: var(--slate-500);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-table tbody tr:hover {
+  background: #fbfdff;
+}
+
+.history-table td {
+  color: var(--slate-600);
+}
+
+.history-table td:first-child {
+  position: relative;
+  color: var(--slate-900);
+}
+
+.history-table td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand-400);
+}
+
+.history-table td:first-child strong {
+  display: block;
+  color: var(--slate-900);
+  font-size: 13px;
+}
+
+.history-table-action {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.history-table-action .secondary-btn.small {
+  min-height: 32px;
+  padding: 6px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.history-table-action .secondary-btn.danger.small {
+  background: #fff7f7;
+  border-color: #fecaca;
+  color: var(--red-600);
+}
+
+.history-table-action .secondary-btn.danger.small:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
 }
 
 .history-empty {
@@ -1289,14 +1359,20 @@ textarea {
 .concept-map span,
 .flow-visual span {
   min-width: 0;
+  min-height: 48px;
   border: 1px solid var(--brand-200);
   border-radius: var(--radius-md);
   background: var(--brand-50);
   color: var(--brand-700);
-  font-size: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.35;
   text-align: center;
-  padding: 9px 7px;
+  padding: 8px 9px;
+  white-space: normal;
+  overflow-wrap: anywhere;
   animation: lift-in 520ms ease both;
   animation-delay: calc(var(--i, 0) * 90ms);
 }
@@ -1343,7 +1419,7 @@ textarea {
   align-items: end;
   justify-content: center;
   gap: 12px;
-  padding: 18px 20px;
+  padding: 14px 18px;
 }
 
 .practice-ladder .visual-title {
@@ -1379,6 +1455,11 @@ textarea {
   height: 88px;
   background: var(--amber-500);
   animation-delay: 200ms;
+}
+
+.practice-ladder .visual-caption {
+  flex: 0 0 100%;
+  margin-top: 2px;
 }
 
 .summary-cycle {
@@ -1888,14 +1969,15 @@ textarea {
 
 .scenario-visual {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   align-content: center;
   justify-items: center;
-  min-height: 132px;
+  min-height: 150px;
 }
 
 .stationery-scenario {
   background: linear-gradient(180deg, rgba(239, 246, 255, 0.78), rgba(240, 253, 250, 0.92));
+  padding-bottom: 14px;
 }
 
 .craft-scenario {
@@ -1903,18 +1985,20 @@ textarea {
 }
 
 .object-equation {
-  width: min(300px, 94%);
+  width: min(520px, 96%);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  row-gap: 22px;
+  gap: 12px;
+  row-gap: 34px;
   flex-wrap: wrap;
+  padding: 4px 0 26px;
 }
 
 .object-group {
   display: flex;
-  gap: 5px;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .notebook {
@@ -2205,19 +2289,20 @@ textarea {
 }
 
 .markdownflow-visual {
-  min-height: 260px;
-  margin: 18px 0;
+  min-height: 190px;
+  margin: 16px 0;
+  padding: 10px;
   border: 1px solid var(--slate-200);
   border-radius: var(--radius-md);
   background: var(--slate-50);
   display: grid;
-  place-items: center;
-  overflow: hidden;
+  place-items: stretch;
+  overflow: visible;
 }
 
 .markdownflow-visual > * {
   width: 100%;
-  min-height: 240px;
+  min-height: 168px;
 }
 
 .markdownflow-points {
@@ -2646,9 +2731,13 @@ body[data-role-mode="student"] .teacher-only {
   .metric-strip {
     gap: 8px;
   }
-  .metric-strip div {
-    min-width: 80px;
+  .dashboard-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .metric-strip > article {
     padding: 8px 12px;
+    min-height: 68px;
   }
   .metric-strip span {
     font-size: 16px;
@@ -2719,7 +2808,8 @@ body[data-role-mode="student"] .teacher-only {
   letter-spacing: 0;
 }
 
-#practice .history-list {
+#practice .history-list,
+#schedule .history-list {
   margin: 0 0 14px;
   padding: 12px;
   border: 1px solid #e5edf5;
@@ -2727,38 +2817,19 @@ body[data-role-mode="student"] .teacher-only {
   background: #ffffff;
 }
 
-#practice .history-head {
+#practice .history-head,
+#schedule .history-head {
   margin-bottom: 10px;
 }
 
-#practice .history-head strong {
+#practice .history-head strong,
+#schedule .history-head strong {
   color: var(--slate-800);
   font-size: 14px;
 }
 
-#practice .history-grid {
-  grid-template-columns: repeat(auto-fill, minmax(240px, 320px));
-}
-
-#practice .history-card {
-  min-height: 96px;
-  align-items: flex-start;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: var(--shadow-sm);
-}
-
-#practice .history-card.active {
-  border-color: var(--brand-300);
-  background: #f0fdfa;
-  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.1);
-}
-
-#practice .history-card button {
-  align-self: flex-start;
-}
-
-#practice .history-empty {
+#practice .history-empty,
+#schedule .history-empty {
   border-radius: 8px;
   background: #f8fafc;
 }

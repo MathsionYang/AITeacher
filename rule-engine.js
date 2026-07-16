@@ -3,6 +3,7 @@
 
   const SCHEMA_VERSION = 2;
   const REQUIRED_QUESTION_COUNT = 10;
+  const MAX_PAPER_QUESTION_COUNT = 100;
   const DIFFICULTIES = new Set(["基础", "提高", "挑战"]);
   const UNIT_WORDS = [
     "平方厘米", "立方厘米", "平方分米", "立方分米", "平方米", "立方米",
@@ -28,7 +29,11 @@
   }
 
   function capGeneratedQuestionCount(value) {
-    return clamp(Number(value) || 0, 0, 20);
+    return clamp(Number(value) || 0, 0, MAX_PAPER_QUESTION_COUNT);
+  }
+
+  function capPaperQuestionCount(value) {
+    return clamp(Number(value) || REQUIRED_QUESTION_COUNT, REQUIRED_QUESTION_COUNT, MAX_PAPER_QUESTION_COUNT);
   }
 
   function normalizeText(value) {
@@ -107,7 +112,7 @@
   }
 
   function normalizePaperPoints(questions) {
-    const capped = (Array.isArray(questions) ? questions : []).slice(0, 20);
+    const capped = (Array.isArray(questions) ? questions : []).slice(0, MAX_PAPER_QUESTION_COUNT);
     if (!capped.length) return [];
     const base = Math.floor(100 / capped.length);
     const remainder = 100 - base * capped.length;
@@ -216,7 +221,14 @@
   function validatePaper(questions, unit, options = {}) {
     const exactCount = options.exactCount !== false;
     const requireKnowledgeCoverage = options.requireKnowledgeCoverage !== false;
-    const limit = exactCount ? capQuestionCount(options.limit) : capGeneratedQuestionCount(options.limit || questions?.length || 0);
+    const explicitExactCount = Number(options.exactQuestionCount);
+    const hasExplicitExactCount = Number.isFinite(explicitExactCount) && explicitExactCount > 0;
+    const exactTarget = hasExplicitExactCount ? capPaperQuestionCount(explicitExactCount) : REQUIRED_QUESTION_COUNT;
+    const limit = hasExplicitExactCount
+      ? exactTarget
+      : exactCount
+        ? capQuestionCount(options.limit)
+        : capGeneratedQuestionCount(options.limit || questions?.length || 0);
     const rejected = [];
     const accepted = [];
     dedupeByStem(questions).forEach((questionItem) => {
@@ -226,15 +238,15 @@
     });
 
     const scoped = enforceUnitQuestionBoundary(accepted, unit);
-    const selected = requireKnowledgeCoverage ? selectQuestionsForKnowledgeCoverage(scoped, unit, limit) : rebalanceQuestionTypes(scoped, limit).slice(0, limit || 20);
-    const normalized = normalizePaperPoints(selected.slice(0, limit || 20));
+    const selected = requireKnowledgeCoverage ? selectQuestionsForKnowledgeCoverage(scoped, unit, limit) : rebalanceQuestionTypes(scoped, limit).slice(0, limit || MAX_PAPER_QUESTION_COUNT);
+    const normalized = normalizePaperPoints(selected.slice(0, limit || MAX_PAPER_QUESTION_COUNT));
     const missingKnowledgePoints = requireKnowledgeCoverage ? findMissingKnowledgePoints(normalized, unit) : [];
     const issues = [];
     if (!normalized.length && questions?.length) issues.push("没有题目通过规则校验");
-    if (exactCount && normalized.length !== REQUIRED_QUESTION_COUNT) issues.push(`题量必须为 ${REQUIRED_QUESTION_COUNT} 题`);
+    if ((hasExplicitExactCount || exactCount) && normalized.length !== exactTarget) issues.push(`题量必须为 ${exactTarget} 题`);
     if (missingKnowledgePoints.length) issues.push(`未覆盖知识点：${missingKnowledgePoints.join("、")}`);
     if ((unit?.points || []).length > limit) issues.push(`当前单元知识点超过 ${limit} 个，无法用 ${limit} 题全部覆盖`);
-    if (normalized.length > REQUIRED_QUESTION_COUNT) issues.push(`题量超过 ${REQUIRED_QUESTION_COUNT} 题`);
+    if (normalized.length > exactTarget && (hasExplicitExactCount || exactCount)) issues.push(`题量超过 ${exactTarget} 题`);
     if (normalized.length && paperTotal(normalized) !== 100) issues.push("总分未归一为 100 分");
 
     return {
@@ -586,6 +598,7 @@
     REQUIRED_QUESTION_COUNT,
     capQuestionCount,
     capGeneratedQuestionCount,
+    capPaperQuestionCount,
     clamp,
     dedupeByStem,
     enforceUnitQuestionBoundary,

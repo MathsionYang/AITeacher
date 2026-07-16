@@ -24,6 +24,8 @@ generationRecords
 schedule
 ```
 
+历史课件、同步出题记录和周期测验记录在教师端支持本机删除。删除只移除对应 localStorage/后端记录，不删除知识点包，也不影响已导出的 PDF/PPTX/JSON 文件。
+
 ## 3. 推荐数据库表
 
 ```text
@@ -49,7 +51,7 @@ practice_sets
   id, scope_key, review_status, export_version, payload_json, updated_at
 
 scheduled_papers
-  id, scope_key, frequency, total_score, review_status, export_version, payload_json, created_at, updated_at
+  id, scope_key, frequency, question_count, total_score, review_status, export_version, payload_json, created_at, updated_at
 
 papers
   id, creator_account_id, paper_type, scope_key, title, total_score, review_status, export_version, payload_json, created_at, updated_at
@@ -64,7 +66,7 @@ generation_cache
   id, scope_key, kind, payload_json, updated_at
 
 generation_records
-  id, kind, scope_key, source, item_count, payload_json, created_at
+  id, kind, scope_key, source, item_count, deleted_at, payload_json, created_at
 
 ppt_plans
   id, scope_key, review_status, export_version, payload_json, updated_at

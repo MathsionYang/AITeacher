@@ -45,6 +45,7 @@
   const agentOrchestrator = window.AITeacherAgentOrchestrator?.createAgentOrchestrator?.({ modelClient });
   const pptxExporter = window.AITeacherPptxExporter;
   const requiredQuestionCount = ruleEngine.REQUIRED_QUESTION_COUNT || 10;
+  const maxScheduledQuestionCount = 100;
   const savedScope = readSubjectScope();
 
   const state = {
@@ -1162,9 +1163,12 @@
     return points.find((point) => point.includes(text) || text.includes(point)) || "";
   }
 
-  function prepareQuestionsForPaper(questions, unit, requestedCount) {
+  function prepareQuestionsForPaper(questions, unit, requestedCount, options = {}) {
     if (ruleEngine.validatePaper) {
-      const prepared = ruleEngine.validatePaper(questions, unit, { limit: requestedCount });
+      const prepared = ruleEngine.validatePaper(questions, unit, {
+        limit: requestedCount,
+        exactQuestionCount: options.exactQuestionCount
+      });
       const sourceRefs = getSourceRefs(unit);
       const checkedAt = new Date().toISOString();
       return {
@@ -1206,7 +1210,7 @@
     if (missing.length) parts.push(`未覆盖知识点：${missing.slice(0, 8).join("、")}${missing.length > 8 ? "等" : ""}`);
     if (prepared?.rejected?.length) parts.push(`已剔除 ${prepared.rejected.length} 题不合格题`);
     if (prepared?.issues?.length) parts.push(`规则提示：${prepared.issues.slice(0, 2).join("；")}`);
-    if (!parts.length) parts.push("题目未满足 10 题、100 分、全知识点覆盖的规则");
+    if (!parts.length) parts.push(`题目未满足 ${requestedCount} 题、100 分、全知识点覆盖的规则`);
     return `${parts.join("；")}。请检查知识点模板，或重新生成。`;
   }
 
@@ -1499,18 +1503,7 @@
         <strong>历史课件</strong>
         <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
       </div>
-      <div class="history-grid">
-        ${records.map(({ unit, record }) => renderHistoryCard({
-          active: unit.id === state.unitId,
-          title: unit.title,
-          meta: `${record.reviewStatusLabel || reviewStatusLabel(record.reviewStatus)} · ${escapeHtml(record.exportVersion || reviewExportVersion)}`,
-          detail: `${(record.slides || []).length} 节 · ${formatDateTime(record.updatedAt || record.createdAt)}`,
-          action: "load-courseware",
-          unitId: unit.id,
-          actionLabel: unit.id === state.unitId ? "当前单元" : "切换到该单元",
-          disabled: unit.id === state.unitId
-        })).join("")}
-      </div>
+      ${renderCoursewareHistoryTable(records)}
     `;
   }
 
@@ -2172,10 +2165,11 @@
     if (slide.visualType === "practice") {
       return `
         <div class="practice-ladder">
-          <strong class="visual-title">同一知识点逐步变式</strong>
+          <strong class="visual-title">练习路径：基础 → 变式 → 应用</strong>
           <span>基础</span>
           <span>变式</span>
           <span>应用</span>
+          <small class="visual-caption">围绕同一知识点换数字、条件和情境，逐步检查是否真正理解。</small>
         </div>
       `;
     }
@@ -2368,7 +2362,7 @@
 
   function shortLabel(value) {
     const text = String(value).replace(/[，。、；：]/g, "");
-    return text.length > 8 ? `${text.slice(0, 8)}…` : text;
+    return text;
   }
 
   function renderPractice() {
@@ -2424,19 +2418,13 @@
         <strong>历史出题记录</strong>
         <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
       </div>
-      <div class="history-grid">
-        ${records.map((record) => renderHistoryCard({
-          active: record.unitId === state.unitId,
-          title: record.unitTitle,
-          meta: `${record.difficulty || state.difficulty} · ${record.itemCount || record.questions?.length || 0} 题 · ${record.totalScore || 100} 分`,
-          detail: `${generationSourceLabel(record.source)} · ${formatDateTime(record.createdAt)}`,
-          action: "load-practice",
-          unitId: record.unitId,
-          recordId: record.id,
-          actionLabel: Array.isArray(record.questions) && record.questions.length ? "载入练习" : "仅有记录",
-          disabled: !Array.isArray(record.questions) || !record.questions.length
-        })).join("")}
-      </div>
+      ${renderHistoryTable(records, {
+        modeLabel: "难度",
+        modeValue: (record) => record.difficulty || state.difficulty,
+        action: "load-practice",
+        actionLabel: "载入练习",
+        deleteAction: "delete-practice"
+      })}
     `;
   }
 
@@ -2453,19 +2441,95 @@
         <strong>历史测验卷</strong>
         <span>${gradeData().name}${volumeData().name} · ${records.length} 条</span>
       </div>
-      <div class="history-grid">
-        ${records.map((record) => renderHistoryCard({
-          active: record.unitId === state.unitId,
-          title: record.unitTitle,
-          meta: `${record.frequency || state.schedule.frequency || "周期"} · ${record.itemCount || record.questions?.length || 0} 题 · ${record.totalScore || 100} 分`,
-          detail: `${generationSourceLabel(record.source)} · ${formatDateTime(record.createdAt)}`,
-          action: "load-schedule",
-          unitId: record.unitId,
-          recordId: record.id,
-          actionLabel: Array.isArray(record.questions) && record.questions.length ? "载入测验" : "仅有记录",
-          disabled: !Array.isArray(record.questions) || !record.questions.length
-        })).join("")}
+      ${renderHistoryTable(records, {
+        modeLabel: "周期",
+        modeValue: (record) => record.frequency || state.schedule.frequency || "周期",
+        action: "load-schedule",
+        actionLabel: "载入测验",
+        deleteAction: "delete-schedule"
+      })}
+    `;
+  }
+
+  function renderCoursewareHistoryTable(records) {
+    return `
+      <div class="history-table-wrap">
+        <table class="history-table courseware-history-table">
+          <thead>
+            <tr>
+              <th>单元</th>
+              <th>状态</th>
+              <th>节数</th>
+              <th>版本</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${records.map(({ unit, record }) => renderCoursewareHistoryTableRow(unit, record)).join("")}
+          </tbody>
+        </table>
       </div>
+    `;
+  }
+
+  function renderCoursewareHistoryTableRow(unit, record) {
+    const isCurrent = unit.id === state.unitId;
+    return `
+      <tr>
+        <td><strong>${escapeHtml(unit.title)}</strong></td>
+        <td>${escapeHtml(record.reviewStatusLabel || reviewStatusLabel(record.reviewStatus))}</td>
+        <td>${(record.slides || []).length} 节</td>
+        <td>${escapeHtml(record.exportVersion || reviewExportVersion)}</td>
+        <td>${escapeHtml(formatDateTime(record.updatedAt || record.createdAt))}</td>
+        <td class="history-table-action">
+          <button class="secondary-btn small" type="button" data-action="load-courseware" data-unit-id="${escapeAttribute(unit.id)}"${isCurrent ? " disabled" : ""}>${isCurrent ? "当前单元" : "切换单元"}</button>
+          <button class="secondary-btn small danger" type="button" data-action="delete-courseware" data-unit-id="${escapeAttribute(unit.id)}">删除</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function renderHistoryTable(records, options) {
+    return `
+      <div class="history-table-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>单元</th>
+              <th>${escapeHtml(options.modeLabel)}</th>
+              <th>题量</th>
+              <th>总分</th>
+              <th>来源</th>
+              <th>生成时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${records.map((record) => renderHistoryTableRow(record, options)).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderHistoryTableRow(record, options) {
+    const questionCount = record.itemCount || record.questions?.length || 0;
+    const totalScore = record.totalScore || 100;
+    const hasQuestions = Array.isArray(record.questions) && record.questions.length > 0;
+    return `
+      <tr>
+        <td><strong>${escapeHtml(record.unitTitle || unitData().title)}</strong></td>
+        <td>${escapeHtml(options.modeValue(record))}</td>
+        <td>${questionCount} 题</td>
+        <td>${totalScore} 分</td>
+        <td>${escapeHtml(generationSourceLabel(record.source))}</td>
+        <td>${escapeHtml(formatDateTime(record.createdAt))}</td>
+        <td class="history-table-action">
+          <button class="secondary-btn small" type="button" data-action="${escapeAttribute(options.action)}" data-unit-id="${escapeAttribute(record.unitId)}" data-record-id="${escapeAttribute(record.id)}"${hasQuestions ? "" : " disabled"}>${hasQuestions ? escapeHtml(options.actionLabel) : "仅有记录"}</button>
+          <button class="secondary-btn small danger" type="button" data-action="${escapeAttribute(options.deleteAction)}" data-record-id="${escapeAttribute(record.id)}">删除</button>
+        </td>
+      </tr>
     `;
   }
 
@@ -2506,26 +2570,75 @@
   }
 
   function handleCoursewareHistoryAction(event) {
-    const button = event.target.closest("button[data-action='load-courseware']");
+    const button = event.target.closest("button[data-action]");
     if (!button) return;
-    setActiveUnit(button.dataset.unitId, { keepCurrentQuestions: true });
-    switchTab("courseware");
+    if (button.dataset.action === "delete-courseware") {
+      deleteCoursewareHistory(button.dataset.unitId);
+      return;
+    }
+    if (button.dataset.action === "load-courseware") {
+      setActiveUnit(button.dataset.unitId, { keepCurrentQuestions: true });
+      switchTab("courseware");
+    }
   }
 
   function handlePracticeHistoryAction(event) {
-    const button = event.target.closest("button[data-action='load-practice']");
+    const button = event.target.closest("button[data-action]");
     if (!button) return;
+    if (button.dataset.action === "delete-practice") {
+      deleteGenerationRecord(button.dataset.recordId, "practice", "历史出题记录");
+      return;
+    }
+    if (button.dataset.action !== "load-practice") return;
     const record = findGenerationRecord(button.dataset.recordId, "practice");
     if (!record?.questions?.length) return;
     loadQuestionRecord(record, "practice");
   }
 
   function handleScheduleHistoryAction(event) {
-    const button = event.target.closest("button[data-action='load-schedule']");
+    const button = event.target.closest("button[data-action]");
     if (!button) return;
+    if (button.dataset.action === "delete-schedule") {
+      deleteGenerationRecord(button.dataset.recordId, "scheduled_paper", "历史测验卷");
+      return;
+    }
+    if (button.dataset.action !== "load-schedule") return;
     const record = findGenerationRecord(button.dataset.recordId, "scheduled_paper");
     if (!record?.questions?.length) return;
     loadQuestionRecord(record, "schedule");
+  }
+
+  function confirmHistoryDelete(label) {
+    return window.confirm ? window.confirm(`确定删除这条${label}？删除后不会影响知识点包和已导出的文件。`) : true;
+  }
+
+  function deleteCoursewareHistory(unitId) {
+    const unit = volumeData().units.find((item) => item.id === unitId);
+    if (!unit) return;
+    if (!confirmHistoryDelete("历史课件")) return;
+    const key = `${state.grade}-${state.volume}-${unit.id}`;
+    delete state.coursewareReviews[key];
+    delete state.pptPlans[key];
+    writeJson(coursewareReviewKey, state.coursewareReviews);
+    writeJson(pptPlanKey, state.pptPlans);
+    if (unit.id === state.unitId) {
+      state.coursewareEditMode = false;
+      hideGenerationProgress("courseware");
+    }
+    renderAll();
+    setModelStatus(`已删除“${unit.title}”的历史课件记录。`, "ok");
+  }
+
+  function deleteGenerationRecord(recordId, kind, label) {
+    const before = Array.isArray(state.generationRecords) ? state.generationRecords.length : 0;
+    const record = findGenerationRecord(recordId, kind);
+    if (!record) return;
+    if (!confirmHistoryDelete(label)) return;
+    state.generationRecords = state.generationRecords.filter((item) => !(item.id === recordId && item.kind === kind));
+    if (state.generationRecords.length === before) return;
+    writeJson(generationRecordsKey, state.generationRecords);
+    renderAll();
+    setModelStatus(`已删除“${record.unitTitle || unitData().title}”的${label}。`, "ok");
   }
 
   function findGenerationRecord(recordId, kind) {
@@ -2539,9 +2652,12 @@
       return;
     }
     const unit = unitData();
-    const prepared = prepareQuestionsForPaper(record.questions || [], unit, capQuestionCount(record.questions.length));
-    if (!isPreparedPaperComplete(prepared, unit, capQuestionCount(record.questions.length))) {
-      setModelStatus(formatPaperValidationError(prepared, unit, capQuestionCount(record.questions.length)), "warn");
+    const recordCount = target === "schedule"
+      ? capScheduledQuestionCount(record.questions?.length || record.itemCount || state.schedule.count)
+      : capQuestionCount(record.questions?.length);
+    const prepared = prepareQuestionsForPaper(record.questions || [], unit, recordCount, target === "schedule" ? { exactQuestionCount: recordCount } : {});
+    if (!isPreparedPaperComplete(prepared, unit, recordCount)) {
+      setModelStatus(formatPaperValidationError(prepared, unit, recordCount), "warn");
       return;
     }
     if (target === "schedule") {
@@ -2606,6 +2722,77 @@
     return scoped.slice(0, safeCount);
   }
 
+  function generateScheduledQuestions(unit, grade, difficulty, count) {
+    const safeCount = capScheduledQuestionCount(count);
+    if (!safeCount) return [];
+    const avoidedStems = collectExistingQuestionStemKeys(unit);
+    const seenStems = new Set(avoidedStems);
+    const baseOffset = scheduledQuestionOffset(unit, safeCount);
+    let candidates = [];
+    let prepared = { questions: [] };
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const offset = baseOffset + attempt * safeCount * 3;
+      const fresh = generateQuestions(unit, grade, difficulty, safeCount, offset, { variableCount: true })
+        .filter((questionItem) => {
+          const key = questionStemKey(questionItem.stem);
+          if (!key || seenStems.has(key)) return false;
+          seenStems.add(key);
+          return true;
+        });
+      candidates = [...candidates, ...fresh];
+      prepared = prepareQuestionsForPaper(candidates, unit, safeCount, { exactQuestionCount: safeCount });
+      if (isPreparedPaperComplete(prepared, unit, safeCount)) return prepared.questions;
+    }
+
+    // If old history is very dense, keep the unit boundary and coverage rules first,
+    // then use a later offset to avoid falling back to the same first-page exercise.
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const offset = baseOffset + 1000 + attempt * safeCount * 5;
+      candidates = [...candidates, ...generateQuestions(unit, grade, difficulty, safeCount, offset, { variableCount: true })];
+      prepared = prepareQuestionsForPaper(candidates, unit, safeCount, { exactQuestionCount: safeCount });
+      if (isPreparedPaperComplete(prepared, unit, safeCount)) return prepared.questions;
+    }
+
+    return prepared.questions.slice(0, safeCount);
+  }
+
+  function collectExistingQuestionStemKeys(unit) {
+    const keys = new Set();
+    const collect = (questions) => {
+      (Array.isArray(questions) ? questions : []).forEach((questionItem) => {
+        if (questionItem?.unitId && questionItem.unitId !== unit.id) return;
+        const key = questionStemKey(questionItem?.stem);
+        if (key) keys.add(key);
+      });
+    };
+    collect(state.currentQuestions);
+    collect(state.scheduledQuestions);
+    (Array.isArray(state.generationRecords) ? state.generationRecords : [])
+      .filter((record) => (
+        ["practice", "scheduled_paper"].includes(record.kind)
+        && String(record.gradeId || "") === String(state.grade)
+        && String(record.volumeId || "") === String(state.volume)
+        && String(record.unitId || "") === String(unit.id)
+      ))
+      .forEach((record) => collect(record.questions));
+    return keys;
+  }
+
+  function scheduledQuestionOffset(unit, count) {
+    const historyCount = (Array.isArray(state.generationRecords) ? state.generationRecords : [])
+      .filter((record) => record.kind === "scheduled_paper" && record.unitId === unit.id)
+      .length;
+    return 37 + historyCount * count * 11 + (state.currentQuestions.length ? count * 7 : 0);
+  }
+
+  function questionStemKey(stem) {
+    return cleanText(stem)
+      .replace(/[，。；;、：:！？?]/g, "")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+  }
+
   function enforceUnitQuestionBoundary(questions, unit) {
     if (ruleEngine.enforceUnitQuestionBoundary) return ruleEngine.enforceUnitQuestionBoundary(questions, unit);
     const allowedPoints = new Set(unit.points || []);
@@ -2622,8 +2809,8 @@
     return (unit.points || []).every((point) => covered.has(point));
   }
 
-  function generateQuestions(unit, grade, difficulty, count, startIndex = 0) {
-    const safeCount = capQuestionCount(count);
+  function generateQuestions(unit, grade, difficulty, count, startIndex = 0, options = {}) {
+    const safeCount = options.variableCount ? capScheduledQuestionCount(count) : capQuestionCount(count);
     const questions = [];
     const modes = ["计算填空题", "选择题", "填空题", "计算填空题", "选择题"];
     const maxSameType = Math.max(2, Math.ceil(safeCount / modes.length));
@@ -3182,12 +3369,18 @@
   }
 
   function capGeneratedQuestionCount(value) {
-    return ruleEngine.capGeneratedQuestionCount ? ruleEngine.capGeneratedQuestionCount(value) : clamp(Number(value) || 0, 0, 20);
+    return ruleEngine.capGeneratedQuestionCount ? ruleEngine.capGeneratedQuestionCount(value) : clamp(Number(value) || 0, 0, maxScheduledQuestionCount);
+  }
+
+  function capScheduledQuestionCount(value) {
+    return ruleEngine.capPaperQuestionCount
+      ? ruleEngine.capPaperQuestionCount(value)
+      : clampInt(value, requiredQuestionCount, maxScheduledQuestionCount);
   }
 
   function normalizePaperPoints(questions) {
     if (ruleEngine.normalizePaperPoints) return ruleEngine.normalizePaperPoints(questions);
-    const capped = questions.slice(0, 20);
+    const capped = questions.slice(0, maxScheduledQuestionCount);
     if (!capped.length) return [];
     const base = Math.floor(100 / capped.length);
     const remainder = 100 - base * capped.length;
@@ -4464,14 +4657,14 @@
 
   function restoreScheduleControls() {
     $("frequencySelect").value = state.schedule.frequency;
-    state.schedule.count = capQuestionCount(state.schedule.count);
+    state.schedule.count = capScheduledQuestionCount(state.schedule.count);
     $("scheduledCount").value = state.schedule.count;
   }
 
   function saveSchedule() {
     state.schedule = {
       frequency: $("frequencySelect").value,
-      count: capQuestionCount($("scheduledCount").value),
+      count: capScheduledQuestionCount($("scheduledCount").value),
       updatedAt: new Date().toISOString()
     };
     $("scheduledCount").value = state.schedule.count;
@@ -4488,7 +4681,7 @@
     $("exportScheduledTeacherPdfBtn").disabled = !hasScheduledQuestions;
     $("scheduleStatus").innerHTML = `
       <strong>${escapeHtml(schedule.frequency)}测验已配置</strong>
-      <p>每次 ${schedule.count} 题，总分 100 分，范围锁定为“${escapeHtml(unitData().title)}”单元全部客观知识点。</p>
+      <p>每次 ${schedule.count} 题（可设 10-100 题），总分 100 分，围绕“${escapeHtml(unitData().title)}”单元全部客观知识点生成不同题目。</p>
     `;
     if (!hasScheduledQuestions) {
       $("scheduledPaper").className = "question-list empty-state";
@@ -4499,9 +4692,10 @@
   function buildScheduledPaper() {
     saveSchedule();
     const unit = unitData();
-    const count = capQuestionCount(state.schedule.count);
-    const generated = generateScopedQuestions(unit, Number(state.grade), state.difficulty, count);
-    const prepared = prepareQuestionsForPaper(generated, unit, count);
+    const count = capScheduledQuestionCount(state.schedule.count);
+    const avoidedCount = collectExistingQuestionStemKeys(unit).size;
+    const generated = generateScheduledQuestions(unit, Number(state.grade), state.difficulty, count);
+    const prepared = prepareQuestionsForPaper(generated, unit, count, { exactQuestionCount: count });
     if (!isPreparedPaperComplete(prepared, unit, count)) {
       setModelStatus(formatPaperValidationError(prepared, unit, count), "warn");
       return;
@@ -4513,6 +4707,7 @@
       totalScore: paperTotal(state.scheduledQuestions),
       frequency: state.schedule.frequency,
       questions: cloneJson(state.scheduledQuestions),
+      avoidedStemCount: avoidedCount,
       reviewStatus: "rule_checked",
       exportVersion: practiceExportVersion
     });
@@ -4520,7 +4715,7 @@
     $("scheduledPaper").innerHTML = state.scheduledQuestions.map(renderQuestionCard).join("");
     renderSchedule();
     renderMetrics();
-    setModelStatus(`周期测验已生成：${state.scheduledQuestions.length} 题，范围为“${unit.title}”。`, "ok");
+    setModelStatus(`周期测验已生成：${state.scheduledQuestions.length} 题，围绕“${unit.title}”知识点生成新题，并避开 ${avoidedCount} 道已有题。`, "ok");
   }
 
   function shuffle(items) {
