@@ -1,0 +1,235 @@
+/* 课题通 EduForge 小程序 - 1:1 原型设计系统 */
+page {
+  --brand-50: #f0fdfa;
+  --brand-100: #ccfbf1;
+  --brand-200: #99f6e4;
+  --brand-300: #5eead4;
+  --brand-400: #2dd4bf;
+  --brand-500: #14b8a6;
+  --brand-600: #0d9488;
+  --brand-700: #0f766e;
+  --brand-800: #115e59;
+  --brand-900: #134e4a;
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  min-height: 100%;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  -webkit-font-smoothing: antialiased;
+}
+
+view, text, image, scroll-view, swiper, button, input, textarea, picker, slider {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  font: inherit;
+}
+button::after { border: none; }
+
+.bg-brand-gradient {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%);
+}
+
+.page-container, .page {
+  min-height: 100vh;
+  padding-bottom: 180rpx;
+  background: #f8fafc;
+}
+
+.page.no-tab {
+  padding-bottom: 40rpx;
+}
+
+.nav-bar {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #ffffff;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.nav-bar-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.nav-bar-back {
+  position: absolute;
+  left: 32rpx;
+  min-width: 44rpx;
+  min-height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  color: #334155;
+}
+
+.nav-bar-action {
+  position: absolute;
+  right: 32rpx;
+  min-height: 44rpx;
+  display: flex;
+  align-items: center;
+  color: #0d9488;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.section-title-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.section-title-more {
+  font-size: 26rpx;
+  color: #94a3b8;
+}
+
+.section-label {
+  margin-bottom: 16rpx;
+  color: #334155;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 28rpx;
+  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.btn-primary, .primary-btn {
+  width: 100%;
+  height: 96rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  box-shadow: 0 8rpx 28rpx rgba(13, 148, 136, 0.3);
+  transition: all 0.15s ease-out;
+}
+
+.btn-primary:active, .primary-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 4rpx 16rpx rgba(13, 148, 136, 0.2);
+}
+
+.btn-secondary, .secondary-btn, .ghost-btn {
+  flex: 1;
+  height: 64rpx;
+  border: 2rpx solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 16rpx;
+  color: #475569;
+  font-size: 24rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  transition: all 0.15s ease-out;
+}
+
+.btn-secondary.primary, .secondary-btn {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.danger-btn {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.tag-pill, .pill, .k-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 12rpx 24rpx;
+  border-radius: 40rpx;
+  background: #f0fdfa;
+  border: 2rpx solid #99f6e4;
+  color: #0f766e;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.pill.blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+.pill.amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #d97706;
+}
+
+.pill-row, .knowledge-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.empty {
+  padding: 44rpx 28rpx;
+  color: #94a3b8;
+  font-size: 26rpx;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.muted { color: #94a3b8; }
+.small { font-size: 24rpx; }

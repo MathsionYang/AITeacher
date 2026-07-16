@@ -1,0 +1,47 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.panel {
+  width: 560rpx;
+  padding: 56rpx 40rpx;
+  border-radius: 36rpx;
+  background: #ffffff;
+  box-shadow: 0 28rpx 60rpx rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.spinner {
+  width: 72rpx;
+  height: 72rpx;
+  margin: 0 auto 28rpx;
+  border-radius: 50%;
+  border: 8rpx solid #ccfbf1;
+  border-top-color: #0d9488;
+  animation: rotate 0.9s linear infinite;
+}
+
+.title {
+  color: #0f172a;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin-top: 12rpx;
+  color: #64748b;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}

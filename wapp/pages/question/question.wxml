@@ -1,0 +1,125 @@
+<view class="page-container">
+  <view class="nav-bar">
+    <text class="nav-bar-back">‹</text>
+    <text class="nav-bar-title">出题中心</text>
+    <text class="nav-bar-action" bindtap="exportPlaceholder">更多</text>
+  </view>
+
+  <view class="mode-tabs">
+    <view class="mode-tab {{mode === 'practice' ? 'active' : ''}}" data-mode="practice" bindtap="switchMode">同步出题</view>
+    <view class="mode-tab {{mode === 'schedule' ? 'active' : ''}}" data-mode="schedule" bindtap="switchMode">周期测验</view>
+  </view>
+
+  <view class="practice-content">
+    <picker mode="selector" range="{{unitNames}}" value="{{unitIndex}}" bindchange="onUnitChange">
+      <view class="unit-selector">
+        <view class="us-label">
+          <view class="us-icon">📚</view>
+          <view class="us-text">
+            <text class="us-name">{{unit.title}}</text>
+            <text class="us-meta">{{unit.summary}}</text>
+          </view>
+        </view>
+        <text class="us-arrow">切换 ›</text>
+      </view>
+    </picker>
+
+    <block wx:if="{{mode === 'practice'}}">
+      <view class="filter-bar">
+        <view wx:for="{{difficultyOptions}}" wx:key="*this" class="filter-chip {{difficulty === item ? 'active' : ''}}" data-value="{{item}}" bindtap="chooseDifficulty">{{item}}</view>
+      </view>
+
+      <button class="btn-primary" bindtap="generatePaper"><text>✦ AI 生成练习</text></button>
+
+      <view class="paper-meta" wx:if="{{paper}}">
+        <view class="paper-meta-item"><text class="pm-num">{{paper.count}}</text><text class="pm-label">题目数</text></view>
+        <view class="paper-meta-divider"></view>
+        <view class="paper-meta-item"><text class="pm-num">{{paper.totalScore}}</text><text class="pm-label">总分</text></view>
+        <view class="paper-meta-divider"></view>
+        <view class="paper-meta-item"><text class="pm-num">{{unit.points.length}}</text><text class="pm-label">知识点</text></view>
+      </view>
+
+      <view class="paper-actions" wx:if="{{paper}}">
+        <button class="btn-secondary primary" bindtap="toggleAnswers">{{showAnswers ? '收起答案' : '显示参考答案'}}</button>
+        <button class="btn-secondary" bindtap="exportPlaceholder">空白卷</button>
+        <button class="btn-secondary" bindtap="exportPlaceholder">含答案</button>
+      </view>
+
+      <view wx:if="{{!paper}}" class="empty-card">暂无试卷。点击“AI 生成练习”后展示 10 道客观题。</view>
+    </block>
+
+    <block wx:if="{{mode === 'schedule'}}">
+      <view class="setting-card">
+        <view class="sc-title"><view class="sc-icon teal">⏱</view><text>测验频率</text></view>
+        <view class="freq-selector">
+          <view wx:for="{{frequencyOptions}}" wx:key="*this" class="freq-option {{frequency === item ? 'active' : ''}}" data-value="{{item}}" bindtap="chooseFrequency">
+            <text class="freq-icon">{{index === 0 ? '🕐' : index === 1 ? '🗓' : '📕'}}</text>
+            <text>{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="setting-card">
+        <view class="sc-title"><view class="sc-icon amber">✎</view><text>题目数量</text></view>
+        <view class="count-display"><text class="cd-num">{{scheduleCount}}</text><text class="cd-unit"> 题</text></view>
+        <slider min="10" max="100" step="1" value="{{scheduleCount}}" activeColor="#14b8a6" backgroundColor="#e2e8f0" block-size="22" block-color="#0d9488" bindchanging="onCountChange" bindchange="onCountChange" />
+        <view class="slider-labels"><text>10题</text><text>100题</text></view>
+      </view>
+
+      <button class="btn-primary" bindtap="generatePaper"><text>✦ AI 生成测验卷</text></button>
+
+      <view class="paper-meta" wx:if="{{paper}}">
+        <view class="paper-meta-item"><text class="pm-num">{{paper.count}}</text><text class="pm-label">题目数</text></view>
+        <view class="paper-meta-divider"></view>
+        <view class="paper-meta-item"><text class="pm-num">{{paper.totalScore}}</text><text class="pm-label">总分</text></view>
+        <view class="paper-meta-divider"></view>
+        <view class="paper-meta-item"><text class="pm-num">{{unit.points.length}}</text><text class="pm-label">知识点</text></view>
+      </view>
+
+      <view class="paper-actions" wx:if="{{paper}}">
+        <button class="btn-secondary primary" bindtap="toggleAnswers">{{showAnswers ? '收起答案' : '显示答案'}}</button>
+        <button class="btn-secondary" bindtap="exportPlaceholder">空白卷</button>
+        <button class="btn-secondary" bindtap="exportPlaceholder">含答案</button>
+      </view>
+    </block>
+
+    <view class="question-list" wx:if="{{paper}}">
+      <view class="question-card" wx:for="{{paper.questions}}" wx:key="id">
+        <view class="q-head">
+          <view class="q-num">{{item.number}}</view>
+          <text class="q-type">{{item.type}}</text>
+          <text class="q-score">{{item.score}}分</text>
+        </view>
+        <text class="q-stem">{{item.stem}}</text>
+        <view class="q-options" wx:if="{{item.options}}">
+          <text class="q-option" wx:for="{{item.options}}" wx:for-item="option" wx:key="*this">{{option}}</text>
+        </view>
+        <text class="q-point">知识点：{{item.knowledgePoint}}</text>
+        <view class="q-toggle" bindtap="toggleAnswers"><text>{{showAnswers ? '收起答案 ▴' : '显示参考答案 ▾'}}</text></view>
+        <view class="q-answer" wx:if="{{showAnswers}}">
+          <text class="ans-label">✓ 参考答案</text>
+          <text class="ans-text">{{item.answer}}</text>
+          <view class="ans-verify">
+            <text class="ans-verify-label">✅ 教师审核提示</text>
+            <text class="ans-verify-text">{{item.auditHint}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-label history-label">{{mode === 'practice' ? '历史出题记录' : '历史测验卷'}}</view>
+    <view class="setting-card history-card">
+      <view wx:if="{{histories.length === 0}}" class="empty">暂无历史记录。</view>
+      <view class="test-history-item" wx:for="{{histories}}" wx:key="id">
+        <view class="thi-icon">📘</view>
+        <view class="thi-info" data-id="{{item.id}}" bindtap="loadHistory">
+          <text class="thi-title">{{item.title}}</text>
+          <text class="thi-meta">{{item.createdAt}} · {{item.count}}题 · {{item.totalScore}}分</text>
+        </view>
+        <button class="delete-btn" data-id="{{item.id}}" bindtap="deleteHistory">删除</button>
+      </view>
+    </view>
+  </view>
+
+  <loading-overlay show="{{loading}}" title="AI 正在生成{{mode === 'practice' ? '练习题' : '测验卷'}}..." subtitle="正在根据知识点和难度智能组卷，请稍候" />
+</view>

@@ -1,0 +1,67 @@
+.presenter {
+  min-height: 100vh;
+  padding: 40rpx 28rpx;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.deck {
+  min-height: calc(100vh - 80rpx);
+  padding: 40rpx 32rpx;
+  border-radius: 36rpx;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #ffffff, #f0fdfa);
+  color: #0f172a;
+}
+
+.deck-meta {
+  color: #0d9488;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.slide-title {
+  margin-top: 24rpx;
+  font-size: 52rpx;
+  font-weight: 950;
+  line-height: 1.18;
+}
+
+.slide-visual {
+  min-height: 360rpx;
+  margin: 40rpx 0;
+  padding: 36rpx;
+  border-radius: 36rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(135deg, #ccfbf1, #ffffff);
+  border: 2rpx solid #99f6e4;
+}
+
+.visual-text {
+  color: #0f766e;
+  font-size: 56rpx;
+  font-weight: 950;
+}
+
+.visual-note {
+  margin-top: 12rpx;
+  color: #64748b;
+  font-size: 26rpx;
+}
+
+.slide-body {
+  flex: 1;
+  color: #334155;
+  font-size: 34rpx;
+  line-height: 1.75;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  margin-top: 40rpx;
+}

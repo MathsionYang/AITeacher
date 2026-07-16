@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/home/home",
+    "pages/courseware/courseware",
+    "pages/question/question",
+    "pages/mine/mine",
+    "pages/presenter/presenter"
+  ],
+  "window": {
+    "navigationBarTitleText": "课题通 EduForge",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f8fafc",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#0d9488",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/courseware/courseware",
+        "text": "课件"
+      },
+      {
+        "pagePath": "pages/question/question",
+        "text": "出题"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

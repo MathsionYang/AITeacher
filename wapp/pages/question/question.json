@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "出题中心",
+  "usingComponents": {
+    "loading-overlay": "/components/loading-overlay/index"
+  }
+}

@@ -1,0 +1,60 @@
+.mode-tabs { display: flex; gap: 8rpx; padding: 16rpx 32rpx; background: #ffffff; border-bottom: 1rpx solid #e2e8f0; }
+.mode-tab { flex: 1; text-align: center; padding: 20rpx 0; border-radius: 16rpx; font-size: 28rpx; font-weight: 600; color: #64748b; }
+.mode-tab.active { background: #f0fdfa; color: #0f766e; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); }
+.practice-content { padding: 32rpx; }
+.unit-selector { background: #ffffff; border-radius: 24rpx; padding: 28rpx 32rpx; margin-bottom: 24rpx; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; }
+.us-label { display: flex; align-items: center; gap: 16rpx; min-width: 0; flex: 1; }
+.us-icon { width: 64rpx; height: 64rpx; border-radius: 16rpx; background: #f0fdfa; color: #0d9488; display: flex; align-items: center; justify-content: center; font-size: 32rpx; flex-shrink: 0; }
+.us-text { display: flex; flex-direction: column; min-width: 0; }
+.us-name { font-size: 28rpx; font-weight: 600; color: #0f172a; }
+.us-meta { font-size: 24rpx; color: #94a3b8; margin-top: 4rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.us-arrow { color: #cbd5e1; font-size: 24rpx; margin-left: 18rpx; }
+.filter-bar { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
+.filter-chip { flex: 1; background: #ffffff; border: 2rpx solid #e2e8f0; border-radius: 20rpx; padding: 20rpx 24rpx; text-align: center; font-size: 26rpx; font-weight: 600; color: #475569; }
+.filter-chip.active { background: #f0fdfa; border-color: #5eead4; color: #0f766e; }
+.paper-meta { background: #ffffff; border-radius: 24rpx; padding: 28rpx 32rpx; margin: 24rpx 0; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-around; }
+.paper-meta-item { text-align: center; }
+.pm-num { display: block; font-size: 40rpx; font-weight: 800; color: #0f766e; }
+.pm-label { display: block; font-size: 22rpx; color: #94a3b8; margin-top: 4rpx; }
+.paper-meta-divider { width: 2rpx; height: 48rpx; background: #e2e8f0; }
+.paper-actions { display: flex; gap: 16rpx; margin-bottom: 24rpx; }
+.question-list { margin-top: 24rpx; }
+.question-card { background: #ffffff; border-radius: 28rpx; padding: 32rpx; margin-bottom: 20rpx; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); }
+.q-head { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
+.q-num { background: #3b82f6; color: #ffffff; width: 44rpx; height: 44rpx; border-radius: 12rpx; font-size: 22rpx; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.q-type { font-size: 22rpx; color: #64748b; background: #f1f5f9; padding: 4rpx 16rpx; border-radius: 8rpx; }
+.q-score { margin-left: auto; font-size: 24rpx; font-weight: 700; color: #d97706; }
+.q-stem { font-size: 28rpx; color: #0f172a; line-height: 1.7; display: block; margin-bottom: 20rpx; }
+.q-options { display: flex; flex-direction: column; gap: 12rpx; margin-bottom: 20rpx; }
+.q-option { font-size: 26rpx; color: #475569; }
+.q-point { display: block; font-size: 24rpx; color: #64748b; margin-top: 12rpx; }
+.q-toggle { display: flex; align-items: center; gap: 8rpx; font-size: 24rpx; color: #0d9488; font-weight: 600; margin-top: 20rpx; }
+.q-answer { margin-top: 20rpx; padding: 24rpx; background: #f0fdf4; border: 2rpx solid #bbf7d0; border-radius: 16rpx; }
+.ans-label { font-size: 22rpx; font-weight: 700; color: #16a34a; display: block; margin-bottom: 8rpx; }
+.ans-text { font-size: 26rpx; color: #334155; display: block; line-height: 1.6; }
+.ans-verify { margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx dashed #bbf7d0; }
+.ans-verify-label { font-size: 22rpx; font-weight: 600; color: #16a34a; display: block; }
+.ans-verify-text { font-size: 22rpx; color: #64748b; margin-top: 4rpx; display: block; line-height: 1.5; }
+.setting-card { background: #ffffff; border-radius: 28rpx; padding: 32rpx; margin-bottom: 24rpx; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); }
+.sc-title { font-size: 30rpx; font-weight: 700; color: #0f172a; margin-bottom: 28rpx; display: flex; align-items: center; gap: 16rpx; }
+.sc-icon { width: 56rpx; height: 56rpx; border-radius: 16rpx; display: flex; align-items: center; justify-content: center; font-size: 28rpx; }
+.sc-icon.teal { background: #f0fdfa; color: #0d9488; }
+.sc-icon.amber { background: #fffbeb; color: #d97706; }
+.freq-selector { display: flex; gap: 16rpx; }
+.freq-option { flex: 1; text-align: center; padding: 24rpx 16rpx; border: 3rpx solid #e2e8f0; border-radius: 20rpx; font-size: 26rpx; font-weight: 600; color: #64748b; display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.freq-option.active { border-color: #14b8a6; background: #f0fdfa; color: #0f766e; }
+.freq-icon { font-size: 40rpx; }
+.count-display { text-align: center; margin-bottom: 16rpx; }
+.cd-num { font-size: 64rpx; font-weight: 800; color: #0f766e; }
+.cd-unit { font-size: 28rpx; color: #94a3b8; }
+.slider-labels { display: flex; justify-content: space-between; margin-top: 8rpx; padding: 0 8rpx; font-size: 22rpx; color: #94a3b8; }
+.empty-card { padding: 48rpx 32rpx; margin-top: 24rpx; background: #ffffff; border-radius: 28rpx; color: #94a3b8; text-align: center; font-size: 26rpx; box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.05); }
+.history-label { margin-top: 32rpx; }
+.history-card { padding-top: 0; padding-bottom: 0; }
+.test-history-item { display: flex; align-items: center; gap: 24rpx; padding: 28rpx 0; border-bottom: 1rpx solid #f1f5f9; }
+.test-history-item:last-child { border-bottom: none; }
+.thi-icon { width: 80rpx; height: 80rpx; border-radius: 20rpx; background: #fffbeb; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 36rpx; flex-shrink: 0; }
+.thi-info { flex: 1; min-width: 0; }
+.thi-title { font-size: 28rpx; font-weight: 600; color: #0f172a; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thi-meta { font-size: 24rpx; color: #94a3b8; margin-top: 4rpx; display: block; }
+.delete-btn { width: 88rpx; height: 56rpx; border-radius: 14rpx; background: #fef2f2; color: #dc2626; font-size: 24rpx; font-weight: 600; }

@@ -1,0 +1,70 @@
+<view class="page-container">
+  <view class="nav-bar">
+    <text class="nav-bar-back">‹</text>
+    <text class="nav-bar-title">课件生成</text>
+    <text class="nav-bar-action" bindtap="goHistory">历史</text>
+  </view>
+
+  <view class="courseware-content">
+    <picker mode="selector" range="{{unitNames}}" value="{{unitIndex}}" bindchange="onUnitChange">
+      <view class="unit-selector">
+        <view class="us-label">
+          <view class="us-icon">📚</view>
+          <view class="us-text">
+            <text class="us-name">{{unit.title}}</text>
+            <text class="us-meta">{{unit.summary}}</text>
+          </view>
+        </view>
+        <text class="us-arrow">切换 ›</text>
+      </view>
+    </picker>
+
+    <button class="btn-primary generate-btn" bindtap="generateCourseware">
+      <text>✦ AI 生成课件</text>
+    </button>
+
+    <view class="section-label">本单元知识点</view>
+    <view class="knowledge-tags">
+      <text class="k-tag" wx:for="{{unit.points}}" wx:key="*this">{{item}}</text>
+    </view>
+
+    <view class="section-label">课件预览<text wx:if="{{courseware}}">（共 {{courseware.slides.length}} 节）</text></view>
+    <view wx:if="{{!courseware}}" class="empty-card">暂无课件。点击“AI 生成课件”后展示可审核课件。</view>
+
+    <view class="slide-list" wx:if="{{courseware}}">
+      <view class="slide-item" wx:for="{{courseware.slides}}" wx:key="title" wx:for-index="idx">
+        <view class="slide-head">
+          <view class="slide-num">{{idx + 1}}</view>
+          <text class="slide-title">{{item.title}}</text>
+        </view>
+        <textarea wx:if="{{editing}}" class="slide-editor" data-index="{{idx}}" value="{{editSlides[idx].body}}" bindinput="onSlideInput" />
+        <text wx:else class="slide-body">{{item.body}}</text>
+        <view class="slide-visual">
+          <text class="visual-main">{{item.visualText}}</text>
+          <text class="visual-sub">图形化辅助理解</text>
+        </view>
+        <view class="slide-actions">
+          <button class="btn-secondary primary" bindtap="openPresenter">📖 授课</button>
+          <button class="btn-secondary" bindtap="toggleEdit">✎ {{editing ? '退出' : '编辑'}}</button>
+          <button class="btn-secondary" bindtap="exportPlaceholder">⤓ 导出</button>
+        </view>
+      </view>
+    </view>
+
+    <button wx:if="{{editing}}" class="btn-primary save-draft" bindtap="saveAuditDraft">保存审核稿</button>
+
+    <view class="section-label history-title">历史课件</view>
+    <view class="history-list">
+      <view wx:if="{{histories.length === 0}}" class="empty">暂无历史课件。</view>
+      <view class="history-item" wx:for="{{histories}}" wx:key="id">
+        <view class="history-main" data-id="{{item.id}}" bindtap="loadHistory">
+          <text class="history-name">{{item.title}}</text>
+          <text class="history-meta">{{item.createdAt}} · {{item.status}}</text>
+        </view>
+        <button class="delete-btn" data-id="{{item.id}}" bindtap="deleteHistory">删除</button>
+      </view>
+    </view>
+  </view>
+
+  <loading-overlay show="{{loading}}" title="AI 正在生成课件..." subtitle="正在根据知识点组织课件内容，请稍候" />
+</view>

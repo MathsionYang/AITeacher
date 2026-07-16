@@ -1,0 +1,92 @@
+<view class="page-container">
+  <view class="home-header bg-brand-gradient">
+    <view class="home-greeting">
+      <view class="home-avatar">师</view>
+      <view class="home-greeting-text">
+        <text class="hello">上午好 👋</text>
+        <text class="name">{{teacher.name}}</text>
+      </view>
+    </view>
+
+    <view class="home-scope-card" bindtap="goMine">
+      <view class="scope-info">
+        <view class="scope-badge">{{scopeText}}</view>
+      </view>
+      <text class="scope-change">切换 ›</text>
+    </view>
+  </view>
+
+  <view class="quick-actions">
+    <view class="quick-action" bindtap="goCourseware">
+      <view class="qa-icon teal">📐</view>
+      <text class="qa-title">课件生成</text>
+      <text class="qa-sub">AI 一键生成</text>
+    </view>
+    <view class="quick-action" bindtap="goQuestion">
+      <view class="qa-icon blue">✎</view>
+      <text class="qa-title">同步出题</text>
+      <text class="qa-sub">10题/100分</text>
+    </view>
+    <view class="quick-action" bindtap="goSchedule">
+      <view class="qa-icon amber">⏱</view>
+      <text class="qa-title">周期测验</text>
+      <text class="qa-sub">自定义题量</text>
+    </view>
+  </view>
+
+  <view class="home-section">
+    <view class="section-title">
+      <text class="section-title-text">工作台概览</text>
+    </view>
+    <view class="stats-row">
+      <view class="stat-card stat-1">
+        <text class="stat-num">{{stats.courseware}}</text>
+        <text class="stat-label">历史课件</text>
+      </view>
+      <view class="stat-card stat-2">
+        <text class="stat-num">{{stats.practice}}</text>
+        <text class="stat-label">出题记录</text>
+      </view>
+      <view class="stat-card stat-3">
+        <text class="stat-num">{{stats.schedule}}</text>
+        <text class="stat-label">测验卷</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="home-section">
+    <view class="section-title">
+      <text class="section-title-text">当前单元</text>
+      <text class="section-title-more">全局同步</text>
+    </view>
+    <view class="unit-summary-card">
+      <view class="unit-summary-title">{{unit.title}}</view>
+      <view class="unit-summary-text">{{unit.summary}}</view>
+      <view class="knowledge-tags mini-tags">
+        <text wx:for="{{unit.points}}" wx:key="*this" class="k-tag">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="home-section">
+    <view class="section-title">
+      <text class="section-title-text">最近使用</text>
+      <text class="section-title-more">全部 ›</text>
+    </view>
+    <view class="activity-list">
+      <view wx:if="{{recent.length === 0}}" class="empty">暂无历史记录。生成课件或试卷后会显示在这里。</view>
+      <view class="activity-item" wx:for="{{recent}}" wx:key="id">
+        <view class="activity-icon {{item.type}}">
+          <text wx:if="{{item.type === 'courseware'}}">📐</text>
+          <text wx:elif="{{item.type === 'practice'}}">✎</text>
+          <text wx:else>⏱</text>
+        </view>
+        <view class="activity-info">
+          <text class="a-title">{{item.title}}</text>
+          <text class="a-meta">{{item.label}} · {{item.createdAt}}</text>
+        </view>
+        <text class="activity-arrow">›</text>
+      </view>
+    </view>
+  </view>
+</view>

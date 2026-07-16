@@ -19,6 +19,7 @@ build/
 books/
 
 # Local environment
+project.private.config.json
 1.md
 .env
 .env.*

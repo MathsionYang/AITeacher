@@ -1,0 +1,138 @@
+<view class="page-container">
+  <view class="profile-header bg-brand-gradient">
+    <view class="profile-avatar">师</view>
+    <view class="profile-info">
+      <text class="pi-name">{{teacher.name}}</text>
+      <view class="pi-role">
+        <text>小学数学教师</text>
+        <text class="verify-badge">✓ 已认证</text>
+      </view>
+    </view>
+  </view>
+
+  <picker mode="selector" range="{{gradeNames}}" value="{{gradeIndex}}" bindchange="onGradeChange">
+    <view class="profile-scope-bar">
+      <view class="psb-left">
+        <view class="psb-icon">📚</view>
+        <view class="psb-text">
+          <text class="psb-name">教材范围</text>
+          <text class="psb-value">{{scope.gradeName}}{{scope.volumeName}} · {{scope.subject}} · {{scope.publisher}}</text>
+        </view>
+      </view>
+      <text class="psb-arrow">›</text>
+    </view>
+  </picker>
+
+  <view class="model-status-card">
+    <view class="msc-icon">🧠</view>
+    <view class="msc-info">
+      <text class="msc-name">{{modelConfig.providerName}} · {{modelConfig.model}}</text>
+      <text class="msc-mode">{{modelConfig.connected ? '已连接' : '未连接'}} · 本地运行</text>
+    </view>
+    <view class="msc-dot {{modelConfig.connected ? 'online' : 'offline'}}"></view>
+  </view>
+
+  <view class="profile-section-label">内容管理</view>
+  <view class="profile-menu">
+    <view class="profile-menu-item" data-target="courseware" bindtap="openContentRecord">
+      <view class="pmi-icon teal">📐</view>
+      <text class="pmi-text">我的课件</text>
+      <text class="pmi-value">{{stats.courseware}} 份</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+    <view class="profile-menu-item" data-target="practice" bindtap="openContentRecord">
+      <view class="pmi-icon blue">✎</view>
+      <text class="pmi-text">出题记录</text>
+      <text class="pmi-value">{{stats.practice}} 份</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+    <view class="profile-menu-item" data-target="schedule" bindtap="openContentRecord">
+      <view class="pmi-icon amber">⏱</view>
+      <text class="pmi-text">测验历史</text>
+      <text class="pmi-value">{{stats.schedule}} 份</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="profile-section-label">系统设置</view>
+  <view class="profile-menu settings-menu">
+    <picker mode="selector" range="{{gradeNames}}" value="{{gradeIndex}}" bindchange="onGradeChange">
+      <view class="profile-menu-item">
+        <view class="pmi-icon teal">级</view>
+        <text class="pmi-text">年级</text>
+        <text class="pmi-value">{{scope.gradeName}}</text>
+        <text class="pmi-arrow">›</text>
+      </view>
+    </picker>
+    <view class="profile-menu-item">
+      <view class="pmi-icon blue">数</view>
+      <text class="pmi-text">学科</text>
+      <text class="pmi-value">数学</text>
+      <text class="pmi-arrow">固定</text>
+    </view>
+    <picker mode="selector" range="{{volumeNames}}" value="{{volumeIndex}}" bindchange="onVolumeChange">
+      <view class="profile-menu-item">
+        <view class="pmi-icon amber">册</view>
+        <text class="pmi-text">册别</text>
+        <text class="pmi-value">{{scope.volumeName}}</text>
+        <text class="pmi-arrow">›</text>
+      </view>
+    </picker>
+  </view>
+
+  <view class="profile-section-label">模型设置</view>
+  <view class="profile-menu model-summary-menu">
+    <view class="profile-menu-item model-summary-item" bindtap="toggleModelSettings">
+      <view class="pmi-icon green">AI</view>
+      <text class="pmi-text">本地模型</text>
+      <text class="pmi-value model-summary-value">{{modelConfig.providerName}} · {{modelConfig.model}}</text>
+      <text class="pmi-arrow">{{modelSettingsExpanded ? '收起' : '配置'}}</text>
+    </view>
+  </view>
+  <view wx:if="{{modelSettingsExpanded}}" class="profile-menu model-form">
+    <view class="form-row">
+      <text class="form-label">服务商</text>
+      <input class="form-input" value="{{modelConfig.providerName}}" data-field="providerName" bindinput="onModelInput" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">模型</text>
+      <input class="form-input" value="{{modelConfig.model}}" data-field="model" bindinput="onModelInput" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">Base URL</text>
+      <input class="form-input" value="{{modelConfig.baseUrl}}" data-field="baseUrl" bindinput="onModelInput" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">API Key</text>
+      <input class="form-input" password value="{{modelConfig.apiKey}}" data-field="apiKey" bindinput="onModelInput" placeholder="本地代理可留空" />
+    </view>
+    <view class="form-actions">
+      <button class="btn-secondary primary" bindtap="saveModelConfig">保存配置</button>
+      <button class="btn-secondary" bindtap="testModel">测试连接</button>
+    </view>
+  </view>
+
+  <view class="profile-section-label">数据管理</view>
+  <view class="profile-menu">
+    <view class="profile-menu-item" bindtap="importPlaceholder">
+      <view class="pmi-icon slate">↑</view>
+      <text class="pmi-text">导入数据</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+    <view class="profile-menu-item" bindtap="exportPlaceholder">
+      <view class="pmi-icon slate">↓</view>
+      <text class="pmi-text">导出数据</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+    <view class="profile-menu-item">
+      <view class="pmi-icon slate">ℹ</view>
+      <text class="pmi-text">关于课题通</text>
+      <text class="pmi-value">v1.0.0</text>
+      <text class="pmi-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="logout-btn" bindtap="logout">
+    <text class="logout-text">退出登录</text>
+  </view>
+</view>

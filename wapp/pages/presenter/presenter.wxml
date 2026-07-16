@@ -1,0 +1,15 @@
+<view class="presenter">
+  <view wx:if="{{courseware}}" class="deck">
+    <view class="deck-meta">{{courseware.unitTitle}} · 第 {{current + 1}} / {{courseware.slides.length}} 页</view>
+    <view class="slide-title">{{slide.title}}</view>
+    <view class="slide-visual">
+      <view class="visual-text">{{slide.visualText}}</view>
+      <view class="visual-note">图形化辅助讲解</view>
+    </view>
+    <view class="slide-body">{{slide.body}}</view>
+    <view class="controls">
+      <button class="ghost-btn" bindtap="prevSlide">上一页</button>
+      <button class="secondary-btn" bindtap="nextSlide">下一页</button>
+    </view>
+  </view>
+</view>

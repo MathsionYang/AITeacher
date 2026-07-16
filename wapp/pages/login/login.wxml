@@ -1,0 +1,35 @@
+<view class="login-page">
+  <view class="brand-card">
+    <view class="brand-mark">Edu</view>
+    <view class="brand-cn">课题通</view>
+    <view class="brand-en">EduForge</view>
+    <view class="brand-desc">小学数学教师备课与出题工具</view>
+  </view>
+
+  <view class="login-card">
+    <view class="login-title">欢迎回来</view>
+    <view class="login-subtitle">当前小程序 MVP 仅支持教师端</view>
+
+    <view class="field">
+      <view class="label">账号 / 工号</view>
+      <input class="input" value="{{account}}" placeholder="请输入账号" bindinput="onAccountInput" />
+    </view>
+
+    <view class="field">
+      <view class="label">登录密码</view>
+      <input class="input" value="{{password}}" password placeholder="请输入密码" bindinput="onPasswordInput" />
+    </view>
+
+    <label class="remember">
+      <checkbox value="remember" checked="{{remember}}" bindchange="onRememberChange" color="#0d9488" />
+      <text>记住登录状态</text>
+    </label>
+
+    <button class="primary-btn login-btn" bindtap="submitLogin">进入教师端</button>
+
+    <view class="demo-tip">
+      <text>演示账号：teacher001</text>
+      <text>密码：123456</text>
+    </view>
+  </view>
+</view>

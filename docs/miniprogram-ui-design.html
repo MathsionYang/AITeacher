@@ -1,0 +1,2652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课题通 EduForge 小程序 UI 设计方案</title>
+<style>
+/* ============================================================
+   课题通 EduForge 小程序 UI 设计系统
+   Design Tokens — 从 Web 端品牌色系适配到小程序
+   ============================================================ */
+:root {
+  /* Brand: Teal */
+  --brand-50:  #f0fdfa;
+  --brand-100: #ccfbf1;
+  --brand-200: #99f6e4;
+  --brand-300: #5eead4;
+  --brand-400: #2dd4bf;
+  --brand-500: #14b8a6;
+  --brand-600: #0d9488;
+  --brand-700: #0f766e;
+  --brand-800: #115e59;
+  --brand-900: #134e4a;
+
+  /* Accent: Amber */
+  --amber-50:  #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+
+  /* Neutrals: Slate */
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+
+  /* Semantic */
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --red-500:   #ef4444;
+  --red-600:   #dc2626;
+  --blue-500:  #3b82f6;
+  --blue-600:  #2563eb;
+
+  /* Shadow */
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+
+  /* Radius */
+  --r-sm: 8rpx;
+  --r-md: 16rpx;
+  --r-lg: 24rpx;
+  --r-xl: 32rpx;
+  --r-full: 9999rpx;
+}
+
+/* ---------- Page Layout ---------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 50%, #fef3c7 100%);
+  min-height: 100vh;
+  padding: 40px 20px;
+  color: var(--slate-900);
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--slate-900);
+  letter-spacing: -0.5px;
+}
+
+.page-header p {
+  margin-top: 8px;
+  color: var(--slate-500);
+  font-size: 15px;
+}
+
+/* ---------- Design Spec Section ---------- */
+.spec-section {
+  max-width: 1200px;
+  margin: 0 auto 48px;
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: var(--shadow-lg);
+}
+
+.spec-section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--slate-900);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-section h2::before {
+  content: "";
+  width: 4px;
+  height: 20px;
+  background: var(--brand-600);
+  border-radius: 2px;
+}
+
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.color-chip {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s;
+}
+
+.color-chip:hover { transform: translateY(-2px); }
+
+.color-chip .swatch {
+  height: 60px;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.color-chip .label {
+  padding: 8px 10px;
+  background: white;
+  font-size: 12px;
+}
+
+.color-chip .label strong { display: block; color: var(--slate-900); }
+.color-chip .label span { color: var(--slate-400); font-size: 11px; }
+
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.spec-card {
+  background: var(--slate-50);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--slate-200);
+}
+
+.spec-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 12px;
+}
+
+.spec-card ul {
+  list-style: none;
+  font-size: 13px;
+  color: var(--slate-600);
+  line-height: 2;
+}
+
+.spec-card ul li::before {
+  content: "·";
+  color: var(--brand-600);
+  font-weight: 900;
+  margin-right: 6px;
+}
+
+/* ---------- Phone Mockup Gallery ---------- */
+.phone-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.phone-frame {
+  width: 375px;
+  height: 720px;
+  background: #000;
+  border-radius: 44px;
+  padding: 12px;
+  box-shadow: 0 30px 60px -15px rgb(0 0 0 / 0.25), 0 0 0 2px var(--slate-300);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.phone-frame::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 28px;
+  background: #000;
+  border-radius: 0 0 18px 18px;
+  z-index: 100;
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  background: var(--slate-50);
+  border-radius: 32px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone-label {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--slate-700);
+}
+
+.phone-label span {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--slate-400);
+  margin-top: 4px;
+}
+
+/* ---------- Status Bar ---------- */
+.status-bar {
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 24px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+  flex-shrink: 0;
+}
+
+.status-bar .time { font-weight: 700; }
+.status-bar .icons { display: flex; gap: 5px; align-items: center; font-size: 12px; }
+
+/* ---------- Nav Bar ---------- */
+.nav-bar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: white;
+  border-bottom: 0.5px solid var(--slate-200);
+  flex-shrink: 0;
+}
+
+.nav-bar .nav-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.nav-bar .nav-back {
+  position: absolute;
+  left: 16px;
+  font-size: 20px;
+  color: var(--slate-700);
+}
+
+.nav-bar .nav-action {
+  position: absolute;
+  right: 16px;
+  font-size: 14px;
+  color: var(--brand-600);
+  font-weight: 600;
+}
+
+/* ---------- Scroll Content ---------- */
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+.scroll-content::-webkit-scrollbar { width: 0; }
+
+/* ---------- Bottom Tab Bar ---------- */
+.tab-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 83px;
+  background: white;
+  border-top: 0.5px solid var(--slate-200);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 34px; /* safe area */
+  z-index: 50;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.tab-item .tab-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--slate-400);
+  transition: color 0.2s;
+}
+
+.tab-item .tab-label {
+  font-size: 10px;
+  color: var(--slate-400);
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.tab-item.active .tab-icon,
+.tab-item.active .tab-label {
+  color: var(--brand-600);
+}
+
+/* ========================================
+   SCREEN 1: 首页/工作台
+   ======================================== */
+.home-header {
+  background: linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 50%, var(--brand-500) 100%);
+  padding: 20px 20px 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-header::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+
+.home-header::before {
+  content: "";
+  position: absolute;
+  right: 20px;
+  bottom: -20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+
+.home-greeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.home-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: white;
+  font-weight: 700;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.home-greeting-text {
+  color: white;
+}
+
+.home-greeting-text .hello {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.home-greeting-text .name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.home-scope-card {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.home-scope-card .scope-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.home-scope-card .scope-badge {
+  background: rgba(255,255,255,0.25);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.home-scope-card .scope-change {
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px;
+  margin-top: -12px;
+  position: relative;
+  z-index: 2;
+}
+
+.quick-action {
+  background: white;
+  border-radius: 16px;
+  padding: 16px 10px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.2s;
+  cursor: pointer;
+}
+
+.quick-action:active { transform: scale(0.95); }
+
+.quick-action .qa-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin: 0 auto 8px;
+}
+
+.quick-action .qa-icon.teal { background: var(--brand-50); color: var(--brand-600); }
+.quick-action .qa-icon.amber { background: var(--amber-50); color: var(--amber-600); }
+.quick-action .qa-icon.blue { background: #eff6ff; color: var(--blue-600); }
+
+.quick-action .qa-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.quick-action .qa-sub {
+  font-size: 10px;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+/* Stats Section */
+.home-section {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.home-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.home-section-title h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.home-section-title .more {
+  font-size: 13px;
+  color: var(--slate-400);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+
+.stat-card:nth-child(1)::before { background: var(--brand-400); }
+.stat-card:nth-child(2)::before { background: var(--amber-400); }
+.stat-card:nth-child(3)::before { background: var(--blue-500); }
+
+.stat-card .stat-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--slate-900);
+}
+
+.stat-card .stat-label {
+  font-size: 11px;
+  color: var(--slate-500);
+  margin-top: 2px;
+}
+
+/* Recent Activity */
+.activity-list {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--slate-100);
+}
+
+.activity-item:last-child { border-bottom: none; }
+
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.activity-icon.courseware { background: var(--brand-50); color: var(--brand-600); }
+.activity-icon.practice { background: #eff6ff; color: var(--blue-600); }
+.activity-icon.test { background: var(--amber-50); color: var(--amber-600); }
+
+.activity-info { flex: 1; min-width: 0; }
+.activity-info .a-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-info .a-meta {
+  font-size: 12px;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.activity-arrow {
+  color: var(--slate-300);
+  font-size: 14px;
+}
+
+/* ========================================
+   SCREEN 2: 课件生成
+   ======================================== */
+.courseware-content {
+  padding: 16px;
+}
+
+/* Unit Selector */
+.unit-selector {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.unit-selector .us-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unit-selector .us-label .us-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--brand-50);
+  color: var(--brand-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.unit-selector .us-label .us-text strong {
+  display: block;
+  font-size: 14px;
+  color: var(--slate-900);
+}
+
+.unit-selector .us-label .us-text span {
+  font-size: 12px;
+  color: var(--slate-400);
+}
+
+.unit-selector .us-arrow {
+  color: var(--slate-300);
+}
+
+/* Generate Button */
+.generate-btn {
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-500));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.generate-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+}
+
+/* Knowledge Tags */
+.knowledge-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.k-tag {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border: 1px solid var(--brand-200);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Slide Cards */
+.slide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slide-item {
+  background: white;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border-left: 3px solid var(--brand-400);
+}
+
+.slide-item .slide-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.slide-item .slide-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--brand-600);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slide-item .slide-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  flex: 1;
+}
+
+.slide-item .slide-body {
+  font-size: 13px;
+  color: var(--slate-600);
+  line-height: 1.6;
+}
+
+.slide-item .slide-visual {
+  margin-top: 10px;
+  height: 80px;
+  background: var(--slate-50);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--brand-400);
+}
+
+.slide-item .slide-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--slate-100);
+}
+
+.slide-action-btn {
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--slate-200);
+  background: white;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.slide-action-btn.primary {
+  background: var(--brand-50);
+  border-color: var(--brand-200);
+  color: var(--brand-700);
+}
+
+/* ========================================
+   SCREEN 3: 同步出题
+   ======================================== */
+.practice-content {
+  padding: 16px;
+}
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-chip {
+  flex: 1;
+  background: white;
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-600);
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  background: var(--brand-50);
+  border-color: var(--brand-300);
+  color: var(--brand-700);
+}
+
+/* Paper Meta */
+.paper-meta {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.paper-meta-item {
+  text-align: center;
+}
+
+.paper-meta-item .pm-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--brand-700);
+}
+
+.paper-meta-item .pm-label {
+  font-size: 11px;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.paper-meta-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--slate-200);
+}
+
+/* Question Card */
+.question-card {
+  background: white;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.question-card .q-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.question-card .q-num {
+  background: var(--blue-500);
+  color: white;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.question-card .q-type {
+  font-size: 11px;
+  color: var(--slate-400);
+  background: var(--slate-100);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.question-card .q-score {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber-600);
+}
+
+.question-card .q-stem {
+  font-size: 14px;
+  color: var(--slate-900);
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+
+.question-card .q-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.question-card .q-option {
+  font-size: 13px;
+  color: var(--slate-600);
+  padding: 4px 0;
+}
+
+.question-card .q-answer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--green-500)15;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.question-card .q-answer {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.question-card .q-answer .ans-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green-600);
+  margin-bottom: 4px;
+}
+
+.question-card .q-answer .ans-text {
+  font-size: 13px;
+  color: var(--slate-700);
+}
+
+.question-card .q-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--brand-600);
+  font-weight: 600;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+/* ========================================
+   SCREEN 4: 周期测验
+   ======================================== */
+.schedule-content {
+  padding: 16px;
+}
+
+.setting-card {
+  background: white;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.setting-card .sc-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-card .sc-title .sc-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--slate-100);
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-row .sr-label {
+  font-size: 14px;
+  color: var(--slate-600);
+}
+
+.setting-row .sr-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+
+.setting-row .sr-value .arrow {
+  color: var(--slate-300);
+  font-size: 12px;
+}
+
+/* Frequency Selector */
+.freq-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.freq-option {
+  text-align: center;
+  padding: 12px 8px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.freq-option.active {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+  color: var(--brand-700);
+}
+
+.freq-option .freq-icon {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+/* Count Slider */
+.count-slider {
+  margin-top: 12px;
+}
+
+.count-display {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.count-display .cd-num {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--brand-700);
+}
+
+.count-display .cd-unit {
+  font-size: 14px;
+  color: var(--slate-400);
+}
+
+.slider-track {
+  height: 6px;
+  background: var(--slate-200);
+  border-radius: 3px;
+  position: relative;
+  margin: 0 8px;
+}
+
+.slider-fill {
+  width: 30%;
+  height: 100%;
+  background: var(--brand-500);
+  border-radius: 3px;
+}
+
+.slider-thumb {
+  position: absolute;
+  left: 30%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  background: white;
+  border: 3px solid var(--brand-600);
+  border-radius: 50%;
+  box-shadow: var(--shadow-md);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--slate-400);
+}
+
+/* Test History */
+.test-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 0.5px solid var(--slate-100);
+}
+
+.test-history-item:last-child { border-bottom: none; }
+
+.thi-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--amber-50);
+  color: var(--amber-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.thi-info { flex: 1; }
+.thi-info .thi-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+.thi-info .thi-meta {
+  font-size: 12px;
+  color: var(--slate-400);
+  margin-top: 2px;
+}
+
+.thi-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.thi-badge.daily { background: #fef3c7; color: var(--amber-600); }
+.thi-badge.weekly { background: var(--brand-50); color: var(--brand-600); }
+.thi-badge.monthly { background: #eff6ff; color: var(--blue-600); }
+
+/* ========================================
+   SCREEN 5: 我的/设置
+   ======================================== */
+.profile-content {
+  padding: 0 0 16px;
+}
+
+.profile-header {
+  background: linear-gradient(135deg, var(--brand-700), var(--brand-500));
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  border: 3px solid rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  font-weight: 700;
+}
+
+.profile-info { color: white; }
+.profile-info .pi-name { font-size: 20px; font-weight: 700; }
+.profile-info .pi-role {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-info .pi-role .verify-badge {
+  background: rgba(255,255,255,0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.profile-scope-bar {
+  margin: 12px 16px 0;
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-scope-bar .psb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-scope-bar .psb-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--brand-50);
+  color: var(--brand-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.profile-scope-bar .psb-text strong {
+  font-size: 14px;
+  color: var(--slate-900);
+  display: block;
+}
+
+.profile-scope-bar .psb-text span {
+  font-size: 12px;
+  color: var(--slate-400);
+}
+
+.profile-menu {
+  margin: 12px 16px;
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--slate-100);
+  cursor: pointer;
+}
+
+.profile-menu-item:last-child { border-bottom: none; }
+
+.pmi-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.pmi-icon.teal { background: var(--brand-50); color: var(--brand-600); }
+.pmi-icon.amber { background: var(--amber-50); color: var(--amber-600); }
+.pmi-icon.blue { background: #eff6ff; color: var(--blue-600); }
+.pmi-icon.green { background: #f0fdf4; color: var(--green-600); }
+.pmi-icon.slate { background: var(--slate-100); color: var(--slate-600); }
+.pmi-icon.red { background: #fef2f2; color: var(--red-600); }
+
+.pmi-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+}
+
+.pmi-value {
+  font-size: 13px;
+  color: var(--slate-400);
+}
+
+.pmi-arrow {
+  color: var(--slate-300);
+  font-size: 14px;
+}
+
+/* Model Status */
+.model-status-card {
+  margin: 0 16px 12px;
+  background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+  border: 1px solid var(--brand-200);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.model-status-card .msc-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: white;
+  color: var(--brand-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.model-status-card .msc-info { flex: 1; }
+.model-status-card .msc-info strong {
+  font-size: 14px;
+  color: var(--brand-800);
+  display: block;
+}
+.model-status-card .msc-info span {
+  font-size: 12px;
+  color: var(--brand-600);
+  opacity: 0.8;
+}
+
+.model-status-card .msc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-500);
+  box-shadow: 0 0 8px var(--green-500);
+}
+
+/* ---------- Generating Animation ---------- */
+.generating-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.gen-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 4px solid var(--brand-100);
+  border-top-color: var(--brand-600);
+  animation: spin 0.8s linear infinite;
+}
+
+.gen-spinner::after {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-50);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.generating-overlay .gen-text {
+  text-align: center;
+}
+
+.generating-overlay .gen-text strong {
+  font-size: 16px;
+  color: var(--brand-800);
+  display: block;
+}
+
+.generating-overlay .gen-text p {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin-top: 6px;
+}
+
+/* ---------- Section Divider ---------- */
+.section-divider {
+  max-width: 1200px;
+  margin: 48px auto;
+  text-align: center;
+  position: relative;
+}
+
+.section-divider::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: var(--slate-200);
+}
+
+.section-divider span {
+  background: linear-gradient(135deg, #e0e7ff, #f0fdfa);
+  padding: 8px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--slate-600);
+  position: relative;
+  z-index: 1;
+  border-radius: 20px;
+}
+
+/* ---------- Info Architecture ---------- */
+.ia-section {
+  max-width: 1200px;
+  margin: 0 auto 48px;
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: var(--shadow-lg);
+}
+
+.ia-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--slate-100);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.ia-tab {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ia-tab.active {
+  background: white;
+  color: var(--brand-700);
+  box-shadow: var(--shadow-sm);
+}
+
+.ia-content { display: none; }
+.ia-content.active { display: block; }
+
+.ia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ia-table th {
+  background: var(--slate-50);
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-500);
+  border-bottom: 2px solid var(--slate-200);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ia-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--slate-100);
+  color: var(--slate-700);
+  vertical-align: top;
+}
+
+.ia-table td strong {
+  color: var(--slate-900);
+}
+
+.ia-table .tag-mini {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ia-table .tag-mini.teal { background: var(--brand-50); color: var(--brand-700); }
+.ia-table .tag-mini.amber { background: var(--amber-50); color: var(--amber-600); }
+.ia-table .tag-mini.blue { background: #eff6ff; color: var(--blue-600); }
+.ia-table .tag-mini.green { background: #f0fdf4; color: var(--green-600); }
+</style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1>课题通 EduForge · 小程序 UI 设计方案</h1>
+  <p>基于产品 PRD 与 Web 端设计系统，适配微信小程序交互范式</p>
+</div>
+
+<!-- ===================== Design Tokens ===================== -->
+<div class="spec-section">
+  <h2>设计规范 — Design Tokens</h2>
+
+  <div class="color-palette">
+    <div class="color-chip">
+      <div class="swatch" style="background: #0f766e;">Brand 700</div>
+      <div class="label"><strong>主色 Teal</strong><span>#0F766E</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #14b8a6;">Brand 500</div>
+      <div class="label"><strong>品牌亮色</strong><span>#14B8A6</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #f59e0b;">Amber 500</div>
+      <div class="label"><strong>强调色 Amber</strong><span>#F59E0B</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #2563eb;">Blue 600</div>
+      <div class="label"><strong>辅助色 Blue</strong><span>#2563EB</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #22c55e;">Green 500</div>
+      <div class="label"><strong>成功色</strong><span>#22C55E</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #ef4444;">Red 500</div>
+      <div class="label"><strong>危险色</strong><span>#EF4444</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #0f172a;">Slate 900</div>
+      <div class="label"><strong>标题文字</strong><span>#0F172A</span></div>
+    </div>
+    <div class="color-chip">
+      <div class="swatch" style="background: #64748b;">Slate 500</div>
+      <div class="label"><strong>正文/辅助</strong><span>#64748B</span></div>
+    </div>
+  </div>
+
+  <div class="spec-grid">
+    <div class="spec-card">
+      <h3>字体规范</h3>
+      <ul>
+        <li>标题 H1: 20px / 700</li>
+        <li>标题 H2: 17px / 700</li>
+        <li>标题 H3: 15px / 600</li>
+        <li>正文 Body: 14px / 400</li>
+        <li>辅助 Caption: 12px / 400</li>
+        <li>数字 Number: 24px / 800</li>
+      </ul>
+    </div>
+    <div class="spec-card">
+      <h3>间距系统</h3>
+      <ul>
+        <li>基础单位: 4px (1rpx ≈ 0.5px)</li>
+        <li>组件内间距: 12-16px</li>
+        <li>组件间间距: 8-12px</li>
+        <li>页面边距: 16px</li>
+        <li>区块间距: 16-24px</li>
+        <li>圆角: 8/12/14/24px</li>
+      </ul>
+    </div>
+    <div class="spec-card">
+      <h3>交互规范</h3>
+      <ul>
+        <li>最小触控区: 44×44px</li>
+        <li>按钮高度: 48px (主) / 40px (次)</li>
+        <li>点击反馈: scale(0.97)</li>
+        <li>转场动画: 200ms ease-out</li>
+        <li>下拉刷新: 系统默认</li>
+        <li>加载态: Spinner + 文字提示</li>
+      </ul>
+    </div>
+    <div class="spec-card">
+      <h3>导航规范</h3>
+      <ul>
+        <li>底部 Tab: 4 个一级入口</li>
+        <li>页面层级: 最深 3 级</li>
+        <li>返回: 左上角箭头 + 系统返回</li>
+        <li>状态栏: 适配 iOS/Android</li>
+        <li>安全区域: 底部 34px</li>
+        <li>顶部导航: 居中标题 17px</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Phone Mockups ===================== -->
+<div class="section-divider"><span>核心页面原型 — 5 屏全景</span></div>
+
+<div class="phone-gallery">
+
+  <!-- ========== SCREEN 1: 首页 ========== -->
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <span class="icons">📶 📡 🔋</span>
+        </div>
+
+        <!-- Scroll Content -->
+        <div class="scroll-content" style="padding-bottom: 100px;">
+          <!-- Header -->
+          <div class="home-header">
+            <div class="home-greeting">
+              <div class="home-avatar">王</div>
+              <div class="home-greeting-text">
+                <div class="hello">早上好 👋</div>
+                <div class="name">王老师</div>
+              </div>
+            </div>
+            <div class="home-scope-card">
+              <div class="scope-info">
+                <div class="scope-badge">五年级 · 上册</div>
+                <div class="scope-badge">数学</div>
+              </div>
+              <div class="scope-change">切换 ›</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <div class="quick-action">
+              <div class="qa-icon teal">📐</div>
+              <div class="qa-title">课件生成</div>
+              <div class="qa-sub">AI 一键生成</div>
+            </div>
+            <div class="quick-action">
+              <div class="qa-icon blue">✎</div>
+              <div class="qa-title">同步出题</div>
+              <div class="qa-sub">10题/100分</div>
+            </div>
+            <div class="quick-action">
+              <div class="qa-icon amber">◷</div>
+              <div class="qa-title">周期测验</div>
+              <div class="qa-sub">自定义题量</div>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="home-section">
+            <div class="home-section-title">
+              <h3>工作台概览</h3>
+            </div>
+            <div class="stats-row">
+              <div class="stat-card">
+                <div class="stat-num">12</div>
+                <div class="stat-label">历史课件</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-num">36</div>
+                <div class="stat-label">已出题目</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-num">5</div>
+                <div class="stat-label">测验卷</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="home-section">
+            <div class="home-section-title">
+              <h3>最近使用</h3>
+              <span class="more">全部 ›</span>
+            </div>
+            <div class="activity-list">
+              <div class="activity-item">
+                <div class="activity-icon courseware">📐</div>
+                <div class="activity-info">
+                  <div class="a-title">第一单元 小数乘法</div>
+                  <div class="a-meta">课件 · 2小时前</div>
+                </div>
+                <div class="activity-arrow">›</div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon practice">✎</div>
+                <div class="activity-info">
+                  <div class="a-title">同步练习 · 10题</div>
+                  <div class="a-meta">出题 · 昨天</div>
+                </div>
+                <div class="activity-arrow">›</div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-icon test">◷</div>
+                <div class="activity-info">
+                  <div class="a-title">每周测验 · 20题</div>
+                  <div class="a-meta">测验 · 3天前</div>
+                </div>
+                <div class="activity-arrow">›</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item active">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">首页</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">📐</div>
+            <div class="tab-label">课件</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">✎</div>
+            <div class="tab-label">出题</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">⚙</div>
+            <div class="tab-label">我的</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">首页 / 工作台<span>用户登录后首屏，快捷入口 + 数据概览</span></div>
+  </div>
+
+  <!-- ========== SCREEN 2: 课件生成 ========== -->
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <span class="icons">📶 📡 🔋</span>
+        </div>
+
+        <!-- Nav Bar -->
+        <div class="nav-bar">
+          <span class="nav-back">‹</span>
+          <span class="nav-title">课件生成</span>
+          <span class="nav-action">历史</span>
+        </div>
+
+        <!-- Scroll Content -->
+        <div class="scroll-content">
+          <div class="courseware-content">
+            <!-- Unit Selector -->
+            <div class="unit-selector">
+              <div class="us-label">
+                <div class="us-icon">📚</div>
+                <div class="us-text">
+                  <strong>第一单元 小数乘法</strong>
+                  <span>五年级上册 · 人教版</span>
+                </div>
+              </div>
+              <div class="us-arrow">切换 ›</div>
+            </div>
+
+            <!-- Generate Button -->
+            <button class="generate-btn">✦ AI 生成课件</button>
+
+            <!-- Knowledge Tags -->
+            <div style="font-size: 13px; font-weight: 700; color: var(--slate-700); margin-bottom: 8px;">本单元知识点</div>
+            <div class="knowledge-tags">
+              <span class="k-tag">小数乘整数</span>
+              <span class="k-tag">小数乘小数</span>
+              <span class="k-tag">积的近似值</span>
+              <span class="k-tag">运算定律</span>
+              <span class="k-tag">解决问题</span>
+            </div>
+
+            <!-- Slide Cards -->
+            <div style="font-size: 13px; font-weight: 700; color: var(--slate-700); margin-bottom: 8px;">课件预览（共 5 节）</div>
+            <div class="slide-list">
+              <div class="slide-item">
+                <div class="slide-head">
+                  <div class="slide-num">1</div>
+                  <div class="slide-title">小数乘整数</div>
+                </div>
+                <div class="slide-body">理解小数乘整数的意义，掌握计算方法，能正确进行笔算和口算。</div>
+                <div class="slide-visual">📊</div>
+                <div class="slide-actions">
+                  <button class="slide-action-btn primary">📖 授课</button>
+                  <button class="slide-action-btn">✎ 编辑</button>
+                  <button class="slide-action-btn">⇩ 导出</button>
+                </div>
+              </div>
+
+              <div class="slide-item">
+                <div class="slide-head">
+                  <div class="slide-num">2</div>
+                  <div class="slide-title">小数乘小数</div>
+                </div>
+                <div class="slide-body">掌握小数乘小数的算理与算法，理解积的小数位数确定方法。</div>
+                <div class="slide-visual">🔢</div>
+                <div class="slide-actions">
+                  <button class="slide-action-btn primary">📖 授课</button>
+                  <button class="slide-action-btn">✎ 编辑</button>
+                  <button class="slide-action-btn">⇩ 导出</button>
+                </div>
+              </div>
+
+              <div class="slide-item">
+                <div class="slide-head">
+                  <div class="slide-num">3</div>
+                  <div class="slide-title">积的近似值</div>
+                </div>
+                <div class="slide-body">会用四舍五入法求积的近似值，理解精确度的意义。</div>
+                <div class="slide-visual">📐</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">首页</div>
+          </div>
+          <div class="tab-item active">
+            <div class="tab-icon">📐</div>
+            <div class="tab-label">课件</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">✎</div>
+            <div class="tab-label">出题</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">⚙</div>
+            <div class="tab-label">我的</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">课件生成<span>选单元 → AI 生成 → 预览/编辑/导出</span></div>
+  </div>
+
+  <!-- ========== SCREEN 3: 同步出题 ========== -->
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <span class="icons">📶 📡 🔋</span>
+        </div>
+
+        <!-- Nav Bar -->
+        <div class="nav-bar">
+          <span class="nav-back">‹</span>
+          <span class="nav-title">同步出题</span>
+          <span class="nav-action">更多</span>
+        </div>
+
+        <!-- Scroll Content -->
+        <div class="scroll-content">
+          <div class="practice-content">
+            <!-- Unit + Difficulty -->
+            <div class="unit-selector">
+              <div class="us-label">
+                <div class="us-icon">📚</div>
+                <div class="us-text">
+                  <strong>第一单元 小数乘法</strong>
+                  <span>五年级上册</span>
+                </div>
+              </div>
+              <div class="us-arrow">切换 ›</div>
+            </div>
+
+            <div class="filter-bar">
+              <div class="filter-chip">基础</div>
+              <div class="filter-chip active">提高</div>
+              <div class="filter-chip">挑战</div>
+            </div>
+
+            <button class="generate-btn">✦ AI 生成练习</button>
+
+            <!-- Paper Meta -->
+            <div class="paper-meta">
+              <div class="paper-meta-item">
+                <div class="pm-num">10</div>
+                <div class="pm-label">题目数</div>
+              </div>
+              <div class="paper-meta-divider"></div>
+              <div class="paper-meta-item">
+                <div class="pm-num">100</div>
+                <div class="pm-label">总分</div>
+              </div>
+              <div class="paper-meta-divider"></div>
+              <div class="paper-meta-item">
+                <div class="pm-num">5</div>
+                <div class="pm-label">知识点</div>
+              </div>
+            </div>
+
+            <!-- Questions -->
+            <div class="question-card">
+              <div class="q-head">
+                <div class="q-num">1</div>
+                <span class="q-type">选择题</span>
+                <span class="q-score">10分</span>
+              </div>
+              <div class="q-stem">0.36 × 5 的积是（ ）位小数。</div>
+              <div class="q-options">
+                <div class="q-option">A. 一位</div>
+                <div class="q-option">B. 两位</div>
+                <div class="q-option">C. 三位</div>
+                <div class="q-option">D. 四位</div>
+              </div>
+              <div class="q-answer">
+                <div class="ans-label">✓ 参考答案</div>
+                <div class="ans-text">B. 两位。0.36 × 5 = 1.80，积有两位小数。</div>
+              </div>
+              <div class="q-toggle">收起答案 ▴</div>
+            </div>
+
+            <div class="question-card">
+              <div class="q-head">
+                <div class="q-num">2</div>
+                <span class="q-type">填空题</span>
+                <span class="q-score">10分</span>
+              </div>
+              <div class="q-stem">2.5 × 0.4 = ____，这个积是 ____ 。</div>
+              <div class="q-toggle">显示参考答案 ▾</div>
+            </div>
+
+            <div class="question-card">
+              <div class="q-head">
+                <div class="q-num">3</div>
+                <span class="q-type">计算填空</span>
+                <span class="q-score">10分</span>
+              </div>
+              <div class="q-stem">3.14 × 2.5 = ____</div>
+              <div class="q-toggle">显示参考答案 ▾</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">首页</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">📐</div>
+            <div class="tab-label">课件</div>
+          </div>
+          <div class="tab-item active">
+            <div class="tab-icon">✎</div>
+            <div class="tab-label">出题</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">⚙</div>
+            <div class="tab-label">我的</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">同步出题<span>选难度 → AI生成10题 → 审核答案 → 导出</span></div>
+  </div>
+
+  <!-- ========== SCREEN 4: 周期测验 ========== -->
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <span class="icons">📶 📡 🔋</span>
+        </div>
+
+        <!-- Nav Bar -->
+        <div class="nav-bar">
+          <span class="nav-back">‹</span>
+          <span class="nav-title">周期测验</span>
+        </div>
+
+        <!-- Scroll Content -->
+        <div class="scroll-content">
+          <div class="schedule-content">
+            <!-- Unit -->
+            <div class="unit-selector">
+              <div class="us-label">
+                <div class="us-icon">📚</div>
+                <div class="us-text">
+                  <strong>第一单元 小数乘法</strong>
+                  <span>五年级上册</span>
+                </div>
+              </div>
+              <div class="us-arrow">切换 ›</div>
+            </div>
+
+            <!-- Frequency Setting -->
+            <div class="setting-card">
+              <div class="sc-title">
+                <div class="sc-icon" style="background: var(--amber-50); color: var(--amber-600);">◷</div>
+                测验频率
+              </div>
+              <div class="freq-selector">
+                <div class="freq-option">
+                  <div class="freq-icon">📅</div>
+                  每日
+                </div>
+                <div class="freq-option active">
+                  <div class="freq-icon">🗓</div>
+                  每周
+                </div>
+                <div class="freq-option">
+                  <div class="freq-icon">📆</div>
+                  每月
+                </div>
+              </div>
+            </div>
+
+            <!-- Count Setting -->
+            <div class="setting-card">
+              <div class="sc-title">
+                <div class="sc-icon" style="background: var(--brand-50); color: var(--brand-600);">✦</div>
+                题目数量
+              </div>
+              <div class="count-slider">
+                <div class="count-display">
+                  <span class="cd-num">30</span>
+                  <span class="cd-unit">题</span>
+                </div>
+                <div class="slider-track">
+                  <div class="slider-fill"></div>
+                  <div class="slider-thumb"></div>
+                </div>
+                <div class="slider-labels">
+                  <span>10题</span>
+                  <span>50题</span>
+                  <span>100题</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="generate-btn">✦ 生成周期测验</button>
+
+            <!-- History -->
+            <div class="setting-card">
+              <div class="sc-title">
+                <div class="sc-icon" style="background: var(--slate-100); color: var(--slate-600);">📋</div>
+                历史测验卷
+              </div>
+              <div class="test-history-item">
+                <div class="thi-icon">📝</div>
+                <div class="thi-info">
+                  <div class="thi-title">第3周测验 · 20题</div>
+                  <div class="thi-meta">2026-07-14 · 100分</div>
+                </div>
+                <div class="thi-badge weekly">每周</div>
+              </div>
+              <div class="test-history-item">
+                <div class="thi-icon">📝</div>
+                <div class="thi-info">
+                  <div class="thi-title">第2周测验 · 20题</div>
+                  <div class="thi-meta">2026-07-07 · 100分</div>
+                </div>
+                <div class="thi-badge weekly">每周</div>
+              </div>
+              <div class="test-history-item">
+                <div class="thi-icon">📝</div>
+                <div class="thi-info">
+                  <div class="thi-title">每日练习 · 10题</div>
+                  <div class="thi-meta">2026-07-05 · 100分</div>
+                </div>
+                <div class="thi-badge daily">每日</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">首页</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">📐</div>
+            <div class="tab-label">课件</div>
+          </div>
+          <div class="tab-item active">
+            <div class="tab-icon">✎</div>
+            <div class="tab-label">出题</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">⚙</div>
+            <div class="tab-label">我的</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">周期测验<span>设频率 → 选题量 → 生成 → 历史归档</span></div>
+  </div>
+
+  <!-- ========== SCREEN 5: 我的/设置 ========== -->
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span class="time">9:41</span>
+          <span class="icons">📶 📡 🔋</span>
+        </div>
+
+        <!-- Scroll Content (no nav bar, profile starts from top) -->
+        <div class="scroll-content">
+          <div class="profile-content">
+            <!-- Profile Header -->
+            <div class="profile-header">
+              <div class="profile-avatar">王</div>
+              <div class="profile-info">
+                <div class="pi-name">王老师</div>
+                <div class="pi-role">
+                  <span class="verify-badge">✓ 已认证</span>
+                  teacher001
+                </div>
+              </div>
+            </div>
+
+            <!-- Scope Bar -->
+            <div class="profile-scope-bar">
+              <div class="psb-left">
+                <div class="psb-icon">📚</div>
+                <div class="psb-text">
+                  <strong>五年级 · 上册 · 数学</strong>
+                  <span>人教版 · 点击修改</span>
+                </div>
+              </div>
+              <div style="color: var(--slate-300);">›</div>
+            </div>
+
+            <!-- Model Status -->
+            <div class="model-status-card">
+              <div class="msc-icon">🤖</div>
+              <div class="msc-info">
+                <strong>AI 模型已连接</strong>
+                <span>GPT-4o · 本地代理模式</span>
+              </div>
+              <div class="msc-dot"></div>
+            </div>
+
+            <!-- Menu Group 1 -->
+            <div class="profile-menu">
+              <div class="profile-menu-item">
+                <div class="pmi-icon teal">📐</div>
+                <div class="pmi-text">我的课件</div>
+                <div class="pmi-value">12份</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+              <div class="profile-menu-item">
+                <div class="pmi-icon blue">✎</div>
+                <div class="pmi-text">出题记录</div>
+                <div class="pmi-value">36题</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+              <div class="profile-menu-item">
+                <div class="pmi-icon amber">◷</div>
+                <div class="pmi-text">测验历史</div>
+                <div class="pmi-value">5份</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+            </div>
+
+            <!-- Menu Group 2 -->
+            <div class="profile-menu">
+              <div class="profile-menu-item">
+                <div class="pmi-icon green">⚙</div>
+                <div class="pmi-text">模型设置</div>
+                <div class="pmi-value">已配置</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+              <div class="profile-menu-item">
+                <div class="pmi-icon slate">↻</div>
+                <div class="pmi-text">导入/导出数据</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+              <div class="profile-menu-item">
+                <div class="pmi-icon slate">ℹ</div>
+                <div class="pmi-text">关于课题通</div>
+                <div class="pmi-value">v1.0.0</div>
+                <div class="pmi-arrow">›</div>
+              </div>
+            </div>
+
+            <!-- Logout -->
+            <div class="profile-menu">
+              <div class="profile-menu-item" style="justify-content: center;">
+                <div class="pmi-icon red">⏻</div>
+                <div class="pmi-text" style="color: var(--red-600);">退出登录</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item">
+            <div class="tab-icon">⌂</div>
+            <div class="tab-label">首页</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">📐</div>
+            <div class="tab-label">课件</div>
+          </div>
+          <div class="tab-item">
+            <div class="tab-icon">✎</div>
+            <div class="tab-label">出题</div>
+          </div>
+          <div class="tab-item active">
+            <div class="tab-icon">⚙</div>
+            <div class="tab-label">我的</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-label">我的 / 设置<span>个人信息 + 教材范围 + 模型状态 + 数据管理</span></div>
+  </div>
+
+</div>
+
+<!-- ===================== Info Architecture ===================== -->
+<div class="section-divider"><span>信息架构与交互说明</span></div>
+
+<div class="ia-section">
+  <div class="ia-tabs">
+    <div class="ia-tab active" onclick="switchIATab(this, 0)">页面架构</div>
+    <div class="ia-tab" onclick="switchIATab(this, 1)">交互流程</div>
+    <div class="ia-tab" onclick="switchIATab(this, 2)">组件清单</div>
+    <div class="ia-tab" onclick="switchIATab(this, 3)">适配说明</div>
+  </div>
+
+  <!-- Tab 1: 页面架构 -->
+  <div class="ia-content active" data-ia="0">
+    <table class="ia-table">
+      <thead>
+        <tr>
+          <th>层级</th>
+          <th>页面</th>
+          <th>核心功能</th>
+          <th>导航入口</th>
+          <th>标签</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Tab 1</strong></td>
+          <td><strong>首页 / 工作台</strong></td>
+          <td>问候语、教材范围卡片、3个快捷入口、数据统计、最近使用记录</td>
+          <td>底部 Tab「首页」</td>
+          <td><span class="tag-mini teal">核心页面</span></td>
+        </tr>
+        <tr>
+          <td><strong>Tab 2</strong></td>
+          <td><strong>课件生成</strong></td>
+          <td>单元选择 → AI生成 → 课件预览（知识点+幻灯片）→ 授课/编辑/导出</td>
+          <td>底部 Tab「课件」+ 首页快捷入口</td>
+          <td><span class="tag-mini teal">核心页面</span></td>
+        </tr>
+        <tr>
+          <td><strong>Tab 3</strong></td>
+          <td><strong>出题中心</strong></td>
+          <td>同步出题（10题/100分）+ 周期测验（10-100题）双模式切换</td>
+          <td>底部 Tab「出题」+ 首页快捷入口</td>
+          <td><span class="tag-mini blue">核心页面</span></td>
+        </tr>
+        <tr>
+          <td><strong>Tab 4</strong></td>
+          <td><strong>我的</strong></td>
+          <td>个人信息、教材范围设置、模型状态、数据管理、退出登录</td>
+          <td>底部 Tab「我的」</td>
+          <td><span class="tag-mini amber">核心页面</span></td>
+        </tr>
+        <tr>
+          <td>Sub 2-1</td>
+          <td>课件详情 / 授课模式</td>
+          <td>全屏幻灯片浏览，支持手势翻页、审核编辑</td>
+          <td>课件页 → 点击「授课」</td>
+          <td><span class="tag-mini green">子页面</span></td>
+        </tr>
+        <tr>
+          <td>Sub 3-1</td>
+          <td>题目详情 / 答案展开</td>
+          <td>单题查看，展开参考答案与教师审核提示</td>
+          <td>出题页 → 点击题目卡片</td>
+          <td><span class="tag-mini green">子页面</span></td>
+        </tr>
+        <tr>
+          <td>Sub 4-1</td>
+          <td>教材范围设置</td>
+          <td>学科/年级/册别选择，单元在各功能页独立选择</td>
+          <td>我的 → 点击教材范围</td>
+          <td><span class="tag-mini green">子页面</span></td>
+        </tr>
+        <tr>
+          <td>Sub 4-2</td>
+          <td>模型设置</td>
+          <td>服务商、模型、Base URL、API Key、测试连接</td>
+          <td>我的 → 模型设置</td>
+          <td><span class="tag-mini green">子页面</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tab 2: 交互流程 -->
+  <div class="ia-content" data-ia="1">
+    <table class="ia-table">
+      <thead>
+        <tr>
+          <th>流程</th>
+          <th>步骤</th>
+          <th>用户操作</th>
+          <th>系统反馈</th>
+          <th>注意事项</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="5"><strong>课件生成</strong></td>
+          <td>1</td>
+          <td>选择单元（默认当前单元）</td>
+          <td>展示本单元知识点标签</td>
+          <td>单元切换全局同步</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>点击「AI 生成课件」</td>
+          <td>全屏加载动画 + 进度文案</td>
+          <td>生成期间不可重复点击</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>等待生成完成</td>
+          <td>展示课件幻灯片列表</td>
+          <td>完成后校验知识点覆盖</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>预览/审核编辑/授课</td>
+          <td>进入全屏授课或编辑模式</td>
+          <td>编辑需教师审核确认</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>导出 PDF/PPTX/Markdown</td>
+          <td>调用小程序保存/分享</td>
+          <td>大文件需等待提示</td>
+        </tr>
+        <tr style="height: 12px;"><td colspan="5"></td></tr>
+        <tr>
+          <td rowspan="5"><strong>同步出题</strong></td>
+          <td>1</td>
+          <td>选择单元 + 难度（基础/提高/挑战）</td>
+          <td>显示当前选择范围</td>
+          <td>默认上次选择</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>点击「AI 生成练习」</td>
+          <td>加载动画 + 文案提示</td>
+          <td>固定10题/100分</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>浏览题目列表</td>
+          <td>题目卡片展示题干+选项</td>
+          <td>答案默认折叠</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>点击「显示参考答案」</td>
+          <td>展开答案+教师审核提示</td>
+          <td>逐题展开/全局展开</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>导出空白卷/含答案PDF</td>
+          <td>生成PDF并保存</td>
+          <td>更多操作在右上角菜单</td>
+        </tr>
+        <tr style="height: 12px;"><td colspan="5"></td></tr>
+        <tr>
+          <td rowspan="4"><strong>周期测验</strong></td>
+          <td>1</td>
+          <td>选择单元 + 频率 + 题量(滑块)</td>
+          <td>实时显示题量数字</td>
+          <td>10-100题可调</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>点击「生成周期测验」</td>
+          <td>加载动画</td>
+          <td>尽量避开历史题干</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>保存测验设置</td>
+          <td>确认频率与题量配置</td>
+          <td>设置仅本地保存</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>查看历史测验卷</td>
+          <td>列表展示+导出操作</td>
+          <td>支持删除单条记录</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tab 3: 组件清单 -->
+  <div class="ia-content" data-ia="2">
+    <table class="ia-table">
+      <thead>
+        <tr>
+          <th>组件</th>
+          <th>用途</th>
+          <th>规格</th>
+          <th>状态</th>
+          <th>标签</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>底部 TabBar</strong></td>
+          <td>4个一级页面导航</td>
+          <td>83px高，含安全区，图标28px</td>
+          <td>默认/选中</td>
+          <td><span class="tag-mini teal">导航</span></td>
+        </tr>
+        <tr>
+          <td><strong>顶部 NavBar</strong></td>
+          <td>页面标题+返回+操作</td>
+          <td>44px高，标题17px居中</td>
+          <td>默认</td>
+          <td><span class="tag-mini teal">导航</span></td>
+        </tr>
+        <tr>
+          <td><strong>快捷入口卡片</strong></td>
+          <td>首页3个功能入口</td>
+          <td>圆角16px，图标44px</td>
+          <td>默认/按下</td>
+          <td><span class="tag-mini blue">卡片</span></td>
+        </tr>
+        <tr>
+          <td><strong>统计卡片</strong></td>
+          <td>数据展示（课件数/题目数等）</td>
+          <td>圆角12px，左侧3px色条</td>
+          <td>默认</td>
+          <td><span class="tag-mini blue">卡片</span></td>
+        </tr>
+        <tr>
+          <td><strong>单元选择器</strong></td>
+          <td>选择当前教学单元</td>
+          <td>白底卡片，右箭头</td>
+          <td>默认/选中</td>
+          <td><span class="tag-mini amber">表单</span></td>
+        </tr>
+        <tr>
+          <td><strong>主按钮</strong></td>
+          <td>AI生成等核心操作</td>
+          <td>48px高，渐变背景，圆角12px</td>
+          <td>默认/按下/加载中/禁用</td>
+          <td><span class="tag-mini amber">按钮</span></td>
+        </tr>
+        <tr>
+          <td><strong>难度筛选条</strong></td>
+          <td>基础/提高/挑战三选一</td>
+          <td>等宽三列，选中高亮</td>
+          <td>默认/选中</td>
+          <td><span class="tag-mini amber">表单</span></td>
+        </tr>
+        <tr>
+          <td><strong>知识点标签</strong></td>
+          <td>展示当前单元知识点</td>
+          <td>圆角20px，品牌色底</td>
+          <td>默认</td>
+          <td><span class="tag-mini blue">展示</span></td>
+        </tr>
+        <tr>
+          <td><strong>课件幻灯片卡</strong></td>
+          <td>课件内容展示+操作</td>
+          <td>左侧3px色条，底部操作栏</td>
+          <td>默认/编辑中</td>
+          <td><span class="tag-mini blue">卡片</span></td>
+        </tr>
+        <tr>
+          <td><strong>题目卡片</strong></td>
+          <td>题目展示+答案折叠</td>
+          <td>题号色块+题型标签+分值</td>
+          <td>折叠/展开</td>
+          <td><span class="tag-mini blue">卡片</span></td>
+        </tr>
+        <tr>
+          <td><strong>试卷摘要条</strong></td>
+          <td>题量/总分/知识点数</td>
+          <td>三列等分，中间分隔线</td>
+          <td>默认</td>
+          <td><span class="tag-mini blue">展示</span></td>
+        </tr>
+        <tr>
+          <td><strong>频率选择器</strong></td>
+          <td>每日/每周/每月</td>
+          <td>三列等宽，图标+文字</td>
+          <td>默认/选中</td>
+          <td><span class="tag-mini amber">表单</span></td>
+        </tr>
+        <tr>
+          <td><strong>题量滑块</strong></td>
+          <td>10-100题范围选择</td>
+          <td>轨道6px+滑块22px</td>
+          <td>默认/拖动中</td>
+          <td><span class="tag-mini amber">表单</span></td>
+        </tr>
+        <tr>
+          <td><strong>加载遮罩</strong></td>
+          <td>AI生成时的等待状态</td>
+          <td>全屏半透明+Spinner+文案</td>
+          <td>加载中</td>
+          <td><span class="tag-mini green">反馈</span></td>
+        </tr>
+        <tr>
+          <td><strong>历史记录卡</strong></td>
+          <td>课件/出题/测验历史</td>
+          <td>左图标+标题+时间+标签</td>
+          <td>默认</td>
+          <td><span class="tag-mini blue">卡片</span></td>
+        </tr>
+        <tr>
+          <td><strong>模型状态卡</strong></td>
+          <td>AI模型连接状态展示</td>
+          <td>渐变背景+状态点</td>
+          <td>已连接/未连接</td>
+          <td><span class="tag-mini green">反馈</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tab 4: 适配说明 -->
+  <div class="ia-content" data-ia="3">
+    <table class="ia-table">
+      <thead>
+        <tr>
+          <th>适配项</th>
+          <th>说明</th>
+          <th>技术方案</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>屏幕适配</strong></td>
+          <td>支持 iPhone SE ~ iPhone 15 Pro Max，Android 各品牌</td>
+          <td>rpx 响应式单位，flex 布局，max-width 约束</td>
+        </tr>
+        <tr>
+          <td><strong>安全区域</strong></td>
+          <td>底部 TabBar 适配 iOS Home Indicator</td>
+          <td>env(safe-area-inset-bottom)，底部预留 34px</td>
+        </tr>
+        <tr>
+          <td><strong>状态栏</strong></td>
+          <td>适配 iOS 刘海屏 / Android 状态栏</td>
+          <td>navigationStyle: default，系统状态栏自动适配</td>
+        </tr>
+        <tr>
+          <td><strong>深色模式</strong></td>
+          <td>支持系统深色模式切换</td>
+          <td>CSS 变量 + @media (prefers-color-scheme: dark)</td>
+        </tr>
+        <tr>
+          <td><strong>字体大小</strong></td>
+          <td>支持系统字体放大（辅助功能）</td>
+          <td>使用 rem/rpx，避免固定 px</td>
+        </tr>
+        <tr>
+          <td><strong>触控目标</strong></td>
+          <td>所有可点击元素 ≥ 44×44px</td>
+          <td>Wcag AA 标准，间距 ≥ 8px</td>
+        </tr>
+        <tr>
+          <td><strong>网络状态</strong></td>
+          <td>断网/弱网提示与重试</td>
+          <td>onNetworkStatusChange，全局 Toast 提示</td>
+        </tr>
+        <tr>
+          <td><strong>本地存储</strong></td>
+          <td>课件/出题/测验数据本地持久化</td>
+          <td>wx.setStorage / wx.getStorage，按单元分片</td>
+        </tr>
+        <tr>
+          <td><strong>PDF 导出</strong></td>
+          <td>生成 PDF 并保存到手机</td>
+          <td>云函数生成或前端 canvas → wx.saveFile</td>
+        </tr>
+        <tr>
+          <td><strong>下拉刷新</strong></td>
+          <td>首页/列表页支持下拉刷新</td>
+          <td>enablePullDownRefresh: true</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function switchIATab(el, index) {
+  document.querySelectorAll('.ia-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ia-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelector(`[data-ia="${index}"]`).classList.add('active');
+}
+</script>
+
+</body>
+</html>

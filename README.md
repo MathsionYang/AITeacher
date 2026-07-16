@@ -130,6 +130,7 @@ python -m py_compile scripts\local_ocr_paddle.py
 - [AI 课件生成规范](docs/05-ai-courseware-generation-spec.md)
 - [大模型与 Agent 架构设计](docs/06-llm-agent-architecture.md)
 - [教师端与后端数据设计](docs/07-teacher-backend-data-design.md)
+- [微信小程序与云开发方案](docs/08-miniprogram-cloudbase-design.md)
 - [小红书内容运营方案](docs/xiaohongshu-content-plan.md)
 - [小红书发布清单与配图建议](docs/xiaohongshu-posts/发布清单与配图建议.md)
 - [抖音发布清单与素材建议](docs/douyin-posts/发布清单与配图建议.md)
